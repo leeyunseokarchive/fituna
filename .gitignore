@@ -1,5 +1,6 @@
 # FiTuna run artifacts
 *.gguf
+*.gguf.tmp
 out/
 .fituna_cache.sqlite3
 

@@ -34,12 +34,20 @@ def quantize(base_gguf: Path, quant: str, out_dir: Path, binaries: BinaryPaths) 
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / f"{_model_stem(base_gguf)}-{quant}.gguf"
 
-    # Idempotent: a previous run already produced this exact quant. A
-    # zero-byte file means a prior run was killed mid-write; don't trust it.
+    # Idempotent: a previous run already produced this exact quant.
     if out_path.exists() and out_path.stat().st_size > 0:
         return out_path
 
-    cmd = [str(binaries.llama_quantize), str(base_gguf), str(out_path), quant]
+    # Write to a temp path and rename into place only on full success. A
+    # size>0 check alone can't tell a complete GGUF apart from one truncated
+    # by a kill/disk-full/crash mid-write; a POSIX rename is atomic, so
+    # out_path itself can never be observed in a partially-written state --
+    # only tmp_path can, and it's never treated as cached.
+    tmp_path = out_path.with_suffix(out_path.suffix + ".tmp")
+    if tmp_path.exists():
+        tmp_path.unlink()  # stale leftover from an earlier interrupted run
+
+    cmd = [str(binaries.llama_quantize), str(base_gguf), str(tmp_path), quant]
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
     except FileNotFoundError as exc:
@@ -56,15 +64,16 @@ def quantize(base_gguf: Path, quant: str, out_dir: Path, binaries: BinaryPaths) 
             f"failed to launch llama-quantize ({binaries.llama_quantize}): {exc}"
         ) from exc
 
-    if proc.returncode != 0 or not out_path.exists():
-        # Clean up a partial/failed output so a later call doesn't think it's cached.
-        if out_path.exists() and out_path.stat().st_size == 0:
-            out_path.unlink()
+    if proc.returncode != 0 or not tmp_path.exists() or tmp_path.stat().st_size == 0:
+        if tmp_path.exists():
+            tmp_path.unlink()
         raise FiTunaError(
             f"llama-quantize failed for quant={quant!r} (exit code {proc.returncode}).\n"
             f"command: {' '.join(cmd)}\n"
             f"stderr:\n{proc.stderr}"
         )
+
+    tmp_path.rename(out_path)
 
     return out_path
 

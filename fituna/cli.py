@@ -38,14 +38,8 @@ from typing import Optional, Sequence
 
 from fituna import binaries, hardware, model_info, report, search
 from fituna.cache import ResultCache
-from fituna.config import (
-    BinaryNotFoundError,
-    BinaryPaths,
-    FiTunaError,
-    HardwareProfile,
-    NoFeasibleConfigError,
-    TargetSpec,
-)
+from fituna.config import BinaryPaths, HardwareProfile, TargetSpec
+from fituna.errors import BinaryNotFoundError, FiTunaError, NoFeasibleConfigError
 
 logger = logging.getLogger("fituna")
 

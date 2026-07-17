@@ -264,6 +264,13 @@ def search(
         # --- Stage 2: speed search -------------------------------------------
         progress(f"[{quant}] bench full-offload (ngl={model_info.n_layers})")
         top = cached_bench(model_info.n_layers, target.ctx)
+        if hw.gpu_vendor == GPUVendor.NONE:
+            # No GPU: -ngl is a no-op, so the full-offload bench is
+            # functionally identical to ngl=0. Relabel *before* recording it
+            # as a best-effort/final candidate, so a best-effort fallback (or
+            # a later NoFeasibleConfigError.closest) never misreports this
+            # quant's ngl as n_layers.
+            top = _with_ngl(top, 0)
         consider_best_effort(top)
 
         if top.gen_tok_per_sec < target.target_tokens_per_sec:
@@ -278,17 +285,16 @@ def search(
             break
 
         if hw.gpu_vendor == GPUVendor.NONE:
-            # No GPU: -ngl is a no-op, skip ngl search entirely and reuse the
-            # already-measured `top` bench, relabeled to ngl=0.
-            candidate_bench = _with_ngl(top, 0)
+            # No GPU: ngl search doesn't apply, reuse the already-relabeled
+            # `top` bench (ngl=0) directly.
             if verify_other_ctx(0):
-                return build_result(candidate_bench)
+                return build_result(top)
             continue
 
         low = cached_bench(0, target.ctx)
         consider_best_effort(low)
         if low.gen_tok_per_sec >= target.target_tokens_per_sec:
-            progress(f"[{quant}] CPU-only offload already meets target (early-exit C)")
+            progress(f"[{quant}] zero-offload already meets target (early-exit C)")
             if verify_other_ctx(0):
                 return build_result(low)
             continue

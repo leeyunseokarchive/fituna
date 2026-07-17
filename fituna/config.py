@@ -55,6 +55,16 @@ class TargetSpec:
     ngl_max_calls: int = 6  # ngl 이진탐색 상한 호출 수(안전장치)
     max_bench_seconds: Optional[int] = None  # 전체 탐색 시간 예산, 초과 시 best-effort 반환
 
+    def __post_init__(self) -> None:
+        # cli.py always builds ctx_candidates with ctx first, but a library
+        # caller constructing TargetSpec directly could pass a ctx not in
+        # ctx_candidates -- enforce the invariant here rather than only at
+        # one call site, so it holds regardless of who constructs this.
+        if self.ctx not in self.ctx_candidates:
+            raise ValueError(
+                f"ctx={self.ctx} must be one of ctx_candidates={self.ctx_candidates}"
+            )
+
 
 @dataclass(frozen=True)
 class BinaryPaths:
