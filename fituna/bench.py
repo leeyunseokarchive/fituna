@@ -84,18 +84,30 @@ def run_bench(
     timeout_sec: int = 300,
 ) -> BenchResult:
     """Run:
-        llama-bench -m <gguf_path> -ngl <ngl> -c <ctx>
+        llama-bench -m <gguf_path> -ngl <ngl> -d <depth>
                      -p <target.prompt_tokens> -n <target.gen_tokens> -o json
     and parse stdout into a BenchResult.
+
+    Current llama-bench has no direct ``-c``/``--ctx-size`` flag -- it
+    allocates the context each test needs from n_prompt + n_gen + n_depth
+    instead (confirmed against a real build: passing ``-c`` is a hard
+    argument-parse error, not a silently-ignored flag). ``-d``/``--n-depth``
+    (tokens already resident in the KV cache before the timed prompt/gen
+    phase) is what reproduces "generation speed once the context is filled
+    to `ctx` tokens" -- the thing a ``-c <ctx>`` flag used to mean here.
+    ``depth = max(0, ctx - prompt_tokens - gen_tokens)`` fills the cache to
+    (as close as possible to) ``ctx`` tokens by the time the timed
+    generation phase runs.
 
     Raises FiTunaError on timeout, non-zero exit, failure to launch the
     binary, or unparsable/empty output.
     """
+    depth = max(0, ctx - target.prompt_tokens - target.gen_tokens)
     cmd = [
         str(binaries.llama_bench),
         "-m", str(gguf_path),
         "-ngl", str(ngl),
-        "-c", str(ctx),
+        "-d", str(depth),
         "-p", str(target.prompt_tokens),
         "-n", str(target.gen_tokens),
         "-o", "json",
