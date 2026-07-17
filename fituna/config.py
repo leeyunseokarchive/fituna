@@ -125,3 +125,65 @@ class NoFeasibleConfigError(FiTunaError):
     def __init__(self, message: str, closest: Optional["SearchResult"] = None) -> None:
         super().__init__(message)
         self.closest = closest
+
+
+def _self_check() -> None:
+    """Minimal assert-based sanity check for this module's core contract.
+
+    Not a full test suite (see tests/test_config.py for that) -- just a
+    runnable guard against the two ways this file could regress silently:
+    dataclasses becoming mutable, and NoFeasibleConfigError losing its
+    ``closest`` payload.
+    """
+    import dataclasses
+
+    # 1. GPUVendor is a str Enum: compares equal to plain strings, so it
+    #    serializes trivially to JSON via str() / json.dumps(..., default=str).
+    assert GPUVendor.NVIDIA == "nvidia"
+    assert GPUVendor("amd") is GPUVendor.AMD
+
+    # 2. TargetSpec defaults match the frozen interface contract exactly.
+    spec = TargetSpec(model_path=Path("model.gguf"), target_tokens_per_sec=20.0,
+                       max_quality_loss_pct=5.0)
+    assert spec.prompt_tokens == 512 and spec.gen_tokens == 128
+    assert spec.ctx == 4096 and spec.ctx_candidates == (4096,)
+    assert spec.quant_candidates == ("Q8_0", "Q6_K", "Q5_K_M", "Q4_K_M", "Q3_K_M", "Q2_K")
+    assert spec.ngl_max_calls == 6 and spec.max_bench_seconds is None
+
+    # 3. All dataclasses are frozen: mutation must raise, never silently succeed.
+    hw = HardwareProfile(gpu_vendor=GPUVendor.NONE, gpu_name=None, vram_mb=None,
+                          cpu_cores=4, ram_mb=8192, os_name="linux")
+    try:
+        hw.cpu_cores = 8  # type: ignore[misc]
+        raise AssertionError("HardwareProfile must be frozen")
+    except dataclasses.FrozenInstanceError:
+        pass
+
+    cand = CandidateConfig(quant="Q4_K_M", ngl=20, ctx=4096)
+    bench = BenchResult(candidate=cand, prompt_tok_per_sec=100.0, gen_tok_per_sec=30.0,
+                         vram_used_mb=2048, raw_stdout="{}")
+    quality = QualityResult(candidate_quant="Q4_K_M", perplexity=6.1,
+                             baseline_perplexity=6.0, quality_loss_pct=1.67)
+    result = SearchResult(config=cand, bench=bench, quality=quality,
+                           gguf_path=Path("out/model-Q4_K_M.gguf"),
+                           run_command=["llama-cli", "-m", "out/model-Q4_K_M.gguf"],
+                           meets_target=True)
+    try:
+        result.meets_target = False  # type: ignore[misc]
+        raise AssertionError("SearchResult must be frozen")
+    except dataclasses.FrozenInstanceError:
+        pass
+
+    # 4. NoFeasibleConfigError must carry its closest-result payload through.
+    err = NoFeasibleConfigError("no quant met the target", closest=result)
+    assert err.closest is result
+    assert str(err) == "no quant met the target"
+    assert NoFeasibleConfigError("x").closest is None
+
+    # 5. Value equality (dataclasses compare structurally, not by identity).
+    assert CandidateConfig(quant="Q4_K_M", ngl=20, ctx=4096) == cand
+
+
+if __name__ == "__main__":
+    _self_check()
+    print("fituna.config self-check OK")

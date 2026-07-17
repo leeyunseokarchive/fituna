@@ -15,9 +15,10 @@ See `docs/ARCHITECTURE.md` for the module diagram and data flow.
 
 ## Status
 
-Early scaffold. The public interfaces (`fituna/config.py` and the function
-signatures across `fituna/*.py`) are fixed; implementations are being filled
-in. See inline `TODO`s.
+Implemented and integration-tested end-to-end (module self-checks + `pytest`
++ a full `fituna run` pass against stand-in `llama-*` binaries all pass). The
+public interfaces in `fituna/config.py` and the function signatures across
+`fituna/*.py` are the fixed cross-module contract.
 
 ## Requirements
 

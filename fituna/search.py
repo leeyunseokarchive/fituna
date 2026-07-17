@@ -6,41 +6,95 @@ The core orchestrator: quality-first filtering over ``quant_candidates``
 over ``ngl`` (bounded by ``ngl_max_calls``), with early-exit as soon as a
 candidate meets both the target throughput and the quality-loss ceiling.
 
-Algorithm sketch (to be implemented):
-    1. Compute/lookup baseline perplexity on the unquantized base GGUF.
-    2. For each quant in target.quant_candidates (quality-descending order):
-         a. quantize() (idempotent) -> quantized_gguf
-         b. evaluate_quality() (cache-aware) -- if quality_loss_pct exceeds
-            max_quality_loss_pct, skip this quant entirely (it can only get
-            worse at lower quant levels... actually it's evaluated per-quant,
-            independent of ngl/ctx, so this check gates the whole quant tier).
-         c. For each ctx in target.ctx_candidates:
-              - binary search ngl in [0, model_info.n_layers] (<= ngl_max_calls
-                bench calls) to find the minimal ngl meeting target_tokens_per_sec,
-                or the best achievable if none meets it.
-              - run_bench() (cache-aware) at candidate ngl/ctx.
-              - if gen_tok_per_sec >= target_tokens_per_sec: record as a hit,
-                early-exit the whole search (first quality-ranked hit wins).
-    3. If no hit, return the best-effort SearchResult (closest to target)
-       with meets_target=False, or raise NoFeasibleConfigError if nothing at
-       all could be benchmarked (e.g. every quant tier failed quality check).
-    4. Respect target.max_bench_seconds as a wall-clock budget throughout;
-       return best-effort on expiry.
+Algorithm (implemented below, matches the spec's two-stage design):
+
+Stage 1 -- quality pre-filter (one ``llama-perplexity`` call per quant):
+    baseline_ppl is computed once (and cached) on the unquantized base GGUF.
+    Each quant is quantized (idempotent) and its quality_loss_pct measured;
+    quants whose loss exceeds ``max_quality_loss_pct`` are skipped entirely
+    (early-exit A) -- they never reach the benchmarking stage.
+
+Stage 2 -- speed search, walking quants in quality-descending order:
+    - top = bench at ngl=n_layers (max offload). If even that misses the
+      target throughput, this quant can't work at any ngl -- skip to the
+      next, lower-quality (often faster) quant (early-exit B).
+    - if hardware has a GPU, low = bench at ngl=0. If that alone already
+      meets the target, no GPU offload is needed -- adopt it immediately
+      (early-exit C), skipping the binary search entirely.
+    - otherwise binary-search the minimal ngl in [0, n_layers] that meets
+      the target (<= ngl_max_calls calls), assuming gen_tok_per_sec is
+      monotonically non-decreasing in ngl (documented assumption; the worst
+      case if it's violated is simply falling back to the already-known-good
+      `top` result, so this stays safe).
+    - any extra ctx_candidates are re-verified at the winning ngl.
+    - the first quant (in quality order) that produces a working candidate
+      wins immediately -- lower-quality quants are never tried.
+
+If no quant/ngl/ctx combination meets the target, the loop naturally
+exhausts and :class:`~fituna.config.NoFeasibleConfigError` is raised,
+carrying the best (fastest) attempt seen as ``closest`` if any benchmark
+ran at all. If the search is cut short by ``target.max_bench_seconds``
+instead, the best-effort result is returned normally with
+``meets_target=False`` (a time-out is not proof of infeasibility, so it
+does not raise).
 """
 
 from __future__ import annotations
 
+import hashlib
+import time
+from dataclasses import replace
 from pathlib import Path
 from typing import Callable, Optional
 
+from fituna.binaries import list_supported_quant_types
+from fituna.bench import run_bench
+from fituna.cache import ResultCache
 from fituna.config import (
+    BenchResult,
     BinaryPaths,
+    CandidateConfig,
+    GPUVendor,
     HardwareProfile,
     ModelInfo,
+    NoFeasibleConfigError,
+    QualityResult,
     SearchResult,
     TargetSpec,
 )
-from fituna.cache import ResultCache
+from fituna.model_info import model_fingerprint
+from fituna.quality import compute_perplexity, evaluate_quality
+from fituna.quantize import quantize
+from fituna.report import build_run_command
+
+# Sentinel quant key used to cache the base-GGUF baseline perplexity inside
+# quality_cache (which is keyed by (model_fp, quant)). ponytail: cache.py's
+# contract only exposes get_quality/put_quality keyed by quant name, so
+# rather than growing the cache schema for one extra value, the baseline is
+# stashed under a quant name real llama-quantize output can never produce.
+_BASELINE_QUANT_KEY = "__baseline__"
+
+
+def _hardware_fingerprint(hw: HardwareProfile) -> str:
+    """Coarse, deterministic cache-key namespace for a hardware profile.
+
+    Not part of the cross-module contract (cache.py only takes an opaque
+    ``hw_fp`` string) so it stays private to this module.
+    """
+    raw = f"{hw.gpu_vendor.value}|{hw.gpu_name}|{hw.vram_mb}|{hw.cpu_cores}|{hw.ram_mb}|{hw.os_name}"
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _with_ngl(bench: BenchResult, ngl: int) -> BenchResult:
+    """Relabel a BenchResult's candidate.ngl without re-benchmarking.
+
+    Used for CPU-only hardware, where ``-ngl`` is a no-op: the full-offload
+    bench (`top`, run at ngl=n_layers) is functionally identical to ngl=0, so
+    we just relabel it instead of paying for a redundant subprocess call.
+    """
+    if bench.candidate.ngl == ngl:
+        return bench
+    return replace(bench, candidate=replace(bench.candidate, ngl=ngl))
 
 
 def search(
@@ -54,8 +108,393 @@ def search(
     progress_cb: Optional[Callable[[str], None]] = None,
 ) -> SearchResult:
     """Run the quality-first / grid-search / ngl-binary-search algorithm
-    described in the module docstring.
-
-    TODO: implement. Report progress via progress_cb(str) if provided.
+    described in the module docstring. Reports progress via
+    ``progress_cb(str)`` if provided.
     """
-    raise NotImplementedError
+    progress: Callable[[str], None] = progress_cb or (lambda _msg: None)
+
+    start = time.monotonic()
+    deadline = start + target.max_bench_seconds if target.max_bench_seconds else None
+
+    def time_left() -> bool:
+        return deadline is None or time.monotonic() < deadline
+
+    model_fp = model_fingerprint(model_info.base_gguf_path)
+    hw_fp = _hardware_fingerprint(hw)
+
+    # ctx grid: target.ctx is always the primary (recorded) ctx; any other
+    # ctx_candidates are re-verified at the winning ngl but never recorded
+    # as the chosen CandidateConfig.ctx.
+    other_ctxs = [c for c in dict.fromkeys(target.ctx_candidates) if c != target.ctx]
+
+    # Filter quant_candidates down to what this llama-quantize build actually
+    # supports. Introspection failures are non-fatal -- fall back to trusting
+    # the caller's list rather than blocking the whole search on it.
+    try:
+        supported = set(list_supported_quant_types(binaries))
+    except Exception as exc:  # noqa: BLE001 -- best-effort introspection
+        progress(f"could not determine supported quant types ({exc}); "
+                  "proceeding without filtering")
+        supported = None
+
+    quant_order = [q for q in target.quant_candidates if supported is None or q in supported]
+    if not quant_order:
+        raise NoFeasibleConfigError(
+            "none of the requested quant candidates "
+            f"{target.quant_candidates} are supported by this llama-quantize "
+            f"build (supported: {sorted(supported) if supported else 'unknown'})"
+        )
+
+    # Baseline perplexity: one call, cached across runs via the sentinel key.
+    baseline_ppl: Optional[float] = None
+    if cache is not None:
+        cached_baseline = cache.get_quality(model_fp, _BASELINE_QUANT_KEY)
+        if cached_baseline is not None:
+            baseline_ppl = cached_baseline.perplexity
+    if baseline_ppl is None:
+        progress("computing baseline perplexity on base GGUF")
+        baseline_ppl = compute_perplexity(model_info.base_gguf_path, wikitext_path, binaries)
+        if cache is not None:
+            cache.put_quality(
+                model_fp,
+                QualityResult(
+                    candidate_quant=_BASELINE_QUANT_KEY,
+                    perplexity=baseline_ppl,
+                    baseline_perplexity=baseline_ppl,
+                    quality_loss_pct=0.0,
+                ),
+            )
+
+    best_effort: Optional[SearchResult] = None
+    best_effort_speed = float("-inf")
+    timed_out = False
+
+    for quant in quant_order:
+        if not time_left():
+            timed_out = True
+            break
+
+        progress(f"[{quant}] quantizing")
+        cand_gguf = quantize(model_info.base_gguf_path, quant, work_dir, binaries)
+
+        # --- Stage 1: quality gate (early-exit A) ---------------------------
+        quality_res = cache.get_quality(model_fp, quant) if cache is not None else None
+        if quality_res is None:
+            progress(f"[{quant}] evaluating quality")
+            quality_res = evaluate_quality(quant, cand_gguf, baseline_ppl, wikitext_path, binaries)
+            if cache is not None:
+                cache.put_quality(model_fp, quality_res)
+
+        if quality_res.quality_loss_pct > target.max_quality_loss_pct:
+            progress(
+                f"[{quant}] quality loss {quality_res.quality_loss_pct:.2f}% > "
+                f"{target.max_quality_loss_pct:.2f}% cap, skipping (early-exit A)"
+            )
+            continue
+
+        if not time_left():
+            timed_out = True
+            break
+
+        # --- helpers closed over this iteration's quant/gguf/quality --------
+        def cached_bench(ngl: int, ctx: int) -> BenchResult:
+            cand = CandidateConfig(quant=quant, ngl=ngl, ctx=ctx)
+            if cache is not None:
+                hit = cache.get_bench(model_fp, hw_fp, cand)
+                if hit is not None:
+                    return hit
+            res = run_bench(cand_gguf, ngl, ctx, target, binaries)
+            if cache is not None:
+                cache.put_bench(model_fp, hw_fp, res)
+            return res
+
+        def consider_best_effort(bench: BenchResult) -> None:
+            nonlocal best_effort, best_effort_speed
+            if bench.gen_tok_per_sec > best_effort_speed:
+                best_effort_speed = bench.gen_tok_per_sec
+                best_effort = SearchResult(
+                    config=bench.candidate,
+                    bench=bench,
+                    quality=quality_res,
+                    gguf_path=cand_gguf,
+                    run_command=build_run_command(cand_gguf, bench.candidate, binaries),
+                    meets_target=False,
+                )
+
+        def build_result(bench: BenchResult) -> SearchResult:
+            return SearchResult(
+                config=bench.candidate,
+                bench=bench,
+                quality=quality_res,
+                gguf_path=cand_gguf,
+                run_command=build_run_command(cand_gguf, bench.candidate, binaries),
+                meets_target=True,
+            )
+
+        def verify_other_ctx(ngl: int) -> bool:
+            nonlocal timed_out
+            for ctx_val in other_ctxs:
+                if not time_left():
+                    timed_out = True
+                    return False
+                r = cached_bench(ngl, ctx_val)
+                consider_best_effort(r)
+                if r.gen_tok_per_sec < target.target_tokens_per_sec:
+                    progress(
+                        f"[{quant}] ngl={ngl} meets target at ctx={target.ctx} "
+                        f"but fails at ctx={ctx_val}"
+                    )
+                    return False
+            return True
+
+        # --- Stage 2: speed search -------------------------------------------
+        progress(f"[{quant}] bench full-offload (ngl={model_info.n_layers})")
+        top = cached_bench(model_info.n_layers, target.ctx)
+        consider_best_effort(top)
+
+        if top.gen_tok_per_sec < target.target_tokens_per_sec:
+            progress(
+                f"[{quant}] full-offload {top.gen_tok_per_sec:.2f} tok/s < "
+                f"target {target.target_tokens_per_sec:.2f}, skipping (early-exit B)"
+            )
+            continue
+
+        if not time_left():
+            timed_out = True
+            break
+
+        if hw.gpu_vendor == GPUVendor.NONE:
+            # No GPU: -ngl is a no-op, skip ngl search entirely and reuse the
+            # already-measured `top` bench, relabeled to ngl=0.
+            candidate_bench = _with_ngl(top, 0)
+            if verify_other_ctx(0):
+                return build_result(candidate_bench)
+            continue
+
+        low = cached_bench(0, target.ctx)
+        consider_best_effort(low)
+        if low.gen_tok_per_sec >= target.target_tokens_per_sec:
+            progress(f"[{quant}] CPU-only offload already meets target (early-exit C)")
+            if verify_other_ctx(0):
+                return build_result(low)
+            continue
+
+        if not time_left():
+            timed_out = True
+            break
+
+        # Binary search the minimal ngl in [0, n_layers] meeting the target.
+        lo, hi = 0, model_info.n_layers
+        best = top  # already known to satisfy the target
+        calls = 0
+        while lo < hi and calls < target.ngl_max_calls and time_left():
+            mid = (lo + hi) // 2
+            r = cached_bench(mid, target.ctx)
+            consider_best_effort(r)
+            calls += 1
+            if r.gen_tok_per_sec >= target.target_tokens_per_sec:
+                best = r
+                hi = mid
+            else:
+                lo = mid + 1
+        if not time_left():
+            timed_out = True
+
+        if verify_other_ctx(best.candidate.ngl):
+            progress(f"[{quant}] found ngl={best.candidate.ngl} meeting target -- done")
+            return build_result(best)
+
+        if timed_out:
+            break
+
+    if timed_out:
+        # A time-out is not proof that no config is feasible -- return the
+        # best-effort result (or, if nothing was ever benched, raise).
+        if best_effort is not None:
+            progress("time budget exceeded; returning best-effort result")
+            return best_effort
+        raise NoFeasibleConfigError(
+            "time budget exceeded before any candidate could be benchmarked"
+        )
+
+    # The quant sweep ran to exhaustion without a single hit: no config
+    # actually meets the target, so this is a genuine infeasibility, not a
+    # best-effort situation. Raise, but attach the fastest attempt seen (if
+    # any) as `closest` so the caller can still inspect it.
+    progress("no candidate met target after exhausting all quant candidates")
+    raise NoFeasibleConfigError(
+        "no quant/ngl/ctx combination met target_tokens_per_sec within "
+        "max_quality_loss_pct",
+        closest=best_effort,
+    )
+
+
+# ---------------------------------------------------------------------------
+# self-check (run: python -m fituna.search)
+# ---------------------------------------------------------------------------
+
+
+def _self_check() -> None:
+    """Assert-based sanity check exercising the early-exit / binary-search /
+    grid-search logic with fake quantize/run_bench/quality/etc., no real
+    llama.cpp binaries required.
+
+    Monkeypatches this module's own imported names directly (plain global
+    reassignment, restored in `finally`) rather than pulling in
+    unittest.mock/pytest -- keeps this runnable as a plain script.
+    """
+    import sys
+
+    # ponytail: `import fituna.search as _mod` would re-import a *second*,
+    # freshly-loaded module object when this file is run as `__main__`
+    # (python -m fituna.search runs it under the name "__main__", separate
+    # from any "fituna.search" entry in sys.modules) -- patches on that
+    # second copy would never be seen by the `search()` actually running
+    # here. sys.modules[__name__] always resolves to *this* running module,
+    # whatever name it was loaded under.
+    _mod = sys.modules[__name__]
+
+    binaries_stub = BinaryPaths(
+        llama_quantize=Path("llama-quantize"),
+        llama_bench=Path("llama-bench"),
+        llama_perplexity=Path("llama-perplexity"),
+    )
+    model_info_stub = ModelInfo(
+        architecture="llama", n_layers=32, n_params=7_000_000_000,
+        base_gguf_path=Path("base-f16.gguf"),
+    )
+    work_dir = Path(".")
+    wikitext = Path("wiki.test.raw")
+
+    quality_map = {"Q8_0": 1.0, "Q6_K": 3.0, "Q4_K_M": 10.0}
+
+    def fake_quantize(base_gguf, quant, out_dir, binaries):
+        return Path(out_dir) / f"model-{quant}.gguf"
+
+    def fake_compute_perplexity(gguf_path, wikitext_path, binaries, chunks=None):
+        return 6.0
+
+    def fake_evaluate_quality(quant, quantized_gguf, baseline_ppl, wikitext_path, binaries):
+        loss = quality_map[quant]
+        return QualityResult(
+            candidate_quant=quant, perplexity=baseline_ppl * (1 + loss / 100),
+            baseline_perplexity=baseline_ppl, quality_loss_pct=loss,
+        )
+
+    def fake_list_supported_quant_types(binaries):
+        return ["Q8_0", "Q6_K", "Q4_K_M"]
+
+    def fake_build_run_command(gguf_path, config, binaries):
+        return ["llama-cli", "-m", str(gguf_path), "-ngl", str(config.ngl), "-c", str(config.ctx)]
+
+    def fake_model_fingerprint(path):
+        return "fake-fp"
+
+    bench_calls = {"n": 0}
+
+    def make_fake_run_bench(speed_fn):
+        def fake_run_bench(gguf_path, ngl, ctx, target, binaries, timeout_sec=300):
+            bench_calls["n"] += 1
+            quant = gguf_path.stem.split("-", 1)[1]
+            speed = speed_fn(ngl, ctx)
+            return BenchResult(
+                candidate=CandidateConfig(quant=quant, ngl=ngl, ctx=ctx),
+                prompt_tok_per_sec=speed * 2, gen_tok_per_sec=speed,
+                vram_used_mb=None, raw_stdout="fake",
+            )
+        return fake_run_bench
+
+    saved = (
+        _mod.quantize, _mod.run_bench, _mod.evaluate_quality, _mod.compute_perplexity,
+        _mod.list_supported_quant_types, _mod.build_run_command, _mod.model_fingerprint,
+    )
+    try:
+        _mod.quantize = fake_quantize
+        _mod.compute_perplexity = fake_compute_perplexity
+        _mod.evaluate_quality = fake_evaluate_quality
+        _mod.list_supported_quant_types = fake_list_supported_quant_types
+        _mod.build_run_command = fake_build_run_command
+        _mod.model_fingerprint = fake_model_fingerprint
+
+        # --- 1. Early-exit hit: speed(ngl) = ngl, target=20 -> minimal ngl=20,
+        #        highest-quality passing quant (Q8_0) wins, GPU binary search path.
+        _mod.run_bench = make_fake_run_bench(lambda ngl, ctx: float(ngl))
+        hw_gpu = HardwareProfile(gpu_vendor=GPUVendor.NVIDIA, gpu_name="RTX4090",
+                                  vram_mb=24000, cpu_cores=16, ram_mb=65536, os_name="linux")
+        target = TargetSpec(
+            model_path=Path("model.gguf"), target_tokens_per_sec=20.0,
+            max_quality_loss_pct=5.0, ctx=4096, ctx_candidates=(4096,),
+            quant_candidates=("Q8_0", "Q6_K", "Q4_K_M"), ngl_max_calls=6,
+        )
+        bench_calls["n"] = 0
+        result = search(target, model_info_stub, hw_gpu, binaries_stub, work_dir, wikitext)
+        assert result.meets_target is True
+        assert result.config.quant == "Q8_0", result.config.quant  # highest quality, first tried
+        assert result.config.ngl == 20, result.config.ngl  # minimal ngl meeting target
+        assert result.bench.gen_tok_per_sec >= 20.0
+        assert bench_calls["n"] <= 2 + target.ngl_max_calls  # top + low + <=6 binary-search calls
+
+        # --- 2. Quality gate skip (early-exit A): tighten max_quality_loss_pct
+        #        so Q8_0/Q6_K fail quality (1.0%/3.0% > 0.5%) and are never
+        #        benchmarked; only Q4_K_M (10% loss, also > 0.5%) remains, so
+        #        it too is skipped without a single bench call -> NoFeasibleConfigError
+        #        with closest=None (nothing was ever benchmarked).
+        strict_target = replace(target, max_quality_loss_pct=0.5)
+        bench_calls["n"] = 0
+        try:
+            search(strict_target, model_info_stub, hw_gpu, binaries_stub, work_dir, wikitext)
+            raise AssertionError("expected NoFeasibleConfigError")
+        except NoFeasibleConfigError as e:
+            assert e.closest is None
+        assert bench_calls["n"] == 0  # quality gate blocked every quant before any bench
+
+        # --- 3. CPU-only hardware: ngl search skipped, top bench reused at ngl=0. ---
+        hw_cpu = HardwareProfile(gpu_vendor=GPUVendor.NONE, gpu_name=None, vram_mb=None,
+                                  cpu_cores=8, ram_mb=32768, os_name="linux")
+        _mod.run_bench = make_fake_run_bench(lambda ngl, ctx: 50.0)  # flat, always meets target
+        bench_calls["n"] = 0
+        result_cpu = search(target, model_info_stub, hw_cpu, binaries_stub, work_dir, wikitext)
+        assert result_cpu.meets_target is True
+        assert result_cpu.config.ngl == 0
+        assert result_cpu.config.quant == "Q8_0"
+        assert bench_calls["n"] == 1  # only the full-offload bench, relabeled -- no extra call
+
+        # --- 4. Full failure: every quant's full-offload speed is below target
+        #        -> early-exit B for all, loop exhausts -> NoFeasibleConfigError
+        #        with closest = the fastest attempt actually seen.
+        _mod.run_bench = make_fake_run_bench(lambda ngl, ctx: 5.0)  # always too slow
+        try:
+            search(target, model_info_stub, hw_gpu, binaries_stub, work_dir, wikitext)
+            raise AssertionError("expected NoFeasibleConfigError")
+        except NoFeasibleConfigError as e:
+            assert e.closest is not None
+            assert e.closest.meets_target is False
+            assert e.closest.bench.gen_tok_per_sec == 5.0
+
+        # --- 5. Multi-ctx verification: candidate meets target at ctx=4096 but
+        #        not at ctx=8192 -> that quant is rejected, falls through to a
+        #        lower-quality quant that meets target at both ctx values.
+        multi_ctx_target = replace(target, ctx_candidates=(4096, 8192))
+
+        def speed_multi_ctx(ngl, ctx):
+            if ctx == 8192:
+                return 0.0  # Q8_0/Q6_K/Q4_K_M all "fail" at the larger ctx here
+            return float(ngl)
+
+        _mod.run_bench = make_fake_run_bench(speed_multi_ctx)
+        try:
+            search(multi_ctx_target, model_info_stub, hw_gpu, binaries_stub, work_dir, wikitext)
+            raise AssertionError("expected NoFeasibleConfigError (no quant survives ctx=8192)")
+        except NoFeasibleConfigError as e:
+            assert e.closest is not None  # best attempt at ctx=4096 was still recorded
+    finally:
+        (
+            _mod.quantize, _mod.run_bench, _mod.evaluate_quality, _mod.compute_perplexity,
+            _mod.list_supported_quant_types, _mod.build_run_command, _mod.model_fingerprint,
+        ) = saved
+
+    print("fituna.search self-check OK")
+
+
+if __name__ == "__main__":
+    _self_check()
