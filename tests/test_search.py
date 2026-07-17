@@ -107,7 +107,7 @@ def test_search_early_exits_on_first_hit(monkeypatch, tmp_path):
     # Every candidate clears the quality gate; Q8_0 is the best (lowest loss).
     _QUALITY_LOSS = {"Q8_0": 1.0, "Q4_K_M": 2.0, "Q2_K": 3.0}
 
-    def fake_evaluate_quality(quant, quantized_gguf, baseline_ppl, wikitext_path, binaries):
+    def fake_evaluate_quality(quant, quantized_gguf, baseline_ppl, wikitext_path, binaries, chunks=None):
         return QualityResult(
             candidate_quant=quant, perplexity=baseline_ppl * (1 + _QUALITY_LOSS[quant] / 100),
             baseline_perplexity=baseline_ppl, quality_loss_pct=_QUALITY_LOSS[quant],
@@ -186,7 +186,7 @@ def test_search_raises_with_closest_when_no_candidate_meets_target(monkeypatch, 
     def fake_compute_perplexity(gguf_path, wikitext_path, binaries, chunks=None):
         return 6.0
 
-    def fake_evaluate_quality(quant, quantized_gguf, baseline_ppl, wikitext_path, binaries):
+    def fake_evaluate_quality(quant, quantized_gguf, baseline_ppl, wikitext_path, binaries, chunks=None):
         return QualityResult(candidate_quant=quant, perplexity=baseline_ppl * 1.02,
                               baseline_perplexity=baseline_ppl, quality_loss_pct=2.0)
 
@@ -248,7 +248,7 @@ def test_search_skips_binary_search_when_cpu_only_already_meets_target(monkeypat
     def fake_compute_perplexity(gguf_path, wikitext_path, binaries, chunks=None):
         return 6.0
 
-    def fake_evaluate_quality(quant, quantized_gguf, baseline_ppl, wikitext_path, binaries):
+    def fake_evaluate_quality(quant, quantized_gguf, baseline_ppl, wikitext_path, binaries, chunks=None):
         return QualityResult(candidate_quant=quant, perplexity=baseline_ppl * 1.02,
                               baseline_perplexity=baseline_ppl, quality_loss_pct=2.0)
 
@@ -298,7 +298,7 @@ def test_search_raises_when_every_quant_fails_the_quality_gate(monkeypatch, tmp_
     def fake_compute_perplexity(gguf_path, wikitext_path, binaries, chunks=None):
         return 6.0
 
-    def fake_evaluate_quality(quant, quantized_gguf, baseline_ppl, wikitext_path, binaries):
+    def fake_evaluate_quality(quant, quantized_gguf, baseline_ppl, wikitext_path, binaries, chunks=None):
         # Every tier blows well past the 1.0% ceiling.
         return QualityResult(candidate_quant=quant, perplexity=baseline_ppl * 1.10,
                               baseline_perplexity=baseline_ppl, quality_loss_pct=10.0)
@@ -351,7 +351,7 @@ def test_search_returns_best_effort_on_time_budget_timeout(monkeypatch, tmp_path
     def fake_compute_perplexity(gguf_path, wikitext_path, binaries, chunks=None):
         return 6.0
 
-    def fake_evaluate_quality(quant, quantized_gguf, baseline_ppl, wikitext_path, binaries):
+    def fake_evaluate_quality(quant, quantized_gguf, baseline_ppl, wikitext_path, binaries, chunks=None):
         return QualityResult(candidate_quant=quant, perplexity=baseline_ppl * 1.02,
                               baseline_perplexity=baseline_ppl, quality_loss_pct=2.0)
 

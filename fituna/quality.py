@@ -107,11 +107,12 @@ def evaluate_quality(
     baseline_ppl: float,
     wikitext_path: Path,
     binaries: BinaryPaths,
+    chunks: Optional[int] = None,
 ) -> QualityResult:
     """compute_perplexity(quantized_gguf, ...) then derive quality_loss_pct =
     (ppl - baseline_ppl) / baseline_ppl * 100.
     """
-    ppl = compute_perplexity(quantized_gguf, wikitext_path, binaries)
+    ppl = compute_perplexity(quantized_gguf, wikitext_path, binaries, chunks)
     loss_pct = (ppl - baseline_ppl) / baseline_ppl * 100.0
     return QualityResult(
         candidate_quant=quant,

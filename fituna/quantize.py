@@ -6,6 +6,7 @@ Thin, idempotent wrapper around the ``llama-quantize`` subprocess.
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -54,9 +55,17 @@ def quantize(base_gguf: Path, quant: str, out_dir: Path, binaries: BinaryPaths, 
     # by a kill/disk-full/crash mid-write; a POSIX rename is atomic, so
     # out_path itself can never be observed in a partially-written state --
     # only tmp_path can, and it's never treated as cached.
-    tmp_path = out_path.with_suffix(out_path.suffix + ".tmp")
-    if tmp_path.exists():
-        tmp_path.unlink()  # stale leftover from an earlier interrupted run
+    #
+    # The PID suffix matters: two fituna processes racing on the same
+    # --out dir for the same model+quant (e.g. run twice by accident, or a
+    # CI matrix sharing a cache dir) would otherwise both write to the
+    # exact same tmp_path concurrently and corrupt each other's output.
+    tmp_path = out_path.with_suffix(out_path.suffix + f".tmp.{os.getpid()}")
+    # Clean up stale tmp files for *this* out_path from any previous PID
+    # (a crashed earlier run) -- not just our own, since our own tmp name
+    # is now unique and was never used before this call.
+    for stale in out_dir.glob(f"{out_path.name}.tmp.*"):
+        stale.unlink()
 
     cmd = [str(binaries.llama_quantize), str(base_gguf), str(tmp_path), quant]
     try:

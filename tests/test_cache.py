@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from fituna.cache import ResultCache
-from fituna.config import BenchResult, CandidateConfig, QualityResult
+from fituna.config import BenchResult, CandidateConfig, FiTunaError, QualityResult
 
 
 def _bench(cand: CandidateConfig, gen_tps: float = 25.0) -> BenchResult:
@@ -276,6 +276,16 @@ def test_schema_has_expected_tables(cache: ResultCache):
         ).fetchall()
     }
     assert {"bench_cache", "quality_cache"}.issubset(tables)
+
+
+def test_corrupt_db_file_raises_fitunaerror(tmp_path: Path):
+    """A non-sqlite file at db_path (corrupt from an interrupted write, or
+    an unrelated file happening to sit at this path) must surface as a
+    FiTunaError with recovery guidance, not a bare sqlite3.DatabaseError."""
+    db_path = tmp_path / "corrupt.sqlite3"
+    db_path.write_bytes(b"not a real sqlite file, just garbage bytes")
+    with pytest.raises(FiTunaError, match=str(db_path)):
+        ResultCache(db_path)
 
 
 def test_close_then_reuse_raises(tmp_path: Path):

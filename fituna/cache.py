@@ -11,9 +11,19 @@ Schema::
                 prompt_tps, gen_tps, vram_mb, raw_stdout, created_at,
                 PRIMARY KEY(model_fp, hw_fp, quant, ngl, ctx))
 
-    quality_cache(model_fp, quant, perplexity, baseline_perplexity, loss_pct,
-                  created_at,
-                  PRIMARY KEY(model_fp, quant))
+    quality_cache(model_fp, quant, ppl_chunks,
+                  perplexity, baseline_perplexity, loss_pct, created_at,
+                  PRIMARY KEY(model_fp, quant, ppl_chunks))
+
+``ppl_chunks`` is part of the quality_cache key, not just an input to the
+perplexity computation: a cached result computed over 32 chunks is not the
+same measurement as one over the full corpus, and must not be silently
+served as a --resume cache hit for a differently-scoped request. ``None``
+(no chunk limit) is stored as the sentinel ``-1`` -- SQLite does allow NULL
+inside a composite PRIMARY KEY, but NULLs are never considered equal to each
+other for uniqueness, so "INSERT OR REPLACE" with a raw NULL key component
+would accumulate a new row on every write instead of overwriting the
+previous one.
 """
 
 from __future__ import annotations
@@ -23,7 +33,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from fituna.config import BenchResult, CandidateConfig, QualityResult
+from fituna.config import BenchResult, CandidateConfig, FiTunaError, QualityResult
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS bench_cache (
@@ -43,13 +53,22 @@ CREATE TABLE IF NOT EXISTS bench_cache (
 CREATE TABLE IF NOT EXISTS quality_cache (
     model_fp TEXT NOT NULL,
     quant TEXT NOT NULL,
+    ppl_chunks INTEGER NOT NULL,
     perplexity REAL NOT NULL,
     baseline_perplexity REAL NOT NULL,
     loss_pct REAL NOT NULL,
     created_at TEXT NOT NULL,
-    PRIMARY KEY (model_fp, quant)
+    PRIMARY KEY (model_fp, quant, ppl_chunks)
 );
 """
+
+# Sentinel stored in quality_cache.ppl_chunks for "no chunk limit" (Python
+# None) -- see the module docstring for why None itself can't be the key.
+_UNLIMITED_CHUNKS = -1
+
+
+def _chunks_key(chunks: Optional[int]) -> int:
+    return _UNLIMITED_CHUNKS if chunks is None else chunks
 
 
 def _now() -> str:
@@ -68,8 +87,24 @@ class ResultCache:
         # not a server; check_same_thread=False costs nothing since search()
         # runs sequentially anyway.
         self._conn = sqlite3.connect(str(db_path), check_same_thread=False)
-        self._conn.executescript(_SCHEMA)
-        self._conn.commit()
+        try:
+            self._conn.executescript(_SCHEMA)
+            self._conn.commit()
+        except sqlite3.DatabaseError as exc:
+            # sqlite3.connect() never touches the file -- the first real
+            # operation does, and that's where "file is not a database"
+            # (corrupt file, disk-full mid-write, or some unrelated file
+            # sitting at this path) actually surfaces. Reproduced directly:
+            # a garbage-bytes file at db_path raises this exact exception
+            # here. Without this, --resume would crash with a bare sqlite3
+            # traceback instead of telling the user what to do about it.
+            self._conn.close()
+            raise FiTunaError(
+                f"cache file {db_path} is not a valid sqlite3 database ({exc}). "
+                "It may be corrupt from an interrupted write, or an unrelated "
+                "file happens to sit at this path -- delete it and re-run "
+                "(the cache will be rebuilt from scratch)."
+            ) from exc
 
     def close(self) -> None:
         self._conn.close()
@@ -116,11 +151,13 @@ class ResultCache:
         )
         self._conn.commit()
 
-    def get_quality(self, model_fp: str, quant: str) -> Optional[QualityResult]:
+    def get_quality(
+        self, model_fp: str, quant: str, ppl_chunks: Optional[int] = None
+    ) -> Optional[QualityResult]:
         row = self._conn.execute(
             """SELECT perplexity, baseline_perplexity, loss_pct
-               FROM quality_cache WHERE model_fp=? AND quant=?""",
-            (model_fp, quant),
+               FROM quality_cache WHERE model_fp=? AND quant=? AND ppl_chunks=?""",
+            (model_fp, quant, _chunks_key(ppl_chunks)),
         ).fetchone()
         if row is None:
             return None
@@ -132,14 +169,17 @@ class ResultCache:
             quality_loss_pct=loss_pct,
         )
 
-    def put_quality(self, model_fp: str, result: QualityResult) -> None:
+    def put_quality(
+        self, model_fp: str, result: QualityResult, ppl_chunks: Optional[int] = None
+    ) -> None:
         self._conn.execute(
             """INSERT OR REPLACE INTO quality_cache
-               (model_fp, quant, perplexity, baseline_perplexity, loss_pct, created_at)
-               VALUES (?, ?, ?, ?, ?, ?)""",
+               (model_fp, quant, ppl_chunks, perplexity, baseline_perplexity, loss_pct, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
             (
                 model_fp,
                 result.candidate_quant,
+                _chunks_key(ppl_chunks),
                 result.perplexity,
                 result.baseline_perplexity,
                 result.quality_loss_pct,
@@ -209,6 +249,20 @@ def _self_check() -> None:
         assert cache.get_quality("model-fp", "Q4_K_M") == quality
         assert cache.get_quality("model-fp", "Q8_0") is None
 
+        # 5b. ppl_chunks is part of the key: a result cached at the default
+        # (None == unlimited) must NOT be served for a request scoped to a
+        # different chunk count -- and vice versa -- even though it uses the
+        # exact same put_quality/get_quality call with a different keyword.
+        assert cache.get_quality("model-fp", "Q4_K_M", ppl_chunks=32) is None
+        quality_32 = QualityResult(
+            candidate_quant="Q4_K_M", perplexity=6.2,
+            baseline_perplexity=6.0, quality_loss_pct=3.33,
+        )
+        cache.put_quality("model-fp", quality_32, ppl_chunks=32)
+        assert cache.get_quality("model-fp", "Q4_K_M", ppl_chunks=32) == quality_32
+        assert cache.get_quality("model-fp", "Q4_K_M") == quality  # unlimited entry untouched
+        assert cache.get_quality("model-fp", "Q4_K_M", ppl_chunks=64) is None
+
         cache.close()
 
         # 6. --resume scenario: reopening the same db_path must see prior data.
@@ -216,6 +270,17 @@ def _self_check() -> None:
         assert reopened.get_bench("model-fp", "hw-fp", cand).gen_tok_per_sec == 30.0
         assert reopened.get_quality("model-fp", "Q4_K_M") == quality
         reopened.close()
+
+        # 7. A corrupt/non-sqlite file at db_path must raise a FiTunaError
+        #    with recovery guidance, not a bare sqlite3.DatabaseError.
+        corrupt_path = Path(tmp) / "corrupt.sqlite3"
+        corrupt_path.write_bytes(b"not a real sqlite file, just garbage bytes")
+        try:
+            ResultCache(corrupt_path)
+            raise AssertionError("expected FiTunaError for a corrupt cache file")
+        except FiTunaError as exc:
+            assert not isinstance(exc, AssertionError)
+            assert str(corrupt_path) in str(exc)
 
 
 if __name__ == "__main__":

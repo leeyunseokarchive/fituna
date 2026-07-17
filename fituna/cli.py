@@ -73,6 +73,21 @@ def _build_parser() -> argparse.ArgumentParser:
     run.add_argument("--vram-mb", type=int, default=None, dest="vram_mb")
     run.add_argument("--llama-bin-dir", default=None, dest="llama_bin_dir")
     run.add_argument("--wikitext", required=True, help="path to wikitext corpus")
+    run.add_argument(
+        "--ppl-chunks",
+        type=int,
+        default=32,
+        dest="ppl_chunks",
+        help=(
+            "limit llama-perplexity to this many chunks per quant (default: 32; "
+            "0 or negative = full corpus, unlimited). Quality loss is a "
+            "statistical estimate, not an exact figure -- a full wikitext-2 "
+            "test-set pass per quant candidate can take hours on a multi-GB "
+            "model, so the default trades some precision for a search that "
+            "finishes in minutes. Pass a larger value or 0 for a more rigorous "
+            "(slower) estimate."
+        ),
+    )
     run.add_argument("--out", default="./out", help="working/output directory")
     run.add_argument("--json", action="store_true", help="emit JSON report to stdout")
     run.add_argument(
@@ -89,19 +104,31 @@ def _build_parser() -> argparse.ArgumentParser:
 
 def _parse_ctx_candidates(raw: str) -> tuple[int, ...]:
     """Comma-separated ints -> de-duplicated tuple, order preserved (first
-    entry becomes TargetSpec.ctx)."""
+    entry becomes TargetSpec.ctx).
+
+    Raises FiTunaError (not a bare ValueError) on a non-integer entry, so a
+    typo here gets `main()`'s clean "log + exit 1" FiTunaError handling
+    instead of falling through to the generic-Exception branch, which dumps
+    a full Python traceback for what's just a malformed CLI argument.
+    """
     seen: set[int] = set()
     ordered: list[int] = []
     for part in raw.split(","):
         part = part.strip()
         if not part:
             continue
-        value = int(part)
+        try:
+            value = int(part)
+        except ValueError as exc:
+            raise FiTunaError(
+                f"--ctx: {part!r} is not an integer (expected comma-separated "
+                "context lengths, e.g. --ctx 4096 or --ctx 4096,8192)"
+            ) from exc
         if value not in seen:
             seen.add(value)
             ordered.append(value)
     if not ordered:
-        raise ValueError("--ctx must contain at least one context length")
+        raise FiTunaError("--ctx must contain at least one context length")
     return tuple(ordered)
 
 
@@ -182,6 +209,9 @@ def _cmd_run(args: argparse.Namespace) -> int:
         ctx=ctx_candidates[0],
         ctx_candidates=ctx_candidates,
         quant_candidates=quant_candidates,
+        # --ppl-chunks 0 (or negative) means "full corpus" -> None, matching
+        # compute_perplexity's own "no limit" sentinel.
+        ppl_chunks=args.ppl_chunks if args.ppl_chunks > 0 else None,
     )
 
     cache = ResultCache(work_dir / ".fituna_cache.sqlite3") if args.resume else None
@@ -299,10 +329,19 @@ def _selfcheck() -> None:
 
     try:
         _parse_ctx_candidates("")
-    except ValueError:
+    except FiTunaError:
         pass
     else:  # pragma: no cover
-        raise AssertionError("expected ValueError for empty --ctx")
+        raise AssertionError("expected FiTunaError for empty --ctx")
+
+    # A non-integer entry must also raise FiTunaError (clean "log + exit 1"),
+    # not a bare ValueError that falls through to a raw traceback dump.
+    try:
+        _parse_ctx_candidates("4096,not-a-number")
+    except FiTunaError as exc:
+        assert "not-a-number" in str(exc)
+    else:  # pragma: no cover
+        raise AssertionError("expected FiTunaError for a non-integer --ctx entry")
 
     print("fituna.cli self-check OK")
 

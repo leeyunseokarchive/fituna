@@ -166,12 +166,14 @@ def search(
     # Baseline perplexity: one call, cached across runs via the sentinel key.
     baseline_ppl: Optional[float] = None
     if cache is not None:
-        cached_baseline = cache.get_quality(model_fp, _BASELINE_QUANT_KEY)
+        cached_baseline = cache.get_quality(model_fp, _BASELINE_QUANT_KEY, target.ppl_chunks)
         if cached_baseline is not None:
             baseline_ppl = cached_baseline.perplexity
     if baseline_ppl is None:
         progress("computing baseline perplexity on base GGUF")
-        baseline_ppl = compute_perplexity(model_info.base_gguf_path, wikitext_path, binaries)
+        baseline_ppl = compute_perplexity(
+            model_info.base_gguf_path, wikitext_path, binaries, target.ppl_chunks
+        )
         if cache is not None:
             cache.put_quality(
                 model_fp,
@@ -181,6 +183,7 @@ def search(
                     baseline_perplexity=baseline_ppl,
                     quality_loss_pct=0.0,
                 ),
+                target.ppl_chunks,
             )
 
     best_effort: Optional[SearchResult] = None
@@ -202,12 +205,16 @@ def search(
         progress(f"[{quant}] quantizing")
         cand_gguf = quantize(model_info.base_gguf_path, quant, work_dir, binaries, model_fp)
 
-        quality_res = cache.get_quality(model_fp, quant) if cache is not None else None
+        quality_res = (
+            cache.get_quality(model_fp, quant, target.ppl_chunks) if cache is not None else None
+        )
         if quality_res is None:
             progress(f"[{quant}] evaluating quality")
-            quality_res = evaluate_quality(quant, cand_gguf, baseline_ppl, wikitext_path, binaries)
+            quality_res = evaluate_quality(
+                quant, cand_gguf, baseline_ppl, wikitext_path, binaries, target.ppl_chunks
+            )
             if cache is not None:
-                cache.put_quality(model_fp, quality_res)
+                cache.put_quality(model_fp, quality_res, target.ppl_chunks)
 
         if quality_res.quality_loss_pct > target.max_quality_loss_pct:
             progress(
@@ -412,7 +419,7 @@ def _self_check() -> None:
     def fake_compute_perplexity(gguf_path, wikitext_path, binaries, chunks=None):
         return 6.0
 
-    def fake_evaluate_quality(quant, quantized_gguf, baseline_ppl, wikitext_path, binaries):
+    def fake_evaluate_quality(quant, quantized_gguf, baseline_ppl, wikitext_path, binaries, chunks=None):
         loss = quality_map[quant]
         return QualityResult(
             candidate_quant=quant, perplexity=baseline_ppl * (1 + loss / 100),

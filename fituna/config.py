@@ -54,6 +54,13 @@ class TargetSpec:
     )  # 품질 내림차순 고정 순서
     ngl_max_calls: int = 6  # ngl 이진탐색 상한 호출 수(안전장치)
     max_bench_seconds: Optional[int] = None  # 전체 탐색 시간 예산, 초과 시 best-effort 반환
+    # llama-perplexity에 넘길 --chunks 상한. 실측 결과: 3B 모델+wikitext-2 test
+    # 전체(제한 없음)로 quant 4개 돌리니 3시간 44분 걸림 -- 품질손실 %는 통계적
+    # 추정치일 뿐이라 전체 코퍼스가 필요하지 않음. None(무제한)을 기본값으로
+    # 두면 사용자가 아무 것도 모른 채 몇 시간짜리 실행을 돌리게 되므로, 기본을
+    # 유한한 값으로 못박는다. 더 엄밀한 평가가 필요하면 명시적으로 None이나
+    # 큰 값을 넘기면 된다.
+    ppl_chunks: Optional[int] = 32
 
     def __post_init__(self) -> None:
         # cli.py always builds ctx_candidates with ctx first, but a library
