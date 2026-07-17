@@ -16,7 +16,7 @@ FiTuna가 아니라 **FiTuna를 실행하는 사용자가 선택한 모델**을 
 | 기반 모델명 | (실행 시점에 `fituna run --model <경로>`로 지정한 모델명을 기재) |
 | 기반 모델 라이선스 | (해당 모델의 공식 라이선스를 기재. 모델마다 상이하므로 다운로드 전 반드시 라이선스 페이지 확인) |
 | 가중치 출처 URL | (실제 다운로드한 Hugging Face/공식 배포처 URL 기재) |
-| FiTuna 소스 코드 라이선스 | Apache-2.0 (본 저장소 `LICENSE` 참고, OSI 인증, 비상업적 이용 제한 없음) |
+| FiTuna 소스 코드 라이선스 | MIT (본 저장소 `LICENSE` 참고, OSI 인증, 비상업적 이용 제한 없음) |
 | FiTuna의 모델 관여 범위 | 가중치를 수정하지 않음. `llama-quantize`로 정밀도만 낮추고(GGUF 양자화), `llama-bench`/`llama-perplexity`로 처리량과 품질손실(perplexity 증가율)을 측정. 학습·파인튜닝·증류·가중치 병합 없음 |
 | 상용 AI 보조 도구 활용 범위 | (본 프로젝트 개발 과정에서 사용한 상용 AI 코딩 보조 도구가 있다면 이름과 활용 범위를 구체적으로 기재. 아래 B절 참고) |
 
@@ -31,7 +31,7 @@ FiTuna가 아니라 **FiTuna를 실행하는 사용자가 선택한 모델**을 
 | 기반 모델명 | Meta Llama 3 8B Instruct (`Meta-Llama-3-8B-Instruct`) |
 | 기반 모델 라이선스 | Llama 3 Community License (Meta) — 재배포/파생물 표시 의무 등 조건부 상업적 이용 허용. FiTuna는 이 모델의 가중치를 저장소에 포함하지 않으며, 사용자가 직접 라이선스에 동의하고 다운로드한 가중치만을 로컬에서 처리 |
 | 가중치 출처 URL | https://huggingface.co/meta-llama/Meta-Llama-3-8B-Instruct |
-| FiTuna 소스 코드 라이선스 | Apache-2.0 |
+| FiTuna 소스 코드 라이선스 | MIT |
 | FiTuna의 모델 관여 범위 | 위 가중치를 `convert_hf_to_gguf.py`로 F16 GGUF 변환 후, `llama-quantize`로 Q8_0~Q2_K 후보를 생성하고 `llama-bench`(tok/s)·`llama-perplexity`(wikitext-2 기준 품질손실 %)로 측정해 목표(tps/품질손실)를 만족하는 최소 자원 조합(quant/ngl/ctx)만 탐색·보고. 가중치 수치 자체는 변경하지 않음(양자화는 llama.cpp가 수행하는 정밀도 변환이며 FiTuna는 이를 subprocess로 호출·측정만 함) |
 | 상용 AI 보조 도구 활용 범위 | 코드 스캐폴딩(모듈 골격, argparse 서브커맨드 구조), 리팩터링, 문서(README/ARCHITECTURE 등) 초안 작성 보조에 Claude Code(Anthropic)를 사용. 핵심 탐색 알고리즘(품질 우선 필터 → ngl 이진탐색 조기종료 로직) 설계, 인터페이스 계약(`fituna/config.py`) 정의, 최종 코드 검증·테스트 작성 및 채택 여부 판단은 개발자가 직접 수행 |
 

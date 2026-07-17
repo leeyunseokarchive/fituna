@@ -169,6 +169,13 @@ def search(
     best_effort_speed = float("-inf")
     timed_out = False
 
+    # --- Stage 1: quantize + measure quality for every candidate, then walk
+    # Stage 2 in *measured* quality order -- not the caller-supplied
+    # quant_candidates order, which is only a hint and can disagree with the
+    # actual measured quality_loss_pct (e.g. a build/dataset where Q6_K
+    # happens to lose less than Q8_0). Trusting the input order here would
+    # silently violate the "highest quality first" guarantee.
+    qualified: list[tuple[str, Path, QualityResult]] = []
     for quant in quant_order:
         if not time_left():
             timed_out = True
@@ -177,7 +184,6 @@ def search(
         progress(f"[{quant}] quantizing")
         cand_gguf = quantize(model_info.base_gguf_path, quant, work_dir, binaries)
 
-        # --- Stage 1: quality gate (early-exit A) ---------------------------
         quality_res = cache.get_quality(model_fp, quant) if cache is not None else None
         if quality_res is None:
             progress(f"[{quant}] evaluating quality")
@@ -192,6 +198,14 @@ def search(
             )
             continue
 
+        qualified.append((quant, cand_gguf, quality_res))
+
+    # Re-sort by measured quality_loss_pct ascending (lowest loss = highest
+    # quality first). Python's sort is stable, so ties keep their relative
+    # quant_candidates order.
+    qualified.sort(key=lambda item: item[2].quality_loss_pct)
+
+    for quant, cand_gguf, quality_res in qualified:
         if not time_left():
             timed_out = True
             break

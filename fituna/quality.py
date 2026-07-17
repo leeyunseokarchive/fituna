@@ -69,7 +69,12 @@ def compute_perplexity(
         )
     except FileNotFoundError as exc:
         raise FiTunaError(
-            f"llama-perplexity binary not found or not executable: {binaries.llama_perplexity}"
+            f"llama-perplexity binary not found: {binaries.llama_perplexity}"
+        ) from exc
+    except OSError as exc:
+        # e.g. PermissionError -- binary exists but isn't executable.
+        raise FiTunaError(
+            f"failed to launch llama-perplexity ({binaries.llama_perplexity}): {exc}"
         ) from exc
     except subprocess.TimeoutExpired as exc:
         raise FiTunaError(

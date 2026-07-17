@@ -48,6 +48,13 @@ def quantize(base_gguf: Path, quant: str, out_dir: Path, binaries: BinaryPaths) 
             "Build llama.cpp (https://github.com/ggerganov/llama.cpp) and either "
             "put its binaries on PATH or pass --llama-bin-dir to fituna."
         ) from exc
+    except OSError as exc:
+        # e.g. PermissionError -- binary exists but isn't executable. Distinct
+        # from BinaryNotFoundError (which means "go build/install it"): this
+        # means "it's there, but something's wrong with it".
+        raise FiTunaError(
+            f"failed to launch llama-quantize ({binaries.llama_quantize}): {exc}"
+        ) from exc
 
     if proc.returncode != 0 or not out_path.exists():
         # Clean up a partial/failed output so a later call doesn't think it's cached.

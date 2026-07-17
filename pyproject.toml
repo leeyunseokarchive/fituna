@@ -8,13 +8,13 @@ version = "0.1.0"
 description = "Hardware-aware auto-tuner that finds the smallest llama.cpp GGUF quantization + runtime config meeting a target throughput and quality-loss budget."
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "Apache-2.0" }
+license = { text = "MIT" }
 authors = [{ name = "FiTuna contributors" }]
 keywords = ["llama.cpp", "gguf", "quantization", "llm", "inference", "benchmarking"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: Apache Software License",
+    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",

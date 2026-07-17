@@ -323,7 +323,13 @@ def test_search_returns_best_effort_on_time_budget_timeout(monkeypatch, tmp_path
     best-effort SearchResult (meets_target=False) instead of raising: "시간
     예산 초과 시 그 시점까지의 최고 속도 결과를 meets_target=False로 반환". A
     fake clock lets the deadline expire right after one successful bench call
-    records a best-effort candidate, without needing a real sleep()."""
+    records a best-effort candidate, without needing a real sleep().
+
+    search() now quantizes+measures quality for *every* candidate (stage 1)
+    before benching *any* of them in measured-quality order (stage 2), so the
+    clock must budget one time_left() check per quant in stage 1 (both Q8_0
+    and Q4_K_M pass the quality gate here) plus one more at the top of stage
+    2's first iteration, before the check that finally expires."""
     import fituna.search as search_module
 
     n_layers = 8
@@ -362,10 +368,12 @@ def test_search_returns_best_effort_on_time_budget_timeout(monkeypatch, tmp_path
         return BenchResult(candidate=cand, prompt_tok_per_sec=100.0, gen_tok_per_sec=30.0,
                             vram_used_mb=4096, raw_stdout="{}")
 
-    # Clock schedule: start=0 (deadline=10); two time_left() checks before the
-    # full-offload bench both read as "time remaining"; the check right after
-    # it reads past the deadline, forcing an immediate timeout break.
-    clock = iter([0.0, 1.0, 2.0, 100.0])
+    # Clock schedule: start=0 (deadline=10); one time_left() check per quant
+    # in stage 1 (Q8_0, Q4_K_M) plus one at the top of stage 2's first
+    # iteration all read as "time remaining"; the check right after the
+    # full-offload bench reads past the deadline, forcing an immediate
+    # timeout break.
+    clock = iter([0.0, 1.0, 2.0, 3.0, 100.0])
 
     def fake_monotonic():
         return next(clock, 100.0)
