@@ -97,7 +97,7 @@ def test_search_early_exits_on_first_hit(monkeypatch, tmp_path):
     quantize_calls: list[str] = []
     bench_calls: list[tuple[str, int]] = []
 
-    def fake_quantize(base_gguf: Path, quant: str, out_dir: Path, binaries: BinaryPaths) -> Path:
+    def fake_quantize(base_gguf: Path, quant: str, out_dir: Path, binaries: BinaryPaths, model_fp: str) -> Path:
         quantize_calls.append(quant)
         return out_dir / f"model-{quant}.gguf"
 
@@ -180,7 +180,7 @@ def test_search_raises_with_closest_when_no_candidate_meets_target(monkeypatch, 
     bench_calls: list[tuple[str, int]] = []
     _TOP_SPEED = {"Q8_0": 15.0, "Q4_K_M": 18.0}  # both below the 20.0 target
 
-    def fake_quantize(base_gguf, quant, out_dir, binaries):
+    def fake_quantize(base_gguf, quant, out_dir, binaries, model_fp):
         return out_dir / f"model-{quant}.gguf"
 
     def fake_compute_perplexity(gguf_path, wikitext_path, binaries, chunks=None):
@@ -242,7 +242,7 @@ def test_search_skips_binary_search_when_cpu_only_already_meets_target(monkeypat
 
     bench_calls: list[int] = []
 
-    def fake_quantize(base_gguf, quant, out_dir, binaries):
+    def fake_quantize(base_gguf, quant, out_dir, binaries, model_fp):
         return out_dir / f"model-{quant}.gguf"
 
     def fake_compute_perplexity(gguf_path, wikitext_path, binaries, chunks=None):
@@ -292,7 +292,7 @@ def test_search_raises_when_every_quant_fails_the_quality_gate(monkeypatch, tmp_
     hw = _hw(GPUVendor.NVIDIA)
     binaries = _binaries(tmp_path)
 
-    def fake_quantize(base_gguf, quant, out_dir, binaries):
+    def fake_quantize(base_gguf, quant, out_dir, binaries, model_fp):
         return out_dir / f"model-{quant}.gguf"
 
     def fake_compute_perplexity(gguf_path, wikitext_path, binaries, chunks=None):
@@ -345,7 +345,7 @@ def test_search_returns_best_effort_on_time_budget_timeout(monkeypatch, tmp_path
     hw = _hw(GPUVendor.NVIDIA)
     binaries = _binaries(tmp_path)
 
-    def fake_quantize(base_gguf, quant, out_dir, binaries):
+    def fake_quantize(base_gguf, quant, out_dir, binaries, model_fp):
         return out_dir / f"model-{quant}.gguf"
 
     def fake_compute_perplexity(gguf_path, wikitext_path, binaries, chunks=None):

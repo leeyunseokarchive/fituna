@@ -15,6 +15,7 @@ https://github.com/ggerganov/ggml/blob/master/docs/gguf.md
 from __future__ import annotations
 
 import hashlib
+import os
 import struct
 import subprocess
 import sys
@@ -55,43 +56,68 @@ _SCALAR_FORMATS: dict[int, tuple[str, int]] = {
 }
 
 
-def _read_exact(f: BinaryIO, n: int) -> bytes:
+def _read_exact(f: BinaryIO, n: int, file_size: int) -> bytes:
+    # GGUF string/array length fields are attacker-controllable 64-bit values
+    # (this file is untrusted input -- it's whatever the user pointed --model
+    # at, e.g. a downloaded HF/GGUF file). Bound every read against the
+    # actual remaining file size *before* calling f.read(n), so a fabricated
+    # length can fail immediately instead of attempting a multi-GB
+    # allocation: reproduced pre-fix, a single crafted length field drove
+    # peak RSS to ~10GB before Python's own MemoryError kicked in.
+    if n < 0 or f.tell() + n > file_size:
+        raise FiTunaError(
+            "GGUF field length exceeds remaining file size -- file is "
+            "truncated or its metadata is corrupt/malicious"
+        )
     data = f.read(n)
     if len(data) != n:
         raise FiTunaError("unexpected end of file while parsing GGUF header")
     return data
 
 
-def _read_u32(f: BinaryIO) -> int:
-    return struct.unpack("<I", _read_exact(f, 4))[0]
+def _read_u32(f: BinaryIO, file_size: int) -> int:
+    return struct.unpack("<I", _read_exact(f, 4, file_size))[0]
 
 
-def _read_u64(f: BinaryIO) -> int:
-    return struct.unpack("<Q", _read_exact(f, 8))[0]
+def _read_u64(f: BinaryIO, file_size: int) -> int:
+    return struct.unpack("<Q", _read_exact(f, 8, file_size))[0]
 
 
-def _read_length(f: BinaryIO, version: int) -> int:
+def _read_length(f: BinaryIO, version: int, file_size: int) -> int:
     # GGUF v1 used uint32 for string/array lengths; v2+ uses uint64.
-    return _read_u64(f) if version >= 2 else _read_u32(f)
+    return _read_u64(f, file_size) if version >= 2 else _read_u32(f, file_size)
 
 
-def _read_string(f: BinaryIO, version: int) -> str:
-    length = _read_length(f, version)
-    return _read_exact(f, length).decode("utf-8", errors="replace")
+def _read_string(f: BinaryIO, version: int, file_size: int) -> str:
+    length = _read_length(f, version, file_size)
+    return _read_exact(f, length, file_size).decode("utf-8", errors="replace")
 
 
-def _read_value(f: BinaryIO, value_type: int, version: int) -> Any:
+def _read_value(f: BinaryIO, value_type: int, version: int, file_size: int) -> Any:
     if value_type == _T_STRING:
-        return _read_string(f, version)
+        return _read_string(f, version, file_size)
     if value_type == _T_ARRAY:
-        elem_type = _read_u32(f)
-        count = _read_length(f, version)
-        return [_read_value(f, elem_type, version) for _ in range(count)]
+        elem_type = _read_u32(f, file_size)
+        count = _read_length(f, version, file_size)
+        # Same untrusted-length concern as strings: even with the read-level
+        # bound above, a huge count of cheap elements (e.g. count=10**9
+        # empty strings) would still balloon into a giant Python list before
+        # any individual read fails. Each array element needs at least 1
+        # byte in the file (a scalar) or 8 bytes (a nested string's own
+        # length prefix), so count can never legitimately exceed file_size --
+        # reject it up front instead of discovering that partway through.
+        if count > file_size:
+            raise FiTunaError(
+                "GGUF array element count exceeds what the file could "
+                "possibly contain -- file is truncated or its metadata is "
+                "corrupt/malicious"
+            )
+        return [_read_value(f, elem_type, version, file_size) for _ in range(count)]
     fmt_size = _SCALAR_FORMATS.get(value_type)
     if fmt_size is None:
         raise FiTunaError(f"unknown GGUF value type id {value_type}")
     fmt, size = fmt_size
-    return struct.unpack(fmt, _read_exact(f, size))[0]
+    return struct.unpack(fmt, _read_exact(f, size, file_size))[0]
 
 
 def ensure_base_gguf(model_path: Path, work_dir: Path, binaries: BinaryPaths) -> Path:
@@ -128,6 +154,14 @@ def ensure_base_gguf(model_path: Path, work_dir: Path, binaries: BinaryPaths) ->
     work_dir.mkdir(parents=True, exist_ok=True)
     out_path = work_dir / "base-f16.gguf"
 
+    # Idempotent, like quantize.py: skip the (slow) conversion subprocess if
+    # a previous run already produced it. This also matters for --resume --
+    # without it, base-f16.gguf's mtime changes on every run, so
+    # model_fingerprint() never repeats and the cache can never hit for an
+    # HF-directory input.
+    if out_path.exists() and out_path.stat().st_size > 0:
+        return out_path
+
     cmd = [
         sys.executable,
         str(convert_script),
@@ -138,7 +172,11 @@ def ensure_base_gguf(model_path: Path, work_dir: Path, binaries: BinaryPaths) ->
         "f16",
     ]
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        # encoding/errors explicit: see hardware.py's _run for why.
+        proc = subprocess.run(
+            cmd, capture_output=True, text=True, check=False,
+            encoding="utf-8", errors="replace",
+        )
     except OSError as exc:
         raise ModelConversionError(
             f"failed to launch convert script {convert_script}: {exc}"
@@ -168,34 +206,36 @@ def read_model_info(gguf_path: Path, binaries: BinaryPaths) -> ModelInfo:
     """
     gguf_path = Path(gguf_path)
     with open(gguf_path, "rb") as f:
-        magic = _read_exact(f, 4)
+        file_size = os.fstat(f.fileno()).st_size
+
+        magic = _read_exact(f, 4, file_size)
         if magic != _GGUF_MAGIC:
             raise FiTunaError(f"{gguf_path} is not a valid GGUF file (bad magic)")
 
-        version = _read_u32(f)
+        version = _read_u32(f, file_size)
         if version >= 2:
-            tensor_count = _read_u64(f)
-            kv_count = _read_u64(f)
+            tensor_count = _read_u64(f, file_size)
+            kv_count = _read_u64(f, file_size)
         else:
-            tensor_count = _read_u32(f)
-            kv_count = _read_u32(f)
+            tensor_count = _read_u32(f, file_size)
+            kv_count = _read_u32(f, file_size)
 
         metadata: dict[str, Any] = {}
         for _ in range(kv_count):
-            key = _read_string(f, version)
-            value_type = _read_u32(f)
-            metadata[key] = _read_value(f, value_type, version)
+            key = _read_string(f, version, file_size)
+            value_type = _read_u32(f, file_size)
+            metadata[key] = _read_value(f, value_type, version, file_size)
 
         n_params = 0
         for _ in range(tensor_count):
-            _read_string(f, version)  # tensor name, unused
-            n_dims = _read_u32(f)
+            _read_string(f, version, file_size)  # tensor name, unused
+            n_dims = _read_u32(f, file_size)
             nelements = 1
             for _ in range(n_dims):
-                dim = _read_u64(f) if version >= 2 else _read_u32(f)
+                dim = _read_u64(f, file_size) if version >= 2 else _read_u32(f, file_size)
                 nelements *= dim
-            _read_u32(f)  # ggml tensor dtype, unused for param count
-            _read_u64(f)  # data offset, unused
+            _read_u32(f, file_size)  # ggml tensor dtype, unused for param count
+            _read_u64(f, file_size)  # data offset, unused
             n_params += nelements
 
     architecture = metadata.get("general.architecture")

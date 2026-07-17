@@ -45,7 +45,7 @@ def _fake_run_factory(responses: dict[str, str]):
     present in the mapping raises FileNotFoundError, matching real
     subprocess.run behaviour for a missing executable."""
 
-    def _fake_run(cmd, capture_output=True, text=True, timeout=5.0, check=False):
+    def _fake_run(cmd, capture_output=True, text=True, timeout=5.0, check=False, **kwargs):
         binary = cmd[0]
         if binary not in responses:
             raise FileNotFoundError(f"no such file: {binary}")

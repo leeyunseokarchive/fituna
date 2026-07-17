@@ -25,14 +25,25 @@ def _model_stem(base_gguf: Path) -> str:
     return _BASE_SUFFIX_RE.sub("", stem) or stem
 
 
-def quantize(base_gguf: Path, quant: str, out_dir: Path, binaries: BinaryPaths) -> Path:
-    """Run `llama-quantize <base_gguf> <out_dir>/<model>-<quant>.gguf <quant>`.
+def quantize(base_gguf: Path, quant: str, out_dir: Path, binaries: BinaryPaths, model_fp: str) -> Path:
+    """Run `llama-quantize <base_gguf> <out_dir>/<model>-<fp8>-<quant>.gguf <quant>`.
 
     If the target file already exists in out_dir, skip the subprocess call
     and return its path directly (idempotent / cache-friendly).
+
+    ``model_fp`` (from fituna.model_info.model_fingerprint) is folded into
+    the output filename, not just the base name derived from base_gguf's
+    path. Without it, two different models that both convert to the same
+    conventional base filename (every HF-directory input becomes
+    work_dir/base-f16.gguf, regardless of which model it came from) would
+    collide on the exact same out_path in the same --out dir, and a stale
+    quantized file from a *previous, different* model would be silently
+    served as a cache hit for the new one -- a wrong-but-plausible-looking
+    result with no error. Keying the filename on the model's own
+    fingerprint makes that collision impossible by construction.
     """
     out_dir.mkdir(parents=True, exist_ok=True)
-    out_path = out_dir / f"{_model_stem(base_gguf)}-{quant}.gguf"
+    out_path = out_dir / f"{_model_stem(base_gguf)}-{model_fp[:12]}-{quant}.gguf"
 
     # Idempotent: a previous run already produced this exact quant.
     if out_path.exists() and out_path.stat().st_size > 0:
@@ -49,7 +60,11 @@ def quantize(base_gguf: Path, quant: str, out_dir: Path, binaries: BinaryPaths) 
 
     cmd = [str(binaries.llama_quantize), str(base_gguf), str(tmp_path), quant]
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        # encoding/errors explicit: see hardware.py's _run for why.
+        proc = subprocess.run(
+            cmd, capture_output=True, text=True, check=False,
+            encoding="utf-8", errors="replace",
+        )
     except FileNotFoundError as exc:
         raise BinaryNotFoundError(
             f"llama-quantize not found at '{binaries.llama_quantize}'. "
@@ -73,7 +88,11 @@ def quantize(base_gguf: Path, quant: str, out_dir: Path, binaries: BinaryPaths) 
             f"stderr:\n{proc.stderr}"
         )
 
-    tmp_path.rename(out_path)
+    # .replace(), not .rename(): Path.rename() raises FileExistsError on
+    # Windows if out_path already exists (POSIX rename() overwrites
+    # atomically; Windows' doesn't). .replace() maps to os.replace(), which
+    # is documented to overwrite atomically on both platforms.
+    tmp_path.replace(out_path)
 
     return out_path
 
@@ -109,22 +128,37 @@ def _self_check() -> None:
             llama_perplexity=Path("unused"),
         )
 
+        fp_a = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        fp_b = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+
         # 1. First call invokes the subprocess and produces the expected path,
-        #    with the "-f16" base suffix stripped from the model name.
-        p1 = quantize(base_gguf, "Q4_K_M", out_dir, binaries)
-        assert p1 == out_dir / "base-Q4_K_M.gguf", p1
+        #    with the "-f16" base suffix stripped from the model name and the
+        #    model fingerprint folded in.
+        p1 = quantize(base_gguf, "Q4_K_M", out_dir, binaries, fp_a)
+        assert p1 == out_dir / f"base-{fp_a[:12]}-Q4_K_M.gguf", p1
         assert p1.exists()
         assert counter_file.read_text().count("x") == 1
 
-        # 2. Second call with identical args is idempotent: no re-invocation.
-        p2 = quantize(base_gguf, "Q4_K_M", out_dir, binaries)
+        # 2. Second call with identical args (same model_fp) is idempotent:
+        #    no re-invocation.
+        p2 = quantize(base_gguf, "Q4_K_M", out_dir, binaries, fp_a)
         assert p2 == p1
         assert counter_file.read_text().count("x") == 1, "must not re-run when cached"
 
         # 3. A different quant produces a different, independently-generated file.
-        p3 = quantize(base_gguf, "Q8_0", out_dir, binaries)
-        assert p3 == out_dir / "base-Q8_0.gguf"
+        p3 = quantize(base_gguf, "Q8_0", out_dir, binaries, fp_a)
+        assert p3 == out_dir / f"base-{fp_a[:12]}-Q8_0.gguf"
         assert counter_file.read_text().count("x") == 2
+
+        # 4. Regression test for the cache-collision bug: a *different* model
+        #    (different model_fp) that happens to convert to the exact same
+        #    base_gguf stem (e.g. two different HF-directory inputs both
+        #    producing work_dir/base-f16.gguf) must NOT reuse quant #1's
+        #    output -- it needs its own file and its own subprocess call.
+        p4 = quantize(base_gguf, "Q4_K_M", out_dir, binaries, fp_b)
+        assert p4 == out_dir / f"base-{fp_b[:12]}-Q4_K_M.gguf"
+        assert p4 != p1, "different models must never share a quantized output path"
+        assert counter_file.read_text().count("x") == 3, "different model_fp must not be cache hit"
 
         # --- failure path: fake binary that always exits non-zero.
         fake_fail = tmp / "fake_fail.sh"
@@ -134,12 +168,12 @@ def _self_check() -> None:
             llama_quantize=fake_fail, llama_bench=Path("unused"), llama_perplexity=Path("unused")
         )
         try:
-            quantize(base_gguf, "Q3_K_M", out_dir, fail_binaries)
+            quantize(base_gguf, "Q3_K_M", out_dir, fail_binaries, fp_a)
             raise AssertionError("expected FiTunaError on non-zero exit")
         except FiTunaError as exc:
             assert not isinstance(exc, BinaryNotFoundError)
             assert "Q3_K_M" in str(exc)
-        assert not (out_dir / "base-Q3_K_M.gguf").exists()
+        assert not (out_dir / f"base-{fp_a[:12]}-Q3_K_M.gguf").exists()
 
         # --- missing binary path: BinaryNotFoundError with an install hint.
         missing_binaries = BinaryPaths(
@@ -148,7 +182,7 @@ def _self_check() -> None:
             llama_perplexity=Path("unused"),
         )
         try:
-            quantize(base_gguf, "Q2_K", out_dir, missing_binaries)
+            quantize(base_gguf, "Q2_K", out_dir, missing_binaries, fp_a)
             raise AssertionError("expected BinaryNotFoundError for missing binary")
         except BinaryNotFoundError as exc:
             assert "llama-quantize" in str(exc)

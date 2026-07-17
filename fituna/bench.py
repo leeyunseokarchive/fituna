@@ -113,7 +113,11 @@ def run_bench(
         "-o", "json",
     ]
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_sec)
+        # encoding/errors explicit: see hardware.py's _run for why.
+        proc = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=timeout_sec,
+            encoding="utf-8", errors="replace",
+        )
     except subprocess.TimeoutExpired as exc:
         raise FiTunaError(
             f"llama-bench timed out after {timeout_sec}s: {' '.join(cmd)}"

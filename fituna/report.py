@@ -140,13 +140,26 @@ def _self_check() -> None:
 
     # 1. build_run_command: PATH-fallback branch when llama-cli sits nowhere
     #    we know about and isn't on PATH -- must still return a usable,
-    #    non-empty command instead of raising.
+    #    non-empty command instead of raising. This must hold regardless of
+    #    whatever the machine actually running this self-check happens to
+    #    have installed (e.g. llama.cpp via Homebrew), so PATH is blanked
+    #    for the duration of this one call rather than assumed empty.
+    import os as _os
+
     binaries = BinaryPaths(
         llama_quantize=Path("/nonexistent/llama-quantize"),
         llama_bench=Path("/nonexistent/llama-bench"),
         llama_perplexity=Path("/nonexistent/llama-perplexity"),
     )
-    cmd = build_run_command(Path("out/model-Q4_K_M.gguf"), cand, binaries)
+    saved_path = _os.environ.get("PATH")
+    try:
+        _os.environ["PATH"] = ""
+        cmd = build_run_command(Path("out/model-Q4_K_M.gguf"), cand, binaries)
+    finally:
+        if saved_path is None:
+            _os.environ.pop("PATH", None)
+        else:
+            _os.environ["PATH"] = saved_path
     assert cmd[0] == "llama-cli"  # bare-name fallback, no crash
     assert cmd == ["llama-cli", "-m", "out/model-Q4_K_M.gguf", "-ngl", "20", "-c", "4096"]
 

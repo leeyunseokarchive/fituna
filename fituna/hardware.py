@@ -37,8 +37,13 @@ def _run(cmd: list[str], timeout: float = 5.0) -> Optional[str]:
     """Run ``cmd``, returning stdout on success or None on any failure
     (binary missing, non-zero exit, timeout). Never raises."""
     try:
+        # encoding/errors explicit: text=True alone decodes with
+        # locale.getpreferredencoding(), which on non-English Windows can be
+        # a non-UTF-8 codepage (cp949/cp1252) and raise UnicodeDecodeError on
+        # any non-ASCII byte in a tool's output.
         result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=timeout, check=False
+            cmd, capture_output=True, text=True, timeout=timeout, check=False,
+            encoding="utf-8", errors="replace",
         )
     except (OSError, subprocess.SubprocessError):
         return None

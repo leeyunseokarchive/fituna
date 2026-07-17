@@ -42,6 +42,7 @@ does not raise).
 from __future__ import annotations
 
 import hashlib
+import re
 import time
 from dataclasses import replace
 from pathlib import Path
@@ -73,6 +74,11 @@ from fituna.report import build_run_command
 # rather than growing the cache schema for one extra value, the baseline is
 # stashed under a quant name real llama-quantize output can never produce.
 _BASELINE_QUANT_KEY = "__baseline__"
+
+# Every real llama-quantize quant type (Q4_K_M, IQ2_XXS, F16, ...) is plain
+# alphanumerics/underscores. Whitelisting this shape blocks a quant string
+# containing "/" or ".." from ever reaching a path-join in quantize.py.
+_SAFE_QUANT_RE = re.compile(r"^[A-Za-z0-9_]+$")
 
 
 def _hardware_fingerprint(hw: HardwareProfile) -> str:
@@ -137,6 +143,18 @@ def search(
                   "proceeding without filtering")
         supported = None
 
+    # Every quant token ends up in a filename (quantize.py) and on a
+    # subprocess argv (as a plain arg, never via a shell, so no injection
+    # risk there) -- but if introspection above failed, an unfiltered quant
+    # string could still contain "/" or ".." and land outside out_dir when
+    # used to build a path. Whitelist regardless of whether introspection
+    # succeeded, rather than only in the fallback branch.
+    unsafe = [q for q in target.quant_candidates if not _SAFE_QUANT_RE.match(q)]
+    if unsafe:
+        raise NoFeasibleConfigError(
+            f"invalid quant candidate(s) {unsafe}: must match {_SAFE_QUANT_RE.pattern!r}"
+        )
+
     quant_order = [q for q in target.quant_candidates if supported is None or q in supported]
     if not quant_order:
         raise NoFeasibleConfigError(
@@ -182,7 +200,7 @@ def search(
             break
 
         progress(f"[{quant}] quantizing")
-        cand_gguf = quantize(model_info.base_gguf_path, quant, work_dir, binaries)
+        cand_gguf = quantize(model_info.base_gguf_path, quant, work_dir, binaries, model_fp)
 
         quality_res = cache.get_quality(model_fp, quant) if cache is not None else None
         if quality_res is None:
@@ -388,7 +406,7 @@ def _self_check() -> None:
 
     quality_map = {"Q8_0": 1.0, "Q6_K": 3.0, "Q4_K_M": 10.0}
 
-    def fake_quantize(base_gguf, quant, out_dir, binaries):
+    def fake_quantize(base_gguf, quant, out_dir, binaries, model_fp):
         return Path(out_dir) / f"model-{quant}.gguf"
 
     def fake_compute_perplexity(gguf_path, wikitext_path, binaries, chunks=None):

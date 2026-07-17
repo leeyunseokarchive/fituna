@@ -15,10 +15,16 @@ See `docs/ARCHITECTURE.md` for the module diagram and data flow.
 
 ## Status
 
-Implemented and integration-tested end-to-end (module self-checks + `pytest`
-+ a full `fituna run` pass against stand-in `llama-*` binaries all pass). The
-public interfaces in `fituna/config.py` and the function signatures across
-`fituna/*.py` are the fixed cross-module contract.
+Implemented and integration-tested end-to-end against **real** llama.cpp
+binaries (Homebrew build) and a real model (Qwen2.5-3B-Instruct GGUF),
+covering the success path, `--resume` cache hits, `BinaryNotFoundError`
+(exit 2), and `NoFeasibleConfigError` best-effort reporting (exit 3), on top
+of module self-checks + `pytest` (74 tests) against stand-in binaries. **All
+real-hardware validation so far is on macOS (Apple Silicon)** — Linux/Windows
+code paths (see "Known limitations" below) are code-reviewed but not
+integration-tested on those platforms. The public interfaces in
+`fituna/config.py` and the function signatures across `fituna/*.py` are the
+fixed cross-module contract.
 
 ## Requirements
 
@@ -26,9 +32,21 @@ public interfaces in `fituna/config.py` and the function signatures across
 - A working [llama.cpp](https://github.com/ggml-org/llama.cpp) build on your
   `PATH` (or point FiTuna at it with `--llama-bin-dir`), providing at least
   `llama-quantize`, `llama-bench`, and `llama-perplexity`.
-- A perplexity evaluation corpus, e.g.
-  [wikitext-2-raw](https://huggingface.co/datasets/Salesforce/wikitext)
-  (CC-BY-SA), downloaded locally.
+- A perplexity evaluation corpus as plain text. The
+  [wikitext-2-raw-v1](https://huggingface.co/datasets/Salesforce/wikitext)
+  dataset (CC-BY-SA) on HuggingFace is distributed as Parquet, not a `.txt`
+  file `llama-perplexity -f` can read directly — export the test split with:
+
+  ```bash
+  pip install datasets  # one-time, only needed to fetch this corpus
+  python -c "
+  from datasets import load_dataset
+  ds = load_dataset('Salesforce/wikitext', 'wikitext-2-raw-v1', split='test')
+  open('wikitext-2-raw-test.txt', 'w').write('\n'.join(ds['text']))
+  "
+  ```
+
+  then pass `--wikitext wikitext-2-raw-test.txt`.
 
 FiTuna itself has **zero runtime Python dependencies** — everything it needs
 is in the standard library. See `docs/SBOM.md`.
@@ -93,6 +111,27 @@ fituna list-binaries --llama-bin-dir /usr/local/bin
    best-effort result.
 4. Bench/quality results are cached in `<out>/.fituna_cache.sqlite3`;
    `--resume` reuses them instead of re-running llama.cpp.
+
+## Known limitations
+
+- **Single GPU only.** Hardware detection reads only the first GPU reported
+  by `nvidia-smi`/`rocm-smi`, and bench invocations don't set
+  `--tensor-split`/`--main-gpu`. Multi-GPU tensor-split support is on the
+  roadmap, not implemented.
+- **Windows AMD GPU auto-detection is a known gap.** `rocm-smi` has no
+  mainstream Windows distribution, so an AMD GPU on Windows is likely to be
+  mis-detected as CPU-only. Use `--gpu amd --vram-mb <N>` to override.
+- **Windows RAM auto-detection is code-reviewed, not integration-tested** —
+  no Windows CI job exists yet to exercise the `ctypes`/`GlobalMemoryStatusEx`
+  path against a real Windows process.
+- **`ngl_max_calls` (default 6)** bounds the `-ngl` binary search; for models
+  much deeper than the range it was tuned against, the search can fall back
+  to the safe-but-suboptimal full-offload candidate before converging on the
+  true minimal `-ngl`. Not an accuracy bug (the reported config still meets
+  the target), just a possibly-conservative one.
+- `llama-bench`/`llama-perplexity` failures (e.g. out-of-memory) surface
+  llama.cpp's own stderr as-is; FiTuna doesn't yet pattern-match common
+  failure causes into an actionable suggestion.
 
 ## Development
 

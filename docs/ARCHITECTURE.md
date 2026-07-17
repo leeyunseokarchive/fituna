@@ -156,7 +156,7 @@ binaries themselves; every other function is a pure transform over
 ```
 <work_dir>/
 ├── base-f16.gguf            # model_info.ensure_base_gguf() — only if input was an HF dir
-├── <model>-<quant>.gguf     # quantize.quantize() — one per quant tried, idempotent (reused if present)
+├── <model>-<fp12>-<quant>.gguf  # quantize.quantize() — one per quant tried, idempotent (reused if present)
 └── .fituna_cache.sqlite3    # cache.ResultCache — bench_cache / quality_cache tables, only with --resume
 ```
 
@@ -166,7 +166,13 @@ exists at its target path, so re-running `fituna run` against the same
 (a cheap `sha256(name:size:mtime)`, not a full-file hash) is the cache key
 component that identifies "this model," combined with a hardware
 fingerprint, so cache entries never leak across a different model or a
-different machine.
+different machine. The first 12 hex chars of that same fingerprint are also
+folded into the quantized `.gguf` filename itself (`<model>-<fp12>-<quant>.gguf`)
+— without it, two different models that both convert to the same
+conventional base filename (every HF-directory input becomes
+`base-f16.gguf`) would collide on the exact same output path in the same
+`--out` dir, silently serving one model's quantized file as a "cache hit"
+for a completely different model.
 
 ## Error handling & exit codes
 

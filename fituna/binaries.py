@@ -40,10 +40,21 @@ def _find_exe(name: str, bin_dir: Optional[Path]) -> Optional[Path]:
 
 
 def _find_script(name: str, bin_dir: Optional[Path]) -> Optional[Path]:
-    """Resolve a helper script by exact filename (may lack the exec bit)."""
+    """Resolve a helper script by exact filename (may lack the exec bit).
+
+    ``--llama-bin-dir`` is documented (README) as the compiled binaries'
+    directory, e.g. ``/path/to/llama.cpp/build/bin`` -- but
+    convert_hf_to_gguf.py lives at the llama.cpp repo *root*, two levels up
+    from a standard CMake build's ``build/bin``, not inside it. Checking only
+    ``bin_dir / name`` meant the exact --llama-bin-dir value the README's own
+    example uses could never find the convert script. Check both the given
+    dir and that conventional repo-root location before giving up.
+    """
     if bin_dir is not None:
-        candidate = bin_dir / name
-        return candidate if candidate.is_file() else None
+        for candidate in (bin_dir / name, bin_dir.parent.parent / name):
+            if candidate.is_file():
+                return candidate
+        return None
     found = shutil.which(name)  # opportunistic; convert scripts are rarely on PATH
     return Path(found) if found else None
 
@@ -81,11 +92,15 @@ def _run_text(binary: Path, arg: str) -> str:
     llama.cpp tools print --help/--version to either stream depending on
     version, and often exit non-zero for --help, so returncode is ignored)."""
     try:
+        # encoding/errors explicit: see hardware.py's _run for why (Windows
+        # non-UTF-8 locale can otherwise raise UnicodeDecodeError).
         proc = subprocess.run(
             [str(binary), arg],
             capture_output=True,
             text=True,
             timeout=30,
+            encoding="utf-8",
+            errors="replace",
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise BinaryNotFoundError(f"Failed to run '{binary} {arg}': {exc}") from exc
@@ -195,6 +210,26 @@ def _selfcheck() -> None:
 
         version = get_llama_cpp_version(paths)
         assert version == "3765 (c919d5d)", version
+
+        # convert_hf_to_gguf.py resolution: the README's own
+        # --llama-bin-dir example points at a standard CMake build's
+        # build/bin, where only compiled binaries live -- the convert
+        # script sits two levels up, at the repo root. Reproduce that
+        # exact layout and confirm _find_script's repo-root fallback
+        # finds it (regression test for the bug where only bin_dir/name
+        # was checked and this exact documented layout never resolved).
+        repo_root = tmp_path / "llama.cpp"
+        build_bin = repo_root / "build" / "bin"
+        build_bin.mkdir(parents=True)
+        _write_fake(build_bin, "llama-quantize", help_text)
+        _write_fake(build_bin, "llama-bench", "usage: llama-bench ...\n")
+        _write_fake(build_bin, "llama-perplexity", "usage: llama-perplexity ...\n")
+        (repo_root / "convert_hf_to_gguf.py").write_text("# fake convert script\n")
+
+        paths_repo = locate_binaries(build_bin)
+        assert paths_repo.convert_script == repo_root / "convert_hf_to_gguf.py", (
+            paths_repo.convert_script
+        )
 
     print("fituna.binaries self-check OK")
 

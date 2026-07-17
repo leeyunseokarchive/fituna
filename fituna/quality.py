@@ -61,11 +61,14 @@ def compute_perplexity(
         cmd += ["--chunks", str(chunks)]
 
     try:
+        # encoding/errors explicit: see hardware.py's _run for why.
         proc = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
             timeout=PPL_TIMEOUT_SEC,
+            encoding="utf-8",
+            errors="replace",
         )
     except FileNotFoundError as exc:
         raise FiTunaError(
