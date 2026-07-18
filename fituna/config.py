@@ -140,6 +140,14 @@ class ModelConversionError(FiTunaError):
     """Raised when HF -> GGUF conversion fails."""
 
 
+class BenchTimeoutError(FiTunaError):
+    """Raised when a single llama-bench invocation exceeds its timeout.
+
+    Distinct from FiTunaError so the search loop can treat "this candidate is
+    too slow to even finish a bench" as a below-target measurement instead of
+    aborting the whole search."""
+
+
 class NoFeasibleConfigError(FiTunaError):
     """Raised when no candidate configuration could satisfy the target at all."""
 

@@ -404,3 +404,39 @@ def test_hardware_fingerprint_varies_with_llama_version():
     c = _hardware_fingerprint(hw, None)
     assert len({a, b, c}) == 3, "llama.cpp version must namespace the bench cache"
     assert a == _hardware_fingerprint(hw, "3765 (c919d5d)"), "must stay deterministic"
+
+
+def test_bench_timeout_treated_as_below_target_not_abort(monkeypatch, tmp_path):
+    """A BenchTimeoutError from one bench call must record 0 tok/s and let the
+    search continue to other candidates, not kill the whole search."""
+    from fituna.config import BenchResult, BenchTimeoutError, NoFeasibleConfigError
+
+    _patch(monkeypatch, "quantize", "quantize",
+           lambda base, quant, work, bins, fp: tmp_path / f"m-{quant}.gguf")
+    _patch(monkeypatch, "quality", "compute_perplexity",
+           lambda *a, **k: 10.0)
+    _patch(monkeypatch, "quality", "evaluate_quality",
+           lambda quant, gguf, base_ppl, wiki, bins, chunks=None: QualityResult(
+               candidate_quant=quant, perplexity=10.0,
+               baseline_perplexity=10.0, quality_loss_pct=0.0))
+    _patch(monkeypatch, "binaries", "list_supported_quant_types",
+           lambda bins: ["Q8_0", "Q4_K_M"])
+
+    def bench(gguf_path, ngl, ctx, target, binaries, timeout_sec=300):
+        if _quant_of(gguf_path) == "Q8_0":
+            raise BenchTimeoutError("llama-bench timed out after 300s")
+        return BenchResult(
+            candidate=CandidateConfig(quant=_quant_of(gguf_path), ngl=ngl, ctx=ctx),
+            prompt_tok_per_sec=100.0, gen_tok_per_sec=50.0,
+            vram_used_mb=None, raw_stdout="{}")
+
+    _patch(monkeypatch, "bench", "run_bench", bench)
+
+    target = TargetSpec(
+        model_path=tmp_path / "m.gguf", target_tokens_per_sec=40.0,
+        max_quality_loss_pct=5.0, ctx=4096, ctx_candidates=[4096],
+        quant_candidates=["Q8_0", "Q4_K_M"])
+    result = search(target, _model_info(tmp_path), _hw(GPUVendor.NONE),
+                    _binaries(tmp_path), tmp_path, tmp_path / "wiki.txt")
+    assert result.meets_target
+    assert result.config.quant == "Q4_K_M"

@@ -14,7 +14,14 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from fituna.config import BenchResult, BinaryPaths, CandidateConfig, FiTunaError, TargetSpec
+from fituna.config import (
+    BenchResult,
+    BenchTimeoutError,
+    BinaryPaths,
+    CandidateConfig,
+    FiTunaError,
+    TargetSpec,
+)
 
 
 def _quant_from_filename(gguf_path: Path) -> str:
@@ -99,8 +106,8 @@ def run_bench(
     (as close as possible to) ``ctx`` tokens by the time the timed
     generation phase runs.
 
-    Raises FiTunaError on timeout, non-zero exit, failure to launch the
-    binary, or unparsable/empty output.
+    Raises BenchTimeoutError on timeout; FiTunaError on non-zero exit,
+    failure to launch the binary, or unparsable/empty output.
     """
     depth = max(0, ctx - target.prompt_tokens - target.gen_tokens)
     cmd = [
@@ -119,7 +126,7 @@ def run_bench(
             encoding="utf-8", errors="replace",
         )
     except subprocess.TimeoutExpired as exc:
-        raise FiTunaError(
+        raise BenchTimeoutError(
             f"llama-bench timed out after {timeout_sec}s: {' '.join(cmd)}"
         ) from exc
     except OSError as exc:

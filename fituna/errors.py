@@ -18,6 +18,7 @@ call sites that only care about error handling, not the data model.
 """
 
 from fituna.config import (
+    BenchTimeoutError,
     BinaryNotFoundError,
     FiTunaError,
     ModelConversionError,
@@ -26,6 +27,7 @@ from fituna.config import (
 
 __all__ = [
     "FiTunaError",
+    "BenchTimeoutError",
     "BinaryNotFoundError",
     "ModelConversionError",
     "NoFeasibleConfigError",

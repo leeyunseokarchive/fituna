@@ -53,6 +53,7 @@ from fituna.bench import run_bench
 from fituna.cache import ResultCache
 from fituna.config import (
     BenchResult,
+    BenchTimeoutError,
     BinaryPaths,
     CandidateConfig,
     GPUVendor,
@@ -251,7 +252,25 @@ def search(
                 hit = cache.get_bench(model_fp, hw_fp, cand)
                 if hit is not None:
                     return hit
-            res = run_bench(cand_gguf, ngl, ctx, target, binaries)
+            try:
+                res = run_bench(cand_gguf, ngl, ctx, target, binaries)
+            except BenchTimeoutError:
+                # A config too slow to finish one bench inside the timeout is
+                # a *measurement* ("below any realistic target"), not a search
+                # abort -- e.g. ngl=0 on a mid-size model during the minimal-
+                # ngl binary search. Record it as 0 tok/s so the search walks
+                # on; cached so --resume never pays the timeout twice.
+                progress(
+                    f"[{quant}] ngl={ngl} bench timed out -- treating as "
+                    "0 tok/s (below target)"
+                )
+                res = BenchResult(
+                    candidate=cand,
+                    prompt_tok_per_sec=0.0,
+                    gen_tok_per_sec=0.0,
+                    vram_used_mb=None,
+                    raw_stdout="bench timed out",
+                )
             if cache is not None:
                 cache.put_bench(model_fp, hw_fp, res)
             return res
