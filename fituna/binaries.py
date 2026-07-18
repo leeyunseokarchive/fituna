@@ -27,9 +27,11 @@ _CONVERT_SCRIPT = "convert_hf_to_gguf.py"
 _QUANT_LINE_RE = re.compile(r"^\s*\d+\s+or\s+([A-Za-z0-9_]+)\s*:", re.MULTILINE)
 
 # llama.cpp's build banner has drifted in wording across versions
-# ("main: build = 3765 (c919d5d)", "version: 3765 (c919d5d)", ...); try the
-# richer "number (hash)" form first, then a looser fallback.
+# ("main: build = 3765 (c919d5d)", "version: 3765 (c919d5d)", and current
+# builds print a bare "llama.cpp 9960"); try the richer "number (hash)" form
+# first, then the bare-banner form, then a looser fallback.
 _VERSION_RE_RICH = re.compile(r"(?:build|version)\s*[:=]\s*(\d+\s*\([0-9a-fA-F]+\))")
+_VERSION_RE_BARE = re.compile(r"^llama\.cpp\s+(\d+)\s*$", re.MULTILINE)
 _VERSION_RE_LOOSE = re.compile(r"(?:build|version)\s*[:=]\s*(\S+)")
 
 
@@ -123,17 +125,28 @@ def list_supported_quant_types(paths: BinaryPaths) -> list[str]:
 
 
 def get_llama_cpp_version(paths: BinaryPaths) -> Optional[str]:
-    """Best-effort version string from `llama-bench --version` or similar.
-    Returns None if the binary doesn't expose one.
+    """Best-effort version string from the llama.cpp binaries.
+    Returns None if none of them expose one.
+
+    Probes llama-perplexity as well as llama-bench: current builds'
+    llama-bench rejects --version outright ("error: invalid parameter") and
+    prints no build banner in --help, while llama-perplexity supports
+    --version ("version: 9960 (a935fbffe)") -- verified against Homebrew
+    build 9960.
     """
-    for arg in ("--version", "--help"):
-        try:
-            text = _run_text(paths.llama_bench, arg)
-        except BinaryNotFoundError:
-            return None
-        match = _VERSION_RE_RICH.search(text) or _VERSION_RE_LOOSE.search(text)
-        if match:
-            return match.group(1).strip()
+    for binary in (paths.llama_bench, paths.llama_perplexity):
+        for arg in ("--version", "--help"):
+            try:
+                text = _run_text(binary, arg)
+            except BinaryNotFoundError:
+                continue
+            match = (
+                _VERSION_RE_RICH.search(text)
+                or _VERSION_RE_BARE.search(text)
+                or _VERSION_RE_LOOSE.search(text)
+            )
+            if match:
+                return match.group(1).strip()
     return None
 
 
