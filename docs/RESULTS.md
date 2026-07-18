@@ -98,6 +98,33 @@ Robustness notes from the same session:
   by hitting it on real hardware.
 - Immediate re-run with `--resume`: **0.88 s** to the identical answer.
 - Disk: 12.1 GB for the four quantized files (plus the 7.5 GB F16 base).
-- Speed-search stage wall-clock (quality stage cached): **12 m 53 s**,
-  of which 5 m was the one deliberate ngl=0 timeout.
+- Stage timings, measured: quality stage cold (baseline PPL + 4×
+  quantize + 4× PPL) **5 m 01 s**; speed-search stage **12 m 53 s** (of
+  which 5 m was the one deliberate ngl=0 timeout); full-cache `--resume`
+  **0.88 s**.
+
+### Run-to-run variance (measured, not hidden)
+
+Benchmark numbers on a laptop are thermally sensitive. A second fully-cold
+session (fresh `--out`, machine already hot from an hour of continuous
+benching) reproduced Q6_K/Q8_0/Q5_K_M within ±0.5 tok/s — but measured
+Q4_K_M full-offload at 22.73 tok/s, vs 36.50 in the original session.
+Three immediate direct `llama-bench` repeats of that exact config:
+
+```
+37.53 tok/s ± 0.20      31.97 tok/s ± 6.74      35.35 tok/s ± 3.26
+```
+
+So ~36 tok/s is the sustained figure and 22.73 was a thermal-throttle
+outlier (note the internal std-dev exploding to ±6.7 while the machine was
+loaded). Two practical consequences, both by design:
+
+- FiTuna reports what it measured *in your session, under your thermal
+  conditions* — which is exactly what you'll get when you run the resulting
+  command right after.
+- If a target sits within a few tok/s of a candidate's sustained speed
+  (like 30 vs Q5_K_M's 29.6–29.7 here), treat the verdict as marginal and
+  re-run the search when the machine is at its normal operating state. A
+  roadmap item is to surface llama-bench's per-run std-dev in the report so
+  marginal verdicts are flagged automatically.
 
