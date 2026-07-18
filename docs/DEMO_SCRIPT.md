@@ -2,10 +2,16 @@
 
 이 문서는 FiTuna 데모 영상을 그대로 촬영/편집할 수 있도록 컷 단위로 정리한
 스크립트다. 각 컷마다 "화면", "터미널 입력", "예상 출력", "내레이션(멘트)"을
-모두 명시했다. **예상 출력 블록의 수치(tok/s, perplexity 등)는 실제 모델·
-하드웨어·llama.cpp 빌드에 따라 달라지는 예시값**이며, 실제 녹화 시 그 자리에서
-나온 실측값으로 자연스럽게 대체하면 된다. 로그의 *형태*(어떤 단계에서 무엇을
-출력하는지, 조기종료 조건 A/B/C가 어디서 발동하는지)만 고정하면 된다.
+모두 명시했다. **아래 출력 블록의 수치는 Apple M3 Pro + llama.cpp Homebrew
+build 9960에서 실제로 측정된 값**(`docs/RESULTS.md`와 동일)이다. 다른 하드웨어
+에서 녹화하면 절대값은 달라지므로 그 자리에서 나온 실측값을 그대로 쓰면 된다 —
+로그의 *형태*(어떤 단계에서 무엇을 출력하는지, 조기종료가 어디서 발동하는지)는
+동일하다.
+
+라이브 탐색 컷은 **SmolLM2-135M-Instruct**(Apache 2.0)를 쓴다: 콜드 캐시
+기준 전체 탐색이 **약 76초**라 3분 영상 안에 실시간으로 담긴다. 보고서의 주
+결과(Qwen3-4B)는 탐색이 10분 이상이므로 영상에서는 결과 화면만 보여주거나
+배속 편집으로 처리한다.
 
 ## 목표
 
@@ -20,11 +26,11 @@ FiTuna가 "모델 지정 → 하드웨어/품질 제약 조건 → 최적 양자
 
 ## 사전 준비 (녹화 최소 하루 전에 끝낼 것)
 
-- [ ] 데모용 모델 1개를 로컬에 준비 (예: `./models/Llama-3-8B-Instruct`,
-  GGUF 파일 또는 HF 포맷 디렉토리). 발표 시간(3분) 안에 탐색이 끝나야 하므로
-  너무 큰 모델은 피한다 — 7B~8B급 권장. README 설치 안내 참고.
-- [ ] `./data/wikitext-2-raw` 다운로드 (CC-BY-SA, README 링크 참고). perplexity
-  계산용 코퍼스.
+- [ ] 데모용 모델: `SmolLM2-135M-Instruct-f16.gguf` (F16, 258MB — HuggingFace
+  `bartowski/SmolLM2-135M-Instruct-GGUF`에서 다운로드, Apache 2.0). 135M이라
+  콜드 탐색이 ~76초로 3분 안에 라이브로 들어간다.
+- [ ] `wikitext-2-raw-test.txt` 준비 (README의 export 스니펫 참고, CC BY-SA).
+  perplexity 계산용 코퍼스.
 - [ ] llama.cpp 빌드 산출물(`llama-quantize`, `llama-bench`,
   `llama-perplexity`, `llama-cli`)이 `PATH`에 있거나 `--llama-bin-dir`로
   넘길 디렉토리를 파악해 둔다. `fituna list-binaries`로 사전 확인.
@@ -79,95 +85,79 @@ OS           : linux
 터미널 입력:
 
 ```bash
-$ fituna run --model ./models/Llama-3-8B-Instruct \
-    --target-tps 20 --max-quality-loss 3 \
-    --ctx 4096 --wikitext ./data/wikitext-2-raw --out ./out -v
+$ fituna run --model SmolLM2-135M-Instruct-f16.gguf \
+    --target-tps 240 --max-quality-loss 5 \
+    --ctx 4096 --quant Q8_0,Q6_K,Q5_K_M,Q4_K_M \
+    --ppl-chunks 32 --wikitext wikitext-2-raw-test.txt --out ./out --resume -v
 ```
 
-`-v`(verbose)를 켜서 진행 로그가 충분히 자세히 보이게 한다. 아래는 진행 로그의
-**형태**를 보여주는 예시 — 조기종료 A/B/C가 로그 상에서 어떻게 드러나는지가
-핵심이다.
+`-v`(verbose)로 진행 로그가 자세히 보이게 한다. 아래는 M3 Pro에서 실측된
+로그(콜드 캐시 기준 전체 ~76초). 조기종료 B가 어떻게 드러나는지가 핵심이다.
 
 ```
-2026-07-17 10:02:11 INFO fituna: resolved binaries: llama-quantize, llama-bench,
-  llama-perplexity, llama-cli (llama.cpp b3xxx)
-2026-07-17 10:02:11 INFO fituna: model: Llama-3-8B-Instruct, 32 layers, 8.03B params
-2026-07-17 10:02:12 INFO fituna: baseline perplexity (F16): 5.812 (wikitext-2-raw)
-
---- stage 1: quality gate (quant 후보를 품질 내림차순으로 검증) ---
-2026-07-17 10:02:40 INFO fituna: [Q8_0] quantize -> out/Llama-3-8B-Instruct-Q8_0.gguf
-2026-07-17 10:03:05 INFO fituna: [Q8_0] perplexity 5.913 (+1.74%)  <= 3.0% OK
-2026-07-17 10:03:41 INFO fituna: [Q6_K] quantize -> out/Llama-3-8B-Instruct-Q6_K.gguf
-2026-07-17 10:04:02 INFO fituna: [Q6_K] perplexity 5.968 (+2.68%)  <= 3.0% OK
-2026-07-17 10:04:35 INFO fituna: [Q5_K_M] quantize -> out/Llama-3-8B-Instruct-Q5_K_M.gguf
-2026-07-17 10:04:57 INFO fituna: [Q5_K_M] perplexity 6.041 (+3.94%)  > 3.0% SKIP (품질 기준 초과)
-
---- stage 2: quant을 품질 내림차순으로 순회하며 속도 탐색 ---
-2026-07-17 10:05:10 INFO fituna: [Q8_0] top bench: ngl=32(full) -> gen 14.2 tok/s
-  (target 20.0) MISS -> 조기종료 B, 다음 quant로 이동
-2026-07-17 10:05:38 INFO fituna: [Q6_K] top bench: ngl=32(full) -> gen 22.8 tok/s
-  (target 20.0) HIT -> ngl 이진탐색 시작
-2026-07-17 10:05:52 INFO fituna: [Q6_K] low bench: ngl=0(cpu-only) -> gen 6.1 tok/s
-  (target 20.0) MISS -> GPU 오프로드 필요, 이진탐색 진행
-2026-07-17 10:06:05 INFO fituna: [Q6_K] ngl=16 -> gen 15.9 tok/s  MISS  lo=17
-2026-07-17 10:06:19 INFO fituna: [Q6_K] ngl=24 -> gen 21.4 tok/s  HIT   hi=24 (best)
-2026-07-17 10:06:32 INFO fituna: [Q6_K] ngl=20 -> gen 18.7 tok/s  MISS  lo=21
-2026-07-17 10:06:46 INFO fituna: [Q6_K] ngl=22 -> gen 20.9 tok/s  HIT   hi=22 (best)
-2026-07-17 10:06:46 INFO fituna: [Q6_K] ngl 이진탐색 종료 (4/6 calls) -> 최소 ngl=22
-2026-07-17 10:06:46 INFO fituna: 목표 충족: quant=Q6_K ngl=22 ctx=4096 -> 전체 탐색 조기종료
-  (Q6_K보다 저품질인 Q5_K_M 이하는 이미 품질 게이트에서 제외되어 시도하지 않음)
+INFO fituna: computing baseline perplexity on base GGUF
+INFO fituna: [Q8_0] quantizing
+INFO fituna: [Q8_0] evaluating quality
+INFO fituna: [Q6_K] quantizing
+INFO fituna: [Q6_K] evaluating quality
+INFO fituna: [Q5_K_M] quantizing
+...
+INFO fituna: [Q8_0] bench full-offload (ngl=30)
+INFO fituna: [Q8_0] full-offload 205.91 tok/s < target 240.00, skipping (early-exit B)
+INFO fituna: [Q6_K] bench full-offload (ngl=30)
+INFO fituna: [Q6_K] found ngl=30 meeting target -- done
 ```
 
 - **내레이션 (로그가 흐르는 동안)**:
-  > "Q8_0부터 품질을 먼저 검사합니다 — perplexity 손실이 3% 이내인 quant만
-  > 통과시킵니다. Q5_K_M은 품질 기준을 넘어서 자동으로 제외됩니다. 그 다음
-  > 남은 quant를 품질이 좋은 순서대로 순회하며 속도를 봅니다. Q8_0은 전체
-  > 레이어를 GPU에 올려도 목표(20 tok/s)에 못 미쳐 즉시 건너뛰고, Q6_K는
-  > 가능성이 있으니 `-ngl` 이진탐색으로 목표를 만족하는 **최소** GPU
-  > 오프로드 레이어 수를 찾습니다. 목표를 만족하는 조합을 찾는 즉시 — 여기서는
-  > Q6_K, ngl=22 — 탐색을 멈춥니다. 더 낮은 품질의 quant는 아예 시도조차
+  > "모든 후보의 품질을 먼저 실측합니다 — 이 순서는 통념이 아니라 방금 잰
+  > perplexity 기준입니다. 그 다음 품질이 좋은 순서대로 속도를 봅니다.
+  > '당연히 가장 좋을' Q8_0은 실측 205 tok/s로 목표 240에 못 미쳐 즉시
+  > 건너뛰고, 다음 후보 Q6_K가 249.5 tok/s로 목표를 만족하는 순간 탐색이
+  > 멈춥니다. 품질손실은 0.53%에 불과합니다. 더 낮은 품질의 quant는 시도조차
   > 하지 않아요."
-- **화면 강조**: `조기종료 B`, `HIT`, `전체 탐색 조기종료` 줄이 나올 때
-  자막이나 하이라이트 박스로 짚어준다.
-- 만약 리허설에서 이 구간이 3분 예산에 비해 너무 길다면(quant가 여러 개 걸리는
-  경우), `--ngl_max_calls`는 CLI 옵션이 아니므로 대신 `--target-tps`를 조금
-  낮추거나 더 작은 모델로 바꿔서 리허설 단계에서 미리 조정한다.
+- **화면 강조**: `early-exit B` 줄과 `found ngl=30 meeting target` 줄에
+  자막/하이라이트.
+- **덧붙일 포인트(자막)**: 이 하드웨어에선 Q4_K_M(244.34 tok/s)이 더 큰
+  Q6_K(249.50 tok/s)보다 오히려 *느리다* — 파일 크기 기반 직관이 틀리는
+  실측 사례.
 
 ### 4. 2:20–2:50 — 결과 확인
 
-탐색이 끝나면 사람이 읽는 최종 리포트가 출력된다:
+탐색이 끝나면 사람이 읽는 최종 리포트가 출력된다 (M3 Pro 실측):
 
 ```
-=== FiTuna search result ===
-model         : ./models/Llama-3-8B-Instruct
-selected quant: Q6_K   (baseline 대비 perplexity +2.68%, 허용 3.0%)
-ngl / ctx     : 22 / 32 layers offloaded, ctx=4096
-throughput    : prompt 812.4 tok/s, gen 20.9 tok/s  (목표 20.0 tok/s) -> MEETS TARGET
-gguf          : out/Llama-3-8B-Instruct-Q6_K.gguf
+FiTuna result: MEETS TARGET
 
-바로 실행:
-  llama-cli -m out/Llama-3-8B-Instruct-Q6_K.gguf -ngl 22 -c 4096
+  quant           : Q6_K
+  ngl             : 30
+  ctx             : 4096
+  gguf            : out/SmolLM2-135M-Instruct-d4777063db8a-Q6_K.gguf
+
+  prompt tok/s (pp): 2939.98
+  gen tok/s    (tg): 249.50
+
+  perplexity      : 18.3377 (baseline 18.2407)
+  quality loss    : 0.53%
+
+  run command:
+    llama-cli -m out/SmolLM2-135M-Instruct-d4777063db8a-Q6_K.gguf -ngl 30 -c 4096
 ```
 
 - **내레이션**:
   > "결과는 선택된 quant, ngl, ctx, 실측 tok/s, 품질 손실률, 그리고 그대로
-  > 복사해서 실행 가능한 `llama-cli` 커맨드까지 한 번에 나옵니다. 이 커맨드를
-  > 그대로 실행하면 방금 찾은 설정으로 바로 추론을 시작할 수 있습니다."
-- 화면에서 `llama-cli ...` 줄을 마우스로 드래그해 선택하거나 복사하는 동작을
-  보여주면 "그대로 실행 가능"이라는 메시지가 시각적으로 강화된다.
-- **캐시 재사용 보여주기**: 같은 커맨드에 `--resume`만 붙여 다시 실행한다.
-
-  ```bash
-  $ fituna run --model ./models/Llama-3-8B-Instruct \
-      --target-tps 20 --max-quality-loss 3 \
-      --ctx 4096 --wikitext ./data/wikitext-2-raw --out ./out --resume
-  ```
-
+  > 복사해서 실행 가능한 `llama-cli` 커맨드까지 한 번에 나옵니다."
+- 화면에서 `llama-cli ...` 줄을 마우스로 드래그해 복사하는 동작을 보여주면
+  "그대로 실행 가능"이라는 메시지가 시각적으로 강화된다.
+- **캐시 재사용 보여주기**: 같은 커맨드를 한 번 더 실행한다(--resume 포함).
   이번에는 quantize/bench/perplexity를 다시 돌리지 않고 `.fituna_cache.sqlite3`
-  에서 즉시 읽어와 몇 초 안에 동일한 결과가 출력된다.
-  > "`--resume`을 붙이면 이미 계산한 벤치마크·품질 결과를 sqlite3 캐시에서
-  > 즉시 재사용합니다 — 같은 모델·하드웨어 조합이면 llama.cpp를 다시 부르지
-  > 않아요."
+  에서 즉시 읽어와 **1초 미만**(실측 0.75초)에 동일한 결과가 출력된다.
+  > "`--resume` 캐시 덕에 같은 모델·하드웨어·llama.cpp 빌드 조합이면 1초 안에
+  > 같은 답이 재현됩니다. 벤치마크가 재현 가능한 산출물이 된다는 뜻입니다."
+- **(선택) 보고서 주 결과 언급**: Qwen3-4B 실측 결과 화면(docs/RESULTS.md의
+  표)을 잠깐 비추며:
+  > "4B급 모델에서는 통념상 최상인 Q8_0이 실측 품질에서도 Q6_K에 밀리고,
+  > 속도에서도 목표 미달이었습니다. 최종 답은 Q4_K_M을 GPU 레이어 33개만
+  > 올리는 구성 — 이런 답은 실측 없이는 나올 수 없습니다."
 
 ### 5. 2:50–3:00 — 마무리
 
@@ -199,8 +189,8 @@ gguf          : out/Llama-3-8B-Instruct-Q6_K.gguf
 
 ## 준비물 요약
 
-- Llama-3-8B-Instruct 등 데모용 모델 1개 (README의 설치 안내 참고).
-- `data/wikitext-2-raw` (README에 다운로드 링크 명시, CC-BY-SA 라이선스).
+- SmolLM2-135M-Instruct-f16.gguf (라이브 탐색용, Apache 2.0).
+- `wikitext-2-raw-test.txt` (README의 export 스니펫 참고, CC BY-SA 라이선스).
 - llama.cpp 빌드 산출물이 PATH에 있거나 `--llama-bin-dir`로 지정 가능한 상태.
 - 리허설 1회 완료 + `./out`, `.fituna_cache.sqlite3` 초기화(`rm -rf ./out`)
   한 상태로 본 촬영 시작.
