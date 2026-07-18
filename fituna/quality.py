@@ -14,7 +14,7 @@ from typing import Optional
 
 from fituna.config import BinaryPaths, FiTunaError, QualityResult
 
-# ponytail: llama-perplexity has no built-in timeout of its own and a full
+# llama-perplexity has no built-in timeout of its own and a full
 # wikitext-2 pass on a large model can run long; 30 min is a generous default
 # ceiling. Bump via PPL_TIMEOUT_SEC module attribute if a caller needs more.
 PPL_TIMEOUT_SEC = 1800

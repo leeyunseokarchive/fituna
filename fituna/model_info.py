@@ -250,12 +250,27 @@ def read_model_info(gguf_path: Path, binaries: BinaryPaths) -> ModelInfo:
             f"{gguf_path}: missing '{architecture}.block_count' metadata key"
         )
 
+    file_type = metadata.get("general.file_type")
+
     return ModelInfo(
         architecture=architecture,
         n_layers=int(n_layers),
         n_params=int(n_params),
         base_gguf_path=gguf_path,
+        file_type=int(file_type) if isinstance(file_type, int) else None,
     )
+
+
+# LLAMA_FTYPE values that are NOT quantized (llama.cpp llama.h): F32, F16, BF16.
+_UNQUANTIZED_FILE_TYPES = frozenset({0, 1, 32})
+
+
+def is_already_quantized(info: ModelInfo) -> bool:
+    """True when the base GGUF's 'general.file_type' says it is already a
+    quantized file. Re-quantizing a quantized GGUF silently degrades quality
+    twice AND makes the perplexity 'baseline' a quantized model, so callers
+    should warn loudly. None (key absent) is treated as not-quantized."""
+    return info.file_type is not None and info.file_type not in _UNQUANTIZED_FILE_TYPES
 
 
 def model_fingerprint(path: Path) -> str:
@@ -270,7 +285,7 @@ def model_fingerprint(path: Path) -> str:
 
 
 # --- self-check -------------------------------------------------------------
-# ponytail: no test framework needed for a single module's worth of parsing
+# no test framework needed for a single module's worth of parsing
 # logic -- an assert-based demo() that builds a minimal synthetic GGUF is the
 # smallest thing that fails if the binary parser or fingerprint break.
 def _write_gguf_string(buf: bytearray, s: str) -> None:

@@ -8,7 +8,7 @@ interface contract (single source of truth for cross-module types). This
 module exists only so ``from fituna.errors import ...`` reads naturally from
 call sites that only care about error handling, not the data model.
 
-# ponytail: this file is a pure re-export shim, not a second definition site.
+# this file is a pure re-export shim, not a second definition site.
 # Every other module in this package imports the exceptions straight from
 # fituna.config (the contract), so nothing here can drift out of sync with
 # it -- there is exactly one class body for each exception, in config.py.

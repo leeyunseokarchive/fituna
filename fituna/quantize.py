@@ -13,7 +13,7 @@ from pathlib import Path
 
 from fituna.config import BinaryPaths, BinaryNotFoundError, FiTunaError
 
-# ponytail: base GGUF files produced by model_info.ensure_base_gguf are named
+# base GGUF files produced by model_info.ensure_base_gguf are named
 # like "<model>-f16.gguf" / "<model>-f32.gguf" (see model_info.py contract:
 # work_dir/base-f16.gguf). Strip that float-precision suffix so the quantized
 # output reads as "<model>-<quant>.gguf" instead of "<model>-f16-<quant>.gguf".

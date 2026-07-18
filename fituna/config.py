@@ -88,6 +88,10 @@ class ModelInfo:
     n_layers: int
     n_params: int
     base_gguf_path: Path  # 양자화 기준 원본(F16/F32) GGUF
+    # GGUF 'general.file_type' (llama.cpp LLAMA_FTYPE enum). 0=F32, 1=F16,
+    # 32=BF16; anything else means the file is already quantized. None when
+    # the writer didn't set the key.
+    file_type: Optional[int] = None
 
 
 @dataclass(frozen=True)

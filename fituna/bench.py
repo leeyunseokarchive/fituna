@@ -24,7 +24,7 @@ def _quant_from_filename(gguf_path: Path) -> str:
     quant token, so the CandidateConfig attached to the BenchResult is
     reconstructed from the naming convention fituna.quantize.quantize() uses
     (``<model>-<quant>.gguf``).
-    ponytail: naive suffix split on the last "-"; good enough since fituna
+    naive suffix split on the last "-"; good enough since fituna
     only ever benches files it named itself. Falls back to the full stem for
     anything that doesn't match.
     """

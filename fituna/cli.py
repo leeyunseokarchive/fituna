@@ -51,7 +51,14 @@ _QUANT_QUALITY_ORDER: tuple[str, ...] = next(
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="fituna", description=__doc__)
+    parser = argparse.ArgumentParser(
+        prog="fituna",
+        description=(
+            "Find the smallest llama.cpp quantization + runtime config "
+            "(quant, -ngl, ctx) that meets a target throughput within a "
+            "quality-loss budget, by benchmarking on your actual hardware."
+        ),
+    )
     parser.add_argument(
         "-v", "--verbose", action="store_true", help="enable debug logging"
     )
@@ -201,6 +208,15 @@ def _cmd_run(args: argparse.Namespace) -> int:
     model_path = Path(args.model)
     base_gguf = model_info.ensure_base_gguf(model_path, work_dir, bins)
     minfo = model_info.read_model_info(base_gguf, bins)
+    if model_info.is_already_quantized(minfo):
+        print(
+            f"WARNING: {base_gguf.name} is already quantized "
+            f"(GGUF general.file_type={minfo.file_type}). Quality loss will be "
+            "measured against this quantized file, not the original F16/F32 "
+            "weights, and re-quantizing it degrades quality twice. Use an "
+            "F16/BF16/F32 GGUF (or the original HF directory) as --model.",
+            file=sys.stderr,
+        )
 
     target = TargetSpec(
         model_path=model_path,

@@ -48,7 +48,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Callable, Optional
 
-from fituna.binaries import list_supported_quant_types
+from fituna.binaries import get_llama_cpp_version, list_supported_quant_types
 from fituna.bench import run_bench
 from fituna.cache import ResultCache
 from fituna.config import (
@@ -69,7 +69,7 @@ from fituna.quantize import quantize
 from fituna.report import build_run_command
 
 # Sentinel quant key used to cache the base-GGUF baseline perplexity inside
-# quality_cache (which is keyed by (model_fp, quant)). ponytail: cache.py's
+# quality_cache (which is keyed by (model_fp, quant)). cache.py's
 # contract only exposes get_quality/put_quality keyed by quant name, so
 # rather than growing the cache schema for one extra value, the baseline is
 # stashed under a quant name real llama-quantize output can never produce.
@@ -81,13 +81,22 @@ _BASELINE_QUANT_KEY = "__baseline__"
 _SAFE_QUANT_RE = re.compile(r"^[A-Za-z0-9_]+$")
 
 
-def _hardware_fingerprint(hw: HardwareProfile) -> str:
+def _hardware_fingerprint(hw: HardwareProfile, llama_version: Optional[str]) -> str:
     """Coarse, deterministic cache-key namespace for a hardware profile.
+
+    ``llama_version`` is part of the key: benchmark numbers are a property of
+    the llama.cpp build as much as of the hardware (a backend speedup between
+    builds changes gen_tok_per_sec on identical hardware), so results measured
+    under one build must not be served as --resume cache hits under another.
+    ``None`` (version undetectable) still produces a stable key.
 
     Not part of the cross-module contract (cache.py only takes an opaque
     ``hw_fp`` string) so it stays private to this module.
     """
-    raw = f"{hw.gpu_vendor.value}|{hw.gpu_name}|{hw.vram_mb}|{hw.cpu_cores}|{hw.ram_mb}|{hw.os_name}"
+    raw = (
+        f"{hw.gpu_vendor.value}|{hw.gpu_name}|{hw.vram_mb}|{hw.cpu_cores}"
+        f"|{hw.ram_mb}|{hw.os_name}|llama={llama_version or 'unknown'}"
+    )
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
@@ -126,7 +135,7 @@ def search(
         return deadline is None or time.monotonic() < deadline
 
     model_fp = model_fingerprint(model_info.base_gguf_path)
-    hw_fp = _hardware_fingerprint(hw)
+    hw_fp = _hardware_fingerprint(hw, get_llama_cpp_version(binaries))
 
     # ctx grid: target.ctx is always the primary (recorded) ctx; any other
     # ctx_candidates are re-verified at the winning ngl but never recorded
@@ -390,7 +399,7 @@ def _self_check() -> None:
     """
     import sys
 
-    # ponytail: `import fituna.search as _mod` would re-import a *second*,
+    # `import fituna.search as _mod` would re-import a *second*,
     # freshly-loaded module object when this file is run as `__main__`
     # (python -m fituna.search runs it under the name "__main__", separate
     # from any "fituna.search" entry in sys.modules) -- patches on that

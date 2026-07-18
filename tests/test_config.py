@@ -280,3 +280,21 @@ def test_no_feasible_config_error_carries_closest_result_payload():
 def test_no_feasible_config_error_is_catchable_as_base_fituna_error():
     with pytest.raises(FiTunaError):
         raise NoFeasibleConfigError("boom")
+
+
+def test_is_already_quantized():
+    from pathlib import Path
+
+    from fituna.model_info import is_already_quantized
+
+    def info(ft):
+        return ModelInfo(
+            architecture="llama", n_layers=1, n_params=1,
+            base_gguf_path=Path("x.gguf"), file_type=ft,
+        )
+
+    assert not is_already_quantized(info(None))   # key absent -> assume fine
+    assert not is_already_quantized(info(0))      # F32
+    assert not is_already_quantized(info(1))      # F16
+    assert not is_already_quantized(info(32))     # BF16
+    assert is_already_quantized(info(15))         # Q4_K_M etc.

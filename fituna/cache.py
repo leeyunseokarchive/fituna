@@ -83,7 +83,7 @@ class ResultCache:
     def __init__(self, db_path: Path) -> None:
         db_path = Path(db_path)
         db_path.parent.mkdir(parents=True, exist_ok=True)
-        # ponytail: single connection, no pooling -- this is a local CLI tool,
+        # single connection, no pooling -- this is a local CLI tool,
         # not a server; check_same_thread=False costs nothing since search()
         # runs sequentially anyway.
         self._conn = sqlite3.connect(str(db_path), check_same_thread=False)

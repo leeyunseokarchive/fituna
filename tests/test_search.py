@@ -393,3 +393,14 @@ def test_search_returns_best_effort_on_time_budget_timeout(monkeypatch, tmp_path
     assert result.config.quant == "Q8_0"
     assert result.bench.gen_tok_per_sec == 30.0
     assert bench_calls == ["Q8_0"], "Q4_K_M must never be reached once the budget is spent"
+
+
+def test_hardware_fingerprint_varies_with_llama_version():
+    from fituna.search import _hardware_fingerprint
+
+    hw = _hw()
+    a = _hardware_fingerprint(hw, "3765 (c919d5d)")
+    b = _hardware_fingerprint(hw, "9960 (abc1234)")
+    c = _hardware_fingerprint(hw, None)
+    assert len({a, b, c}) == 3, "llama.cpp version must namespace the bench cache"
+    assert a == _hardware_fingerprint(hw, "3765 (c919d5d)"), "must stay deterministic"

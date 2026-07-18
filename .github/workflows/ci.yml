@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.11", "3.13"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install pytest
+      - name: Unit tests
+        run: pytest -q
+      - name: Module self-checks
+        run: |
+          python -m fituna.config
+          python -m fituna.cache
+          python -m fituna.search
+          python -m fituna.model_info
+          python -m fituna.quantize
+          python -m fituna.quality
+          python -m fituna.bench
+          python -m fituna.hardware
+          python -m fituna.binaries
+          python -m fituna.report
+          python -m fituna.cli --selfcheck

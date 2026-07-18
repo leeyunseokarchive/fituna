@@ -190,7 +190,7 @@ def _detect_ram_mb() -> int:
             except ValueError:
                 pass
     elif system == "Windows":
-        # ponytail: stdlib-only Windows RAM query via ctypes; if this ever
+        # stdlib-only Windows RAM query via ctypes; if this ever
         # needs more precision (e.g. per-NUMA-node), swap in `psutil`.
         try:
             import ctypes
@@ -214,7 +214,7 @@ def _detect_ram_mb() -> int:
             return int(stat.ullTotalPhys) // (1024 * 1024)
         except Exception:
             pass
-    return 0  # ponytail: detection failed / unknown platform, caller treats 0 as "unknown"
+    return 0  # detection failed / unknown platform, caller treats 0 as "unknown"
 
 
 # ---------------------------------------------------------------------------
@@ -248,7 +248,7 @@ def detect_hardware() -> HardwareProfile:
             if apple is not None:
                 gpu_vendor, gpu_name, vram_mb = apple
                 if gpu_vendor == GPUVendor.APPLE and vram_mb is None:
-                    # ponytail: Apple Silicon unified memory has no separate
+                    # Apple Silicon unified memory has no separate
                     # VRAM figure; approximate with total system RAM. Upgrade
                     # if a precise unified-memory-GPU-share API shows up.
                     vram_mb = ram_mb

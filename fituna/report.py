@@ -45,7 +45,7 @@ def _find_llama_cli(binaries: BinaryPaths) -> str:
     if found:
         return found
 
-    # ponytail: no llama-cli found anywhere -- return the bare command name
+    # no llama-cli found anywhere -- return the bare command name
     # rather than raising. The command is advisory (user copy-pastes it);
     # search/bench/quantize already succeeded without needing llama-cli.
     return "llama-cli"
