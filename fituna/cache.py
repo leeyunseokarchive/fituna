@@ -24,6 +24,14 @@ inside a composite PRIMARY KEY, but NULLs are never considered equal to each
 other for uniqueness, so "INSERT OR REPLACE" with a raw NULL key component
 would accumulate a new row on every write instead of overwriting the
 previous one.
+
+``corpus_fp`` is part of the key for the same reason: perplexity is a
+property of (model, quant, corpus). Without it, switching --quality-corpus
+from English wikitext to a Korean corpus under --resume would silently
+serve the English measurements as "Korean" results -- found designing
+exactly that comparison experiment. Old cache files created before this
+column existed are dropped and rebuilt (it's a cache; remeasuring is the
+correct response to a schema upgrade).
 """
 
 from __future__ import annotations
@@ -54,11 +62,12 @@ CREATE TABLE IF NOT EXISTS quality_cache (
     model_fp TEXT NOT NULL,
     quant TEXT NOT NULL,
     ppl_chunks INTEGER NOT NULL,
+    corpus_fp TEXT NOT NULL DEFAULT '',
     perplexity REAL NOT NULL,
     baseline_perplexity REAL NOT NULL,
     loss_pct REAL NOT NULL,
     created_at TEXT NOT NULL,
-    PRIMARY KEY (model_fp, quant, ppl_chunks)
+    PRIMARY KEY (model_fp, quant, ppl_chunks, corpus_fp)
 );
 """
 
@@ -88,6 +97,18 @@ class ResultCache:
         # runs sequentially anyway.
         self._conn = sqlite3.connect(str(db_path), check_same_thread=False)
         try:
+            # Pre-corpus_fp cache files have a quality_cache without the
+            # corpus dimension; serving their rows would repeat the exact
+            # stale-measurement bug the column exists to prevent. Drop and
+            # rebuild -- a cache remeasures, it doesn't migrate.
+            cols = {
+                row[1]
+                for row in self._conn.execute(
+                    "PRAGMA table_info(quality_cache)"
+                ).fetchall()
+            }
+            if cols and "corpus_fp" not in cols:
+                self._conn.execute("DROP TABLE quality_cache")
             self._conn.executescript(_SCHEMA)
             self._conn.commit()
         except sqlite3.DatabaseError as exc:
@@ -152,12 +173,17 @@ class ResultCache:
         self._conn.commit()
 
     def get_quality(
-        self, model_fp: str, quant: str, ppl_chunks: Optional[int] = None
+        self,
+        model_fp: str,
+        quant: str,
+        ppl_chunks: Optional[int] = None,
+        corpus_fp: str = "",
     ) -> Optional[QualityResult]:
         row = self._conn.execute(
             """SELECT perplexity, baseline_perplexity, loss_pct
-               FROM quality_cache WHERE model_fp=? AND quant=? AND ppl_chunks=?""",
-            (model_fp, quant, _chunks_key(ppl_chunks)),
+               FROM quality_cache
+               WHERE model_fp=? AND quant=? AND ppl_chunks=? AND corpus_fp=?""",
+            (model_fp, quant, _chunks_key(ppl_chunks), corpus_fp),
         ).fetchone()
         if row is None:
             return None
@@ -170,16 +196,22 @@ class ResultCache:
         )
 
     def put_quality(
-        self, model_fp: str, result: QualityResult, ppl_chunks: Optional[int] = None
+        self,
+        model_fp: str,
+        result: QualityResult,
+        ppl_chunks: Optional[int] = None,
+        corpus_fp: str = "",
     ) -> None:
         self._conn.execute(
             """INSERT OR REPLACE INTO quality_cache
-               (model_fp, quant, ppl_chunks, perplexity, baseline_perplexity, loss_pct, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+               (model_fp, quant, ppl_chunks, corpus_fp, perplexity,
+                baseline_perplexity, loss_pct, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 model_fp,
                 result.candidate_quant,
                 _chunks_key(ppl_chunks),
+                corpus_fp,
                 result.perplexity,
                 result.baseline_perplexity,
                 result.quality_loss_pct,

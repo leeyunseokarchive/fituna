@@ -137,6 +137,13 @@ def search(
 
     model_fp = model_fingerprint(model_info.base_gguf_path)
     hw_fp = _hardware_fingerprint(hw, get_llama_cpp_version(binaries))
+    # Same cheap name:size:mtime fingerprint as the model's -- perplexity is
+    # a property of (model, quant, corpus), so the corpus must namespace the
+    # quality cache or switching --quality-corpus under --resume would
+    # silently serve measurements from the previous corpus. Only computed
+    # when a cache exists: it stats the file, and cache-less runs never
+    # touch the corpus until llama-perplexity does.
+    corpus_fp = model_fingerprint(wikitext_path) if cache is not None else ""
 
     # ctx grid: target.ctx is always the primary (recorded) ctx; any other
     # ctx_candidates are re-verified at the winning ngl but never recorded
@@ -176,7 +183,9 @@ def search(
     # Baseline perplexity: one call, cached across runs via the sentinel key.
     baseline_ppl: Optional[float] = None
     if cache is not None:
-        cached_baseline = cache.get_quality(model_fp, _BASELINE_QUANT_KEY, target.ppl_chunks)
+        cached_baseline = cache.get_quality(
+            model_fp, _BASELINE_QUANT_KEY, target.ppl_chunks, corpus_fp
+        )
         if cached_baseline is not None:
             baseline_ppl = cached_baseline.perplexity
     if baseline_ppl is None:
@@ -194,6 +203,7 @@ def search(
                     quality_loss_pct=0.0,
                 ),
                 target.ppl_chunks,
+                corpus_fp,
             )
 
     best_effort: Optional[SearchResult] = None
@@ -216,7 +226,9 @@ def search(
         cand_gguf = quantize(model_info.base_gguf_path, quant, work_dir, binaries, model_fp)
 
         quality_res = (
-            cache.get_quality(model_fp, quant, target.ppl_chunks) if cache is not None else None
+            cache.get_quality(model_fp, quant, target.ppl_chunks, corpus_fp)
+            if cache is not None
+            else None
         )
         if quality_res is None:
             progress(f"[{quant}] evaluating quality")
@@ -224,7 +236,7 @@ def search(
                 quant, cand_gguf, baseline_ppl, wikitext_path, binaries, target.ppl_chunks
             )
             if cache is not None:
-                cache.put_quality(model_fp, quality_res, target.ppl_chunks)
+                cache.put_quality(model_fp, quality_res, target.ppl_chunks, corpus_fp)
 
         if quality_res.quality_loss_pct > target.max_quality_loss_pct:
             progress(

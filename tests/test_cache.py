@@ -300,3 +300,43 @@ def test_close_then_reuse_raises(tmp_path: Path):
     c.close()
     with pytest.raises(sqlite3.ProgrammingError):
         c.get_bench("model-fp", "hw-fp", cand)
+
+
+def test_quality_cache_keyed_by_corpus(tmp_path):
+    """Perplexity is a property of (model, quant, corpus): a measurement on
+    the English corpus must not be served for a request scoped to a Korean
+    corpus, and vice versa."""
+    cache = ResultCache(tmp_path / "c.sqlite3")
+    en = QualityResult(candidate_quant="Q4_K_M", perplexity=6.1,
+                       baseline_perplexity=6.0, quality_loss_pct=1.67)
+    ko = QualityResult(candidate_quant="Q4_K_M", perplexity=9.5,
+                       baseline_perplexity=9.0, quality_loss_pct=5.56)
+
+    cache.put_quality("m", en, ppl_chunks=32, corpus_fp="corpus-en")
+    assert cache.get_quality("m", "Q4_K_M", ppl_chunks=32, corpus_fp="corpus-ko") is None
+    cache.put_quality("m", ko, ppl_chunks=32, corpus_fp="corpus-ko")
+    assert cache.get_quality("m", "Q4_K_M", ppl_chunks=32, corpus_fp="corpus-en") == en
+    assert cache.get_quality("m", "Q4_K_M", ppl_chunks=32, corpus_fp="corpus-ko") == ko
+    cache.close()
+
+
+def test_old_schema_quality_cache_dropped_not_served(tmp_path):
+    """A cache file created before corpus_fp existed must be rebuilt, not
+    have its corpus-ambiguous rows served as hits."""
+    db = tmp_path / "old.sqlite3"
+    conn = sqlite3.connect(str(db))
+    conn.executescript(
+        """CREATE TABLE quality_cache (
+               model_fp TEXT NOT NULL, quant TEXT NOT NULL,
+               ppl_chunks INTEGER NOT NULL, perplexity REAL NOT NULL,
+               baseline_perplexity REAL NOT NULL, loss_pct REAL NOT NULL,
+               created_at TEXT NOT NULL,
+               PRIMARY KEY (model_fp, quant, ppl_chunks));
+           INSERT INTO quality_cache VALUES ('m', 'Q8_0', 32, 6.0, 6.0, 0.0, 'x');"""
+    )
+    conn.commit()
+    conn.close()
+
+    cache = ResultCache(db)
+    assert cache.get_quality("m", "Q8_0", ppl_chunks=32) is None
+    cache.close()
