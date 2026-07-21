@@ -103,6 +103,41 @@ Robustness notes from the same session:
   which 5 m was the one deliberate ngl=0 timeout); full-cache `--resume`
   **0.88 s**.
 
+## Run 3 — English vs Korean quality corpus (same model, same quants)
+
+Motivation: quality loss is measured as perplexity increase on a corpus —
+so which corpus? We measured Qwen3-4B-Instruct-2507 with the identical
+quantized files against both the English default (wikitext-2 test split)
+and Korean Wikipedia (`wikimedia/wikipedia` `20231101.ko`, first 500
+articles, CC BY-SA), `--ppl-chunks 32`:
+
+| Quant | Quality loss (EN wikitext) | Quality loss (KO kowiki) |
+|---|---|---|
+| Q6_K | −0.30 % | −0.06 % |
+| Q8_0 | +0.07 % | −0.01 % |
+| Q5_K_M | +1.53 % | +0.48 % |
+| Q4_K_M | +1.73 % | +0.77 % |
+
+Two honest observations:
+
+- **The ranking happened to stay the same** (Q6_K best → Q4_K_M worst on
+  both corpora). We do not claim the order always flips.
+- **The magnitudes differ by >2×** — and that changes real verdicts. With
+  `--max-quality-loss 1`, the English corpus kills Q5_K_M/Q4_K_M at the
+  quality gate (early-exit A), the surviving quants are too slow, and the
+  search honestly reports **BEST EFFORT (target not met)**. The Korean
+  corpus passes all four, and Q4_K_M meets the target at ngl=34
+  (30.06 tok/s, 0.77 % loss). Same model, same machine, same target, same
+  budget — **the corpus alone flips feasibility.** If your users speak
+  Korean, gate on Korean text (`--quality-corpus kowiki-corpus.txt`; export
+  snippet in the README).
+
+Incidentally, designing this experiment caught a real cache bug: quality
+results were keyed by (model, quant, chunks) but not by corpus, so the
+second corpus would silently reuse the first corpus's numbers. The cache
+key now includes a corpus fingerprint — the tool's honesty is itself
+regression-tested.
+
 ### Run-to-run variance (measured, not hidden)
 
 Benchmark numbers on a laptop are thermally sensitive. A second fully-cold

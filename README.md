@@ -237,8 +237,10 @@ Silicon); see [Known limitations](#known-limitations).
 
 - [x] **MCP server** — AI coding agents get measured local-model
   recommendations instead of guessing from specs (`fituna-mcp`)
-- [ ] **Korean calibration corpus option** — quality measurement on Korean
-  text for Korean open-weight models (EXAONE, Qwen, ...)
+- [x] **Korean calibration corpus option** — `--quality-corpus` gates on
+  any language's text; measured EN-vs-KO comparison shows the corpus alone
+  can flip a feasibility verdict
+  ([data](docs/RESULTS.md#run-3--english-vs-korean-quality-corpus-same-model-same-quants))
 - [ ] NVIDIA/Linux measured-results matrix (Colab-reproducible notebook)
 - [ ] Surface llama-bench std-dev to auto-flag marginal verdicts
 - [ ] Multi-GPU `--tensor-split` support
