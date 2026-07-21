@@ -175,6 +175,26 @@ run-to-run variance analysis (including a thermal-throttle outlier we caught
 and documented): **[docs/RESULTS.md](docs/RESULTS.md)** · Usage scenarios:
 [docs/USE_CASES.md](docs/USE_CASES.md)
 
+## MCP server — measured answers for AI agents
+
+Ask a chatbot "which local model config fits my machine?" and it guesses
+from specs. Point it at FiTuna's MCP server and it *measures*:
+
+```bash
+claude mcp add fituna -- fituna-mcp      # or any MCP client, stdio transport
+```
+
+Tools exposed:
+
+| Tool | What it does |
+|---|---|
+| `fituna_detect_hardware` | GPU vendor/name, VRAM, CPU cores, RAM as FiTuna sees them |
+| `fituna_recommend` | Run the measured search for a target spec; returns the winning config, measured tok/s, measured quality loss, and a ready-to-run command. Slow once, ~1 s on repeat (cache). |
+
+The server is stdlib-only like the rest of FiTuna — the MCP stdio transport
+is newline-delimited JSON-RPC 2.0, no SDK required
+([`fituna/mcp_server.py`](fituna/mcp_server.py)).
+
 ## Project structure
 
 ```
@@ -198,8 +218,8 @@ Silicon); see [Known limitations](#known-limitations).
 
 ## Roadmap
 
-- [ ] **MCP server** — let AI coding agents request measured local-model
-  recommendations instead of guessing from specs
+- [x] **MCP server** — AI coding agents get measured local-model
+  recommendations instead of guessing from specs (`fituna-mcp`)
 - [ ] **Korean calibration corpus option** — quality measurement on Korean
   text for Korean open-weight models (EXAONE, Qwen, ...)
 - [ ] NVIDIA/Linux measured-results matrix (Colab-reproducible notebook)

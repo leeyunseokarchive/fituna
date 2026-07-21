@@ -30,6 +30,7 @@ dev = ["pytest"]
 
 [project.scripts]
 fituna = "fituna.cli:main"
+fituna-mcp = "fituna.mcp_server:main"
 
 [project.urls]
 Homepage = "https://github.com/leeyunseokarchive/fituna"

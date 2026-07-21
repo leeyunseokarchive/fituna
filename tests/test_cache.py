@@ -6,6 +6,7 @@ needed -- the whole point of this cache is to be a thin, honest sqlite3
 wrapper).
 """
 
+import re
 import sqlite3
 from pathlib import Path
 
@@ -284,7 +285,9 @@ def test_corrupt_db_file_raises_fitunaerror(tmp_path: Path):
     FiTunaError with recovery guidance, not a bare sqlite3.DatabaseError."""
     db_path = tmp_path / "corrupt.sqlite3"
     db_path.write_bytes(b"not a real sqlite file, just garbage bytes")
-    with pytest.raises(FiTunaError, match=str(db_path)):
+    # re.escape: `match` is a regex, and a Windows path like C:\Users\...
+    # contains \U -- an invalid regex escape that fails the whole test.
+    with pytest.raises(FiTunaError, match=re.escape(str(db_path))):
         ResultCache(db_path)
 
 
