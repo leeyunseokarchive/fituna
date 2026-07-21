@@ -192,6 +192,10 @@ run-to-run variance analysis (including a thermal-throttle outlier we caught
 and documented): **[docs/RESULTS.md](docs/RESULTS.md)** · Usage scenarios:
 [docs/USE_CASES.md](docs/USE_CASES.md)
 
+Reproduce on NVIDIA/Linux yourself — one-click Colab notebook (free T4
+tier): [notebooks/colab_nvidia_verification.ipynb](notebooks/colab_nvidia_verification.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/leeyunseokarchive/fituna/blob/main/notebooks/colab_nvidia_verification.ipynb)
+
 ## MCP server — measured answers for AI agents
 
 Ask a chatbot "which local model config fits my machine?" and it guesses
