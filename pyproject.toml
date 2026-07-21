@@ -32,7 +32,7 @@ dev = ["pytest"]
 fituna = "fituna.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/fituna/fituna"
+Homepage = "https://github.com/leeyunseokarchive/fituna"
 
 [tool.setuptools.packages.find]
 include = ["fituna*"]

@@ -1,196 +1,235 @@
-# FiTuna
+<div align="center">
 
-FiTuna finds the smallest llama.cpp GGUF quantization + runtime config
-(`quant`, `-ngl`, `-c`) that meets a target generation throughput without
-exceeding a quality-loss budget — automatically, for your actual hardware.
+# 🎯 FiTuna
 
-FiTuna does not do any inference or quantization math itself. All heavy
-lifting happens inside [llama.cpp](https://github.com/ggml-org/llama.cpp)
-binaries (`llama-quantize`, `llama-bench`, `llama-perplexity`), which FiTuna
-runs as subprocesses and whose output it parses. FiTuna itself is a thin,
-dependency-free Python orchestrator: hardware detection + a quality-first
-search over quant/ngl/ctx candidates + result caching.
+**Stop guessing your llama.cpp config. Measure it.**
 
-See `docs/ARCHITECTURE.md` for the module diagram and data flow.
+*Hardware-benchmark-driven auto-tuning for local LLMs — give it a model, a
+target speed, and a quality budget; get back the smallest config that
+actually hits the numbers on **your** machine.*
 
-## Status
+[![CI](https://github.com/leeyunseokarchive/fituna/actions/workflows/ci.yml/badge.svg)](https://github.com/leeyunseokarchive/fituna/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
+[![Zero dependencies](https://img.shields.io/badge/runtime%20deps-0-brightgreen.svg)](docs/SBOM.md)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-Implemented and integration-tested end-to-end against **real** llama.cpp
-binaries (Homebrew build) and a real model (Qwen3-4B-Instruct-2507, Apache
-2.0), covering the success path, `--resume` cache hits, `BinaryNotFoundError`
-(exit 2), and `NoFeasibleConfigError` best-effort reporting (exit 3), on top
-of module self-checks + `pytest` (77 tests) against stand-in binaries — see
-`docs/RESULTS.md` for the measured numbers. **All real-hardware validation so
-far is on macOS (Apple Silicon)** — Linux/Windows code paths (see "Known
-limitations" below) run unit tests + self-checks in CI
-(`.github/workflows/ci.yml`, ubuntu/macos/windows matrix) but have not had a
-real-binary integration run on those platforms. The public interfaces in
-`fituna/config.py` and the function signatures across `fituna/*.py` are the
-fixed cross-module contract.
+</div>
 
-## Requirements
+---
 
-- Python 3.11+
-- A working [llama.cpp](https://github.com/ggml-org/llama.cpp) build on your
-  `PATH` (or point FiTuna at it with `--llama-bin-dir`), providing at least
-  `llama-quantize`, `llama-bench`, and `llama-perplexity`. Easiest routes:
+```bash
+$ fituna run --model Qwen3-4B-Instruct-2507-F16.gguf \
+    --target-tps 30 --max-quality-loss 5 --ctx 4096 --wikitext wiki.txt --out ./out
 
-  ```bash
-  brew install llama.cpp        # macOS/Linux Homebrew — ships all three
-  # or build from source (any platform):
-  git clone https://github.com/ggml-org/llama.cpp && cd llama.cpp
-  cmake -B build && cmake --build build --config Release
-  # then: fituna ... --llama-bin-dir ./llama.cpp/build/bin
-  ```
+[Q6_K]   full-offload 28.48 tok/s < target 30.00, skipping (early-exit B)
+[Q8_0]   full-offload 24.22 tok/s < target 30.00, skipping (early-exit B)
+[Q5_K_M] full-offload 29.59 tok/s < target 30.00, skipping (early-exit B)
+[Q4_K_M] found ngl=33 meeting target -- done
 
-  Note: package-manager builds (Homebrew etc.) do **not** ship
-  `convert_hf_to_gguf.py`, which FiTuna needs only when `--model` points at a
-  HuggingFace-format *directory*. If you pass an F16/BF16 `.gguf` file
-  directly (many models publish one), no convert script is needed; for HF-dir
-  input, use a source checkout as `--llama-bin-dir` (the script sits at the
-  repo root) and `pip install torch transformers` for the script itself.
-- A perplexity evaluation corpus as plain text. The
-  [wikitext-2-raw-v1](https://huggingface.co/datasets/Salesforce/wikitext)
-  dataset (CC-BY-SA) on HuggingFace is distributed as Parquet, not a `.txt`
-  file `llama-perplexity -f` can read directly — export the test split with:
+FiTuna result: MEETS TARGET
+  quant : Q4_K_M   ngl : 33   ctx : 4096
+  gen tok/s : 30.81      quality loss : 1.73%
+  run command:
+    llama-cli -m out/Qwen3-4B-Instruct-2507-...-Q4_K_M.gguf -ngl 33 -c 4096
+```
 
-  ```bash
-  pip install datasets  # one-time, only needed to fetch this corpus
-  python -c "
-  from datasets import load_dataset
-  ds = load_dataset('Salesforce/wikitext', 'wikitext-2-raw-v1', split='test')
-  open('wikitext-2-raw-test.txt', 'w').write('\n'.join(ds['text']))
-  "
-  ```
+That's a real run (Apple M3 Pro — [full logs](docs/RESULTS.md)). Note what
+happened: the "obviously best" Q8_0 **failed** the speed target, Q5_K_M missed
+it by **0.41 tok/s**, and the answer wasn't just a quant — it was a quant
+*plus* the minimal GPU offload (`-ngl 33`, not full 36). None of that is
+predictable from a spec sheet. That's why FiTuna measures.
 
-  then pass `--wikitext wikitext-2-raw-test.txt`.
+## Why
 
-FiTuna itself has **zero runtime Python dependencies** — everything it needs
-is in the standard library. See `docs/SBOM.md`.
+Running a local LLM means picking a quantization level (Q2–Q8), a GPU offload
+layer count (`-ngl`), and a context length — a search space that people
+navigate today by trial and error:
 
-## Install
+- **Ollama / LM Studio** apply fixed per-model presets; a request for finer
+  quantization control was [closed as not planned](https://github.com/ollama/ollama/issues/14674).
+- **NVIDIA Model Optimizer**'s AutoQuantize is CUDA-only.
+- **VRAM calculators & chatbot advice** estimate from specs — and specs
+  don't know your thermals, memory bandwidth, or llama.cpp build flags.
+
+FiTuna replaces the guesswork with a measured search. It orchestrates the
+llama.cpp binaries you already have (`llama-quantize`, `llama-bench`,
+`llama-perplexity`) and finds the config that meets your target — verified on
+your hardware, reproducible from cache.
+
+## Features
+
+- 🔍 **Target-driven search** — input: model + target tok/s + max quality
+  loss %. Output: quant × `-ngl` × ctx config + a ready-to-run command.
+- 📏 **Measured, not assumed** — candidates are walked in *measured*
+  perplexity order (in our runs Q6_K beat Q8_0 — [see data](docs/RESULTS.md)),
+  with a binary search for the minimal GPU offload.
+- ⚡ **Aggressive early exits** — quality-gate failures and hopeless quants
+  are skipped without wasting benches; a bench that can't finish in time
+  counts as "too slow", not a crash.
+- 🗃️ **Reproducible cache** — results keyed by model fingerprint × hardware
+  × llama.cpp build version in sqlite3; `--resume` re-answers in <1s and
+  survives interruptions.
+- 🖥️ **Hardware auto-detection** — NVIDIA (`nvidia-smi`), AMD (`rocm-smi`),
+  Apple Silicon unified memory (`system_profiler`), with manual override.
+- 🪶 **Zero runtime dependencies** — pure Python 3.11+ stdlib. `pip install`
+  and go.
+
+## Quickstart
+
+**1. Get llama.cpp** (provides the actual quantize/bench/perplexity engines):
+
+```bash
+brew install llama.cpp        # macOS/Linux Homebrew — ships all needed binaries
+# or build from source (any platform):
+git clone https://github.com/ggml-org/llama.cpp && cd llama.cpp
+cmake -B build && cmake --build build --config Release
+```
+
+**2. Install FiTuna:**
 
 ```bash
 pip install -e .
-# or, for development:
-pip install -e ".[dev]"
 ```
 
-## Usage
-
-Auto-detect hardware:
+**3. Get a quality corpus** (wikitext-2 test split, CC BY-SA):
 
 ```bash
-fituna detect-hw
+pip install datasets  # one-time, only to fetch the corpus
+python -c "
+from datasets import load_dataset
+ds = load_dataset('Salesforce/wikitext', 'wikitext-2-raw-v1', split='test')
+open('wikitext-2-raw-test.txt', 'w').write('\n'.join(ds['text']))
+"
 ```
 
-Search for a config meeting a throughput + quality target (pass an F16/BF16
-GGUF directly — or an HF-format directory if a convert script is available,
-see Requirements):
+**4. Run:**
 
 ```bash
-fituna run --model ./models/Qwen3-4B-Instruct-2507-F16.gguf \
-  --target-tps 20 --max-quality-loss 3 \
-  --ctx 4096 --wikitext ./wikitext-2-raw-test.txt --out ./out
+fituna detect-hw                          # see what FiTuna detects
+fituna run --model your-model-F16.gguf \
+  --target-tps 30 --max-quality-loss 5 \
+  --ctx 4096 --wikitext wikitext-2-raw-test.txt --out ./out --resume
 ```
 
-> **Disk usage:** the search quantizes *every* quant candidate that passes
-> the quality gate stage before benchmarking (quality is measured for all
-> candidates first, so the speed search can walk them in *measured* quality
-> order). With the default 6 candidates and an 8B model, expect roughly
-> 25–35 GB in `--out` on top of the base GGUF. Files are reused across runs
-> (quantization is idempotent), and you can narrow `--quant` to bound this.
+Pass an F16/BF16 `.gguf` directly (many models publish one), or an HF-format
+directory if `convert_hf_to_gguf.py` is available (source checkout +
+`pip install torch transformers`; package-manager builds don't ship it).
 
-Pin GPU hardware manually, restrict quant candidates, try multiple context
-lengths, and emit machine-readable JSON:
+> **Disk usage:** the search quantizes every candidate that reaches the
+> quality stage — ~12 GB for four candidates of a 4B model. Files are reused
+> across runs; narrow `--quant` to bound this.
 
-```bash
-fituna run --model ./models/qwen3-8b-f16.gguf --gpu nvidia --vram-mb 12000 \
-  --target-tps 35 --max-quality-loss 5 \
-  --quant Q8_0,Q6_K,Q5_K_M,Q4_K_M,Q3_K_M --ctx 8192,4096 \
-  --wikitext ./data/wikitext-2-raw --json > result.json
+## How it works
+
+```mermaid
+flowchart LR
+    subgraph Input
+        A["model.gguf<br/>(or HF dir)"]
+        B["target tok/s<br/>quality budget"]
+    end
+
+    A --> C[hardware.py<br/>GPU / VRAM / RAM<br/>auto-detect]
+    B --> D
+
+    subgraph "Stage 1 · Quality (all candidates)"
+        D[quantize.py<br/>llama-quantize] --> E[quality.py<br/>llama-perplexity<br/>loss vs F16 baseline]
+        E --> F{"loss ≤ budget?"}
+        F -- no --> X[dropped]
+    end
+
+    subgraph "Stage 2 · Speed (early-exit walk)"
+        F -- yes, sorted by<br/>measured quality --> G[bench.py<br/>llama-bench full-offload]
+        G -- misses target --> Y[skip quant]
+        G -- hits --> H["binary-search<br/>minimal -ngl"]
+    end
+
+    C --> G
+    H --> I[["result:<br/>quant + ngl + ctx<br/>+ run command"]]
+    E & G <--> K[(cache.py<br/>sqlite3<br/>--resume)]
 ```
 
-CPU-only run against a non-default llama.cpp build dir, resuming from cache:
+**Stage 1** measures perplexity loss for *every* candidate — because Stage 2
+walks them in **measured** quality order, and you can't sort by a number you
+haven't measured. (In practice the conventional Q8_0-first ranking was wrong
+on both models we tested.) **Stage 2** early-exits hard: a quant whose
+full-offload bench misses the target is dropped without further benches, and
+the first quant that passes wins — lower-quality quants are never benchmarked.
 
-```bash
-fituna run --model ./models/phi-3-mini --gpu none --target-tps 8 --max-quality-loss 2 \
-  --llama-bin-dir /opt/llama.cpp/build/bin --wikitext ./data/wikitext-2-raw --resume
-```
+All subprocess results land in a sqlite3 cache keyed by model fingerprint,
+hardware profile, **and llama.cpp build version** — so `--resume` never
+serves numbers measured under a different backend build.
 
-Inspect which llama.cpp binaries FiTuna resolved:
+Design details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · Interface
+contract: [`fituna/config.py`](fituna/config.py)
 
-```bash
-fituna list-binaries --llama-bin-dir /usr/local/bin
-```
+## Measured results
 
-## How the search works
-
-Two stages, with different cost profiles:
-
-1. **Quality stage (paid for every candidate).** Each quant candidate is
-   quantized (idempotent — skipped if the file exists) and its perplexity
-   loss vs. the unquantized baseline is measured. Candidates over
-   `--max-quality-loss` are dropped. This stage deliberately measures *all*
-   candidates up front: the speed stage walks them in **measured** quality
-   order, and you can't sort by a number you haven't measured. (Ordering by
-   the conventional Q8_0 → Q2_K ranking instead would be a guess — and
-   guesses are exactly what this tool exists to replace.)
-2. **Speed stage (early-exits aggressively).** Walking survivors from
-   highest measured quality down: bench at full offload (if even that misses
-   the target, skip the quant entirely), then binary-search the minimal
-   `-ngl` (bounded by `ngl_max_calls` bench calls) and re-verify extra
-   `ctx_candidates`. The first quant that meets `--target-tps` wins —
-   lower-quality quants are never benchmarked.
-3. If nothing satisfies both constraints, FiTuna reports the closest
-   best-effort config and exits 3.
-4. Bench/quality results are cached in `<out>/.fituna_cache.sqlite3`, keyed
-   by model fingerprint, hardware profile **and llama.cpp build version**;
-   `--resume` reuses them instead of re-running llama.cpp.
-
-## Why not just ask a chatbot / use presets?
-
-| | FiTuna | Ollama / LM Studio presets | Chatbot advice / VRAM calculators |
+| Model | Target | What the "obvious" pick did | What FiTuna found |
 |---|---|---|---|
-| Picks quant for *your* hardware | measured on-device | coarse VRAM heuristic | guessed from specs |
-| Target throughput (tok/s) input | yes — search constraint | no | no |
-| Quality-loss budget input | yes — measured perplexity gate | no | no |
-| Output verifiable | re-run = same numbers (cached) | n/a | not reproducible |
+| Qwen3-4B-Instruct (Apache 2.0) | 30 tok/s, ≤5% loss | Q8_0: 24.22 tok/s ❌ (and measured *worse* quality than Q6_K) | **Q4_K_M @ ngl=33 → 30.81 tok/s, 1.73% loss** ✅ |
+| SmolLM2-135M (Apache 2.0) | 240 tok/s, ≤5% loss | Q8_0: 205.91 tok/s ❌ | **Q6_K → 249.50 tok/s, 0.53% loss** ✅ (and Q4_K_M measured *slower* than Q6_K) |
 
-The gap is real: hardware variance (thermals, memory bandwidth, backend
-build flags) makes spec-based guesses miss — in our own E2E run the
-"obviously best" Q8_0 config missed the throughput target while a Q5_K_M
-config beat it with 1% measured quality loss (`docs/RESULTS.md`).
+Environment: Apple M3 Pro, llama.cpp build 9960. Full logs, timings,
+run-to-run variance analysis (including a thermal-throttle outlier we caught
+and documented): **[docs/RESULTS.md](docs/RESULTS.md)** · Usage scenarios:
+[docs/USE_CASES.md](docs/USE_CASES.md)
+
+## Project structure
+
+```
+fituna/
+├── cli.py         # argparse entry point, exit-code mapping (0/1/2/3)
+├── config.py      # frozen-dataclass interface contract (single source of truth)
+├── hardware.py    # GPU/VRAM/CPU/RAM auto-detection + manual override
+├── binaries.py    # llama.cpp binary discovery + capability introspection
+├── model_info.py  # direct GGUF header parsing (struct), HF-dir conversion
+├── quantize.py    # llama-quantize wrapper (idempotent, atomic writes)
+├── quality.py     # llama-perplexity wrapper (quality-loss measurement)
+├── bench.py       # llama-bench wrapper (throughput measurement)
+├── search.py      # the two-stage search orchestrator
+├── cache.py       # sqlite3 result cache (--resume)
+└── report.py      # human/JSON result rendering + run-command builder
+```
+
+75+ unit tests (mocked subprocess layer) + per-module runnable self-checks +
+3-OS × 2-Python CI matrix. Real-binary E2E validated on macOS (Apple
+Silicon); see [Known limitations](#known-limitations).
+
+## Roadmap
+
+- [ ] **MCP server** — let AI coding agents request measured local-model
+  recommendations instead of guessing from specs
+- [ ] **Korean calibration corpus option** — quality measurement on Korean
+  text for Korean open-weight models (EXAONE, Qwen, ...)
+- [ ] NVIDIA/Linux measured-results matrix (Colab-reproducible notebook)
+- [ ] Surface llama-bench std-dev to auto-flag marginal verdicts
+- [ ] Multi-GPU `--tensor-split` support
 
 ## Known limitations
 
-- **Single GPU only.** Hardware detection reads only the first GPU reported
-  by `nvidia-smi`/`rocm-smi`, and bench invocations don't set
-  `--tensor-split`/`--main-gpu`. Multi-GPU tensor-split support is on the
-  roadmap, not implemented.
-- **Windows AMD GPU auto-detection is a known gap.** `rocm-smi` has no
-  mainstream Windows distribution, so an AMD GPU on Windows is likely to be
-  mis-detected as CPU-only. Use `--gpu amd --vram-mb <N>` to override.
-- **Windows RAM auto-detection is code-reviewed, not integration-tested** —
-  no Windows CI job exists yet to exercise the `ctypes`/`GlobalMemoryStatusEx`
-  path against a real Windows process.
-- **`ngl_max_calls` (default 6)** bounds the `-ngl` binary search; for models
-  much deeper than the range it was tuned against, the search can fall back
-  to the safe-but-suboptimal full-offload candidate before converging on the
-  true minimal `-ngl`. Not an accuracy bug (the reported config still meets
-  the target), just a possibly-conservative one.
-- `llama-bench`/`llama-perplexity` failures (e.g. out-of-memory) surface
-  llama.cpp's own stderr as-is; FiTuna doesn't yet pattern-match common
-  failure causes into an actionable suggestion.
+- **Single GPU only** — first GPU reported by `nvidia-smi`/`rocm-smi`;
+  no `--tensor-split`.
+- **Windows AMD auto-detection** — `rocm-smi` has no mainstream Windows
+  distribution; use `--gpu amd --vram-mb <N>`.
+- **Quality = wikitext-2 perplexity** — a general-purpose proxy; it does not
+  guarantee domain quality (code, Korean, ...). Korean calibration is on the
+  roadmap.
+- **Benchmarks are thermally sensitive** — verdicts within a few tok/s of
+  the target are marginal; see the
+  [variance analysis](docs/RESULTS.md#run-to-run-variance-measured-not-hidden).
+- Real-hardware E2E so far is macOS (Apple Silicon); Linux/Windows paths are
+  unit-tested + CI-run but not yet integration-run on real binaries there.
 
-## Development
+## Contributing
 
-```bash
-pip install -e ".[dev]"
-pytest
-```
+Contributions welcome — the codebase is small, dependency-free, and
+contract-first (start at [`fituna/config.py`](fituna/config.py)). See
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-MIT — see `LICENSE`. Third-party notices for subprocess-invoked tools
-(llama.cpp, etc.) are in `THIRD_PARTY_NOTICES.md`.
+[MIT](LICENSE) © FiTuna contributors. Third-party notices (llama.cpp and
+subprocess-invoked tools): [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) ·
+SBOM: [docs/SBOM.md](docs/SBOM.md) · AI-assisted development disclosure:
+[docs/AI_MODEL_USAGE.md](docs/AI_MODEL_USAGE.md)
