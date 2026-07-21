@@ -92,14 +92,31 @@ cmake -B build && cmake --build build --config Release
 pip install -e .
 ```
 
-**3. Get a quality corpus** (wikitext-2 test split, CC BY-SA):
+**3. Get a quality corpus.** Quality loss is measured as perplexity increase
+on a plain-text corpus — and it's only meaningful on text resembling your
+actual workload. Any UTF-8 text file works (`--quality-corpus`).
+
+English default — wikitext-2 test split (CC BY-SA):
 
 ```bash
-pip install datasets  # one-time, only to fetch the corpus
+pip install datasets  # one-time, only to fetch corpora
 python -c "
 from datasets import load_dataset
 ds = load_dataset('Salesforce/wikitext', 'wikitext-2-raw-v1', split='test')
 open('wikitext-2-raw-test.txt', 'w').write('\n'.join(ds['text']))
+"
+```
+
+Korean models — Korean Wikipedia (CC BY-SA), so the quality gate measures
+what actually degrades for Korean users (English perplexity can rank quants
+differently than Korean perplexity — measure the language you'll run):
+
+```bash
+python -c "
+from datasets import load_dataset
+ds = load_dataset('wikimedia/wikipedia', '20231101.ko', split='train', streaming=True)
+texts = [row['text'] for _, row in zip(range(500), ds)]
+open('kowiki-corpus.txt', 'w').write('\n'.join(texts))
 "
 ```
 

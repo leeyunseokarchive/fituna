@@ -79,7 +79,19 @@ def _build_parser() -> argparse.ArgumentParser:
     run.add_argument("--gpu", choices=["none", "nvidia", "amd", "apple"], default=None)
     run.add_argument("--vram-mb", type=int, default=None, dest="vram_mb")
     run.add_argument("--llama-bin-dir", default=None, dest="llama_bin_dir")
-    run.add_argument("--wikitext", required=True, help="path to wikitext corpus")
+    run.add_argument(
+        "--quality-corpus",
+        "--wikitext",  # historical name, kept as an alias
+        required=True,
+        dest="wikitext",
+        help=(
+            "plain-text corpus for perplexity-based quality measurement. "
+            "Any UTF-8 text works: wikitext-2 (English default), Korean "
+            "Wikipedia for Korean models, your own domain text -- quality "
+            "loss is only meaningful on text resembling your workload. See "
+            "README 'Quality corpus' for export snippets."
+        ),
+    )
     run.add_argument(
         "--ppl-chunks",
         type=int,
