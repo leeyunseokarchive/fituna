@@ -180,6 +180,7 @@ contract: [`fituna/config.py`](fituna/config.py)
 |---|---|---|---|
 | Qwen3-4B-Instruct (Apache 2.0) | 30 tok/s, ≤5% loss | Q8_0: 24.22 tok/s ❌ (and measured *worse* quality than Q6_K) | **Q4_K_M @ ngl=33 → 30.81 tok/s, 1.73% loss** ✅ |
 | SmolLM2-135M (Apache 2.0) | 240 tok/s, ≤5% loss | Q8_0: 205.91 tok/s ❌ | **Q6_K → 249.50 tok/s, 0.53% loss** ✅ (and Q4_K_M measured *slower* than Q6_K) |
+| Midm-2.0-Mini-Instruct, Korean (MIT) | 40 tok/s, ≤5% loss | Q8_0: 34.26 tok/s ❌ | **Q4_K_M @ ngl=48 → 44.62 tok/s, 2.58% loss** ✅ (Korean vs English corpus *flipped* the Q6_K/Q5_K_M quality ranking) |
 
 Environment: Apple M3 Pro, llama.cpp build 9960. Full logs, timings,
 run-to-run variance analysis (including a thermal-throttle outlier we caught
