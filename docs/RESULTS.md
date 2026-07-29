@@ -132,8 +132,8 @@ Two honest observations:
   corpus passes all four, and Q4_K_M meets the target at ngl=34
   (30.06 tok/s, 0.77 % loss). Same model, same machine, same target, same
   budget — **the corpus alone flips feasibility.** If your users speak
-  Korean, gate on Korean text (`--quality-corpus kowiki-corpus.txt`; export
-  snippet in the README).
+  Korean, gate on Korean text (`--quality-corpus kowiki-corpus.txt`, fetched
+  via `fituna fetch-corpus --lang ko --out kowiki-corpus.txt`).
 
 Incidentally, designing this experiment caught a real cache bug: quality
 results were keyed by (model, quant, chunks) but not by corpus, so the

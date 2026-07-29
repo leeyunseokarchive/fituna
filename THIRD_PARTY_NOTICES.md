@@ -88,17 +88,28 @@ absent:
 
 ## 3. Perplexity evaluation corpus (user-supplied input data, not bundled)
 
-`fituna/quality.py` requires a text corpus (`--wikitext`) to feed
-`llama-perplexity`. FiTuna ships **no corpus**; the documented, recommended
-choice is:
+`fituna/quality.py` requires a text corpus (`--quality-corpus`) to feed
+`llama-perplexity`. FiTuna ships **no corpus**; `fituna fetch-corpus`
+(`fituna/corpus.py`, stdlib `urllib` only) downloads one of two presets from
+HuggingFace's public dataset-viewer API on request:
 
-- **Dataset**: WikiText-2 (raw) — https://huggingface.co/datasets/Salesforce/wikitext
-- **License**: CC-BY-SA (see the dataset page for the exact version and
-  attribution terms)
-- **How FiTuna uses it**: read-only, as an input file path passed straight
-  through to `llama-perplexity -f <wikitext_path>`. It is never copied,
-  modified, or redistributed by FiTuna; the user downloads it separately
-  (see `README.md` → Requirements).
+- **English default — WikiText-2 (raw), test split**:
+  https://huggingface.co/datasets/Salesforce/wikitext
+  (`Salesforce/wikitext`, config `wikitext-2-raw-v1`)
+- **Korean — Wikipedia, train split**:
+  https://huggingface.co/datasets/wikimedia/wikipedia
+  (`wikimedia/wikipedia`, config `20231101.ko`)
+- **License (both)**: CC BY-SA 3.0, also dual-licensed GFDL — attribution
+  and share-alike apply. Verified directly against each dataset's own
+  HuggingFace metadata (`cardData.license`), not assumed.
+- **How FiTuna uses it**: `fetch-corpus` writes the downloaded text, once,
+  to the `--out` path the user chose; from then on it is read-only, passed
+  straight through to `llama-perplexity -f <corpus_path>` by
+  `fituna/quality.py`. It is never bundled, modified, or redistributed by
+  FiTuna itself — `.gitignore` keeps any `--out` path ending in `.txt` (the
+  convention every documented example uses) out of the repository, and the
+  user fetches or supplies the corpus separately (see `README.md` →
+  Quickstart).
 
 ---
 

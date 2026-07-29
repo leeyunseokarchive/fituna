@@ -145,6 +145,28 @@ class DoctorCheck:
     remedy: Optional[str] = None  # one-line fix instruction; None means "PASS"
 
 
+@dataclass(frozen=True)
+class CorpusPreset:
+    """One ``fituna fetch-corpus --lang`` preset: which HuggingFace dataset
+    (dataset/config/split/text_field) to pull plain-text rows from, how many
+    rows to fetch by default, and the license notice to print on stdout
+    after a successful fetch.
+
+    Only the shape lives here -- the concrete EN/KO preset data lives in
+    ``fituna.corpus.PRESETS`` (the module that owns corpus-fetching), the
+    same "dataclass shape in config.py, concrete data at its owning module"
+    split already used for BinaryPaths (config.py) / REQUIRED_BINARIES
+    (binaries.py).
+    """
+
+    dataset: str
+    config: str
+    split: str
+    text_field: str
+    default_rows: int
+    license_note: str  # ready-to-print stdout line; verified, not guessed -- see fituna/corpus.py
+
+
 class FiTunaError(Exception):
     """Base class for all FiTuna errors."""
 
