@@ -91,6 +91,16 @@ _MANUAL_FALLBACK = (
     "this specific corpus."
 )
 
+# Shared guidance for every way writing to `--out` can fail: its parent
+# already existing as a file, its parent directory not being writable, or
+# the final rename failing. One wording for all three, reused below, so the
+# error looks the same regardless of which step actually failed.
+_OUT_WRITE_GUIDANCE = (
+    "Check that --out names a file path, not an existing directory, and "
+    "that its parent directory is writable (on Windows, also make sure the "
+    "destination isn't open in another program), then try again."
+)
+
 
 def _resolve_source(
     lang: str, dataset: Optional[str], config: Optional[str], split: Optional[str]
@@ -177,24 +187,31 @@ def fetch_corpus(
 
     Write is atomic: content is written to a temp file in ``out``'s own
     directory and only ``os.replace``-d into ``out`` after every requested
-    row is fetched successfully. Any failure (network, HTTP, malformed
-    response, or the final rename itself) deletes the temp file and
-    re-raises as ``FiTunaError`` -- ``out`` is never left holding a partial
-    download and no temp file is ever left behind.
+    row is fetched successfully. Any failure -- network, HTTP, malformed
+    response, preparing the destination (``out``'s parent already existing
+    as a plain file, or a parent directory that isn't writable), or the
+    final rename itself -- deletes the temp file and re-raises as
+    ``FiTunaError`` -- ``out`` is never left holding a partial download and
+    no temp file is ever left behind.
 
     ``rows`` defaults to the ``lang`` preset's ``default_rows`` (1000 for
     en, 500 for ko) when not given -- even when ``dataset``/``config``/
     ``split`` override the preset's source, since ``--lang`` is still the
     only signal for which default row count applies. A resolved row count
     that is not positive (``rows=0`` or negative) raises ``FiTunaError``
-    immediately, before any file or network I/O.
+    immediately, before any file or network I/O. A *positive* row count
+    whose split nonetheless yields zero rows on the very first page (a
+    valid HTTP 200 with ``"rows": []``) also raises ``FiTunaError`` --
+    otherwise this would write a 0-byte file and print a full license
+    notice for a corpus that doesn't exist, the same dishonesty the
+    non-positive-``rows`` guard above already exists to prevent.
 
     Reports progress via ``progress_cb(str)`` if given, once per page
     fetched (e.g. ``"fetched 300/1000 rows"``).
 
-    Returns the number of rows actually written, which may be less than
-    requested if the split runs out first (not an error -- see module
-    docstring's "offset past the end" note).
+    Returns the number of rows actually written (always positive -- see
+    above), which may be less than requested if the split runs out first
+    (not an error -- see module docstring's "offset past the end" note).
     """
     resolved_dataset, resolved_config, resolved_split, text_field = _resolve_source(
         lang, dataset, config, split
@@ -208,8 +225,18 @@ def fetch_corpus(
         raise FiTunaError(f"--rows must be positive, got {total}")
     progress: Callable[[str], None] = progress_cb or (lambda _msg: None)
 
-    out.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp_name = tempfile.mkstemp(prefix=f".{out.name}.", suffix=".tmp", dir=out.parent)
+    try:
+        # Two sibling bad-`--out` shapes land here: `out.parent` already
+        # exists as a plain file (mkdir raises FileExistsError), or it
+        # exists but isn't writable (mkstemp raises PermissionError). Both
+        # must become the same clear FiTunaError as a failed os.replace
+        # below, not a raw traceback.
+        out.parent.mkdir(parents=True, exist_ok=True)
+        fd, tmp_name = tempfile.mkstemp(prefix=f".{out.name}.", suffix=".tmp", dir=out.parent)
+    except OSError as exc:
+        raise FiTunaError(
+            f"could not prepare {out} for writing: {exc}. {_OUT_WRITE_GUIDANCE}"
+        ) from exc
     tmp_path = Path(tmp_name)
     written = 0
     schema_checked = False
@@ -249,6 +276,18 @@ def fetch_corpus(
                 offset += len(page_rows)
                 progress(f"fetched {written}/{total} rows")
 
+        if written == 0:
+            # The fetched-count twin of the `total <= 0` guard above: a
+            # split that returns zero rows on its very first page (a valid
+            # HTTP 200, not an error) would otherwise silently produce a
+            # 0-byte corpus file plus a full CC BY-SA license notice for
+            # content that doesn't exist.
+            raise FiTunaError(
+                f"dataset={resolved_dataset!r} config={resolved_config!r} "
+                f"split={resolved_split!r} returned no rows at all -- "
+                f"nothing to write. {_MANUAL_FALLBACK}"
+            )
+
         # Rename must stay inside this try: a `run`/`doctor` habit of
         # pointing `--out` at a directory (that flag means a directory for
         # those subcommands, a file here) makes os.replace raise
@@ -262,11 +301,7 @@ def fetch_corpus(
             os.replace(tmp_path, out)
         except OSError as exc:
             raise FiTunaError(
-                f"could not save the fetched corpus to {out}: {exc}. Check "
-                "that --out names a file path, not an existing directory, "
-                "and that its parent directory is writable (on Windows, "
-                "also make sure the destination isn't open in another "
-                "program), then try again."
+                f"could not save the fetched corpus to {out}: {exc}. {_OUT_WRITE_GUIDANCE}"
             ) from exc
     except BaseException:
         tmp_path.unlink(missing_ok=True)

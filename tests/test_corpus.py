@@ -151,14 +151,21 @@ def test_fetch_corpus_stops_early_when_split_is_smaller_than_requested(fake_urlo
     assert out.read_text(encoding="utf-8").splitlines() == [f"row{i}" for i in range(30)]
 
 
-def test_fetch_corpus_handles_an_entirely_empty_split(fake_urlopen, tmp_path):
+def test_fetch_corpus_errors_on_an_entirely_empty_split(fake_urlopen, tmp_path):
+    """A split that returns zero rows on its very first page (a valid HTTP
+    200 with `"rows": []`, the documented stop-paginating signal) must not
+    silently write a 0-byte corpus file plus a full CC BY-SA license notice
+    for content that doesn't exist -- same dishonesty the `--rows <= 0`
+    guard already prevents on the request side, just discovered after the
+    request instead of before it."""
     fake_urlopen(_fake_urlopen_factory(total=0))
     out = tmp_path / "corpus.txt"
 
-    n = corpus.fetch_corpus(out, lang="en", rows=100)
+    with pytest.raises(FiTunaError):
+        corpus.fetch_corpus(out, lang="en", rows=100)
 
-    assert n == 0
-    assert out.read_text(encoding="utf-8") == ""
+    assert not out.exists()
+    assert list(tmp_path.iterdir()) == []  # no 0-byte file, no leftover temp file
 
 
 # ---------------------------------------------------------------------------
@@ -262,6 +269,61 @@ def test_fetch_corpus_wraps_os_replace_failure_as_fituna_error_when_out_is_a_dir
 
     assert out.is_dir()  # the pre-existing directory itself is untouched
     assert list(tmp_path.iterdir()) == [out], "no leftover atomic-write temp file"
+
+
+def test_fetch_corpus_wraps_mkdir_failure_as_fituna_error_when_out_parent_is_a_file(
+    monkeypatch, tmp_path
+):
+    """`--out <existing-file>/corpus.txt`: an easy typo where `--out`'s
+    parent is itself an existing plain file, not a directory. That makes
+    `out.parent.mkdir(parents=True, exist_ok=True)` raise FileExistsError
+    (unlike the os.replace-failure test above, this fails before any
+    temp file is ever created). Must surface as the same clean FiTunaError
+    as a failed os.replace, not a raw traceback, and before any network
+    request."""
+
+    def _unexpected_urlopen(url, timeout=None):
+        raise AssertionError("must fail before any network request")
+
+    monkeypatch.setattr(urllib.request, "urlopen", _unexpected_urlopen)
+
+    blocker = tmp_path / "blocker.txt"
+    blocker.write_text("this is a file, not a directory", encoding="utf-8")
+    out = blocker / "corpus.txt"
+
+    with pytest.raises(FiTunaError) as exc_info:
+        corpus.fetch_corpus(out, lang="en", rows=5)
+
+    assert "writable" in str(exc_info.value)
+    assert [p.name for p in tmp_path.iterdir()] == ["blocker.txt"]  # nothing else created
+
+
+def test_fetch_corpus_wraps_mkstemp_permission_error_as_fituna_error(monkeypatch, tmp_path):
+    """`--out` inside a read-only directory: `out.parent.mkdir(exist_ok=True)`
+    is a no-op (the directory already exists) but `tempfile.mkstemp` then
+    raises PermissionError trying to create the atomic-write temp file
+    inside it. Simulated via monkeypatch rather than a real chmod'd
+    directory -- POSIX permission bits aren't reliably enforced for the
+    test-running user across CI's ubuntu/macos/windows matrix (e.g. when
+    running as root, or on Windows where chmod doesn't map the same way).
+    Must surface as the same clean FiTunaError, not a raw traceback."""
+
+    def _unexpected_urlopen(url, timeout=None):
+        raise AssertionError("must fail before any network request")
+
+    monkeypatch.setattr(urllib.request, "urlopen", _unexpected_urlopen)
+
+    def _fake_mkstemp(*args, **kwargs):
+        raise PermissionError(13, "Permission denied")
+
+    monkeypatch.setattr(corpus.tempfile, "mkstemp", _fake_mkstemp)
+    out = tmp_path / "corpus.txt"
+
+    with pytest.raises(FiTunaError) as exc_info:
+        corpus.fetch_corpus(out, lang="en", rows=5)
+
+    assert "writable" in str(exc_info.value)
+    assert list(tmp_path.iterdir()) == []  # nothing created
 
 
 # ---------------------------------------------------------------------------

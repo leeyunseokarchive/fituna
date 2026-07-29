@@ -11,6 +11,12 @@ out/
 # suffix>.tmp` next to the destination regardless of --out name (see
 # tempfile.mkstemp() in fituna/corpus.py's fetch_corpus()).
 *.txt
+# ...but don't swallow ordinary repo .txt files this project might add --
+# unanchored *.txt would otherwise silently untrack them (`git add` becomes
+# a silent no-op instead of an error). Negate the obvious names; a corpus
+# file never legitimately uses one of these.
+!requirements.txt
+!LICENSE.txt
 .*.tmp
 
 # Python
