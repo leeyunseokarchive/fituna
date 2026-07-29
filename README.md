@@ -233,9 +233,10 @@ fituna/
 └── report.py      # human/JSON result rendering + run-command builder
 ```
 
-75+ unit tests (mocked subprocess layer) + per-module runnable self-checks +
+80 unit tests (mocked subprocess layer) + per-module runnable self-checks +
 3-OS × 2-Python CI matrix. Real-binary E2E validated on macOS (Apple
-Silicon); see [Known limitations](#known-limitations).
+Silicon/Metal) and Linux (NVIDIA T4/CUDA); see
+[Known limitations](#known-limitations).
 
 ## Roadmap
 
@@ -245,7 +246,9 @@ Silicon); see [Known limitations](#known-limitations).
   any language's text; measured EN-vs-KO comparison shows the corpus alone
   can flip a feasibility verdict
   ([data](docs/RESULTS.md#run-3--english-vs-korean-quality-corpus-same-model-same-quants))
-- [ ] NVIDIA/Linux measured-results matrix (Colab-reproducible notebook)
+- [x] NVIDIA/Linux measured run (Tesla T4 via the Colab notebook —
+  [Run 4](docs/RESULTS.md#run-4--nvidia-tesla-t4-linux-google-colab):
+  the quality-gate verdict itself flipped between Metal and CUDA)
 - [ ] Surface llama-bench std-dev to auto-flag marginal verdicts
 - [ ] Multi-GPU `--tensor-split` support
 
@@ -255,14 +258,16 @@ Silicon); see [Known limitations](#known-limitations).
   no `--tensor-split`.
 - **Windows AMD auto-detection** — `rocm-smi` has no mainstream Windows
   distribution; use `--gpu amd --vram-mb <N>`.
-- **Quality = wikitext-2 perplexity** — a general-purpose proxy; it does not
-  guarantee domain quality (code, Korean, ...). Korean calibration is on the
-  roadmap.
+- **Quality = perplexity on a corpus you choose** — a proxy, not a
+  guarantee of domain quality. Gate on text resembling your workload
+  (`--quality-corpus`; measured EN-vs-KO comparison in
+  [docs/RESULTS.md](docs/RESULTS.md)).
 - **Benchmarks are thermally sensitive** — verdicts within a few tok/s of
   the target are marginal; see the
   [variance analysis](docs/RESULTS.md#run-to-run-variance-measured-not-hidden).
-- Real-hardware E2E so far is macOS (Apple Silicon); Linux/Windows paths are
-  unit-tested + CI-run but not yet integration-run on real binaries there.
+- Real-hardware E2E: macOS (Apple Silicon/Metal) and Linux (NVIDIA
+  T4/CUDA, via the Colab notebook). Windows paths are unit-tested + CI-run
+  but not yet integration-run against real binaries.
 
 ## Contributing
 

@@ -5,7 +5,7 @@ open-weight models. Numbers below are what the tool actually printed —
 reproduce them with the exact commands shown (absolute numbers vary by
 machine and llama.cpp build; the *shape* of the outcome is the point).
 
-**Environment (all runs)**
+**Environment (Runs 1–3)**
 
 | | |
 |---|---|
@@ -13,6 +13,9 @@ machine and llama.cpp build; the *shape* of the outcome is the point).
 | llama.cpp | Homebrew build 9960 |
 | Quality corpus | wikitext-2-raw-v1 test split (`--ppl-chunks 32`) |
 | FiTuna | this repository, `pip install -e .` |
+
+Run 4 is the same experiment on **NVIDIA Tesla T4 (Linux, Google Colab)** —
+see below.
 
 ---
 
@@ -137,6 +140,39 @@ results were keyed by (model, quant, chunks) but not by corpus, so the
 second corpus would silently reuse the first corpus's numbers. The cache
 key now includes a corpus fingerprint — the tool's honesty is itself
 regression-tested.
+
+## Run 4 — NVIDIA Tesla T4, Linux (Google Colab)
+
+Same model, same command, same target as Run 1 — different hardware.
+Reproduced via
+[notebooks/colab_nvidia_verification.ipynb](../notebooks/colab_nvidia_verification.ipynb)
+(free T4 tier; llama.cpp built from source with CUDA). `fituna detect-hw`
+correctly auto-detected `nvidia / Tesla T4 / 15360 MB VRAM / linux` via the
+`nvidia-smi` parsing path.
+
+| Candidate | Measured quality loss (T4/CUDA) | vs macOS/Metal | Measured gen tok/s (T4) | vs macOS | Verdict at target 240 |
+|---|---|---|---|---|---|
+| Q8_0 | — | — | 202.70 | 205.91 | miss |
+| Q6_K | 0.83 % | 0.53 % | **205.50** | 249.50 | miss → **best effort** |
+| Q5_K_M | — | — | 172.03 | 233.26 | miss |
+| Q4_K_M | **5.22 % → killed by 5 % gate (early-exit A)** | 4.74 % → passed | never benched | 244.34 | — |
+
+Cold search: **61 s**. `--resume` re-run: **1.45 s**, identical output.
+Result: BEST EFFORT (Q6_K, 205.50 tok/s, 0.83 % loss) — the 240 tok/s
+target that the M3 Pro meets is honestly reported as infeasible on the T4.
+
+Three cross-platform facts a lookup table cannot know:
+
+- **The quality gate verdict flipped between platforms.** Q4_K_M measured
+  4.74 % loss under Metal (passes the 5 % budget) but 5.22 % under CUDA
+  (killed at the gate). Same file, same corpus — different backend
+  numerics, different feasible set.
+- **The speed ranking is platform-specific.** On the T4, Q6_K outruns
+  Q8_0 *and* Q5_K_M (which is slowest of the three); the M3 Pro ordering
+  is different again.
+- **Feasibility itself is hardware-relative** — the identical command
+  passes on one machine and best-efforts on the other, which is precisely
+  the answer a user needs before picking hardware or lowering a target.
 
 ### Run-to-run variance (measured, not hidden)
 
