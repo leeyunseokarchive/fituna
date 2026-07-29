@@ -15,8 +15,8 @@ search, and caching. It has zero runtime Python dependencies (stdlib only).
 ```
                               ┌───────────┐
                               │  cli.py   │  argparse entry point (run /
-                              └─────┬─────┘  detect-hw / list-binaries)
-                                    │ builds TargetSpec, dispatches
+                              └─────┬─────┘  detect-hw / list-binaries /
+                                    │ doctor); builds TargetSpec, dispatches
         ┌───────────────┬──────────┼───────────┬──────────────────┐
         ▼                ▼          ▼           ▼                  ▼
   hardware.py      binaries.py  model_info.py  quantize.py    report.py
@@ -57,6 +57,17 @@ Arrows show call direction, not import direction: `search.py` *calls*
 call back into `search.py`. `cli.py` is the only module that imports and
 calls all the others — every other module only depends on `config.py`
 (and, where noted, on `binaries.py`'s `BinaryPaths`).
+
+`fituna/mcp_server.py` is a second, thinner entry point alongside `cli.py`:
+a stdlib-only MCP stdio server (newline-delimited JSON-RPC 2.0, no SDK
+dependency — the same zero-runtime-dependency guarantee `cli.py` gets from
+the stdlib) exposing two tools, `fituna_detect_hardware` and
+`fituna_recommend`, so an AI agent can ask for a measured config
+recommendation the same way `cli.py run` produces one. It calls
+`binaries.py` / `hardware.py` / `model_info.py` / `search.py` / `report.py`
+/ `cache.py` directly rather than shelling out to `cli.py`, and always runs
+with an active `cache.ResultCache` so a repeat question about the same
+model/hardware answers in about a second.
 
 ## Runtime data flow (one `fituna run`)
 
@@ -189,6 +200,16 @@ re-exported from `errors.py`) to process exit codes:
 `ModelConversionError` (HF→GGUF conversion subprocess failure) and a
 `FiTunaError` raised from a `llama-bench`/`llama-perplexity` timeout both
 fall through to exit code 1.
+
+`fituna doctor` does not go through this exception mapping at all —
+`_cmd_doctor` computes its exit code directly from the check results via
+`doctor.exit_code()`, bypassing `main()`'s `FiTunaError` handling entirely
+(there is nothing for it to catch). It reuses the same 0/1/2 values for a
+related but distinct condition: 0 if every check is PASS or WARN, 2 if any
+of the three required llama.cpp binaries FAILed (deliberately mirroring the
+`BinaryNotFoundError` → 2 convention above), 1 for any other FAIL. There is
+no doctor equivalent of exit code 3 — `NoFeasibleConfigError` is a
+`run`-only condition doctor never produces.
 
 ## Why this shape
 

@@ -1,7 +1,8 @@
 """fituna.cli
 =============
 
-argparse-based CLI. Subcommands: ``run``, ``detect-hw``, ``list-binaries``.
+argparse-based CLI. Subcommands: ``run``, ``detect-hw``, ``list-binaries``,
+``doctor``.
 
 CLI <-> dataclass field mapping (see fituna/config.py for the dataclasses):
 
@@ -36,7 +37,7 @@ from dataclasses import asdict, fields
 from pathlib import Path
 from typing import Optional, Sequence
 
-from fituna import binaries, hardware, model_info, report, search
+from fituna import binaries, doctor, hardware, model_info, report, search
 from fituna.cache import ResultCache
 from fituna.config import BinaryPaths, HardwareProfile, TargetSpec
 from fituna.errors import BinaryNotFoundError, FiTunaError, NoFeasibleConfigError
@@ -117,6 +118,15 @@ def _build_parser() -> argparse.ArgumentParser:
 
     lb = sub.add_parser("list-binaries", help="show resolved llama.cpp binaries")
     lb.add_argument("--llama-bin-dir", default=None, dest="llama_bin_dir")
+
+    doc = sub.add_parser(
+        "doctor",
+        help="diagnose the environment: Python version, llama.cpp binaries/version, "
+        "hardware detection, output directory writability, and free disk space",
+    )
+    doc.add_argument("--llama-bin-dir", default=None, dest="llama_bin_dir")
+    doc.add_argument("--out", default="./out", help="directory to check for write access and free disk space")
+    doc.add_argument("--json", action="store_true", help="emit JSON report to stdout")
 
     return parser
 
@@ -205,6 +215,18 @@ def _cmd_list_binaries(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_doctor(args: argparse.Namespace) -> int:
+    """Never raises (see fituna/doctor.py): every check is individually
+    guarded, and the exit code is computed from the check results rather
+    than from a caught exception, so this bypasses main()'s FiTunaError
+    handling entirely -- there is nothing for it to catch here."""
+    bin_dir = Path(args.llama_bin_dir) if args.llama_bin_dir else None
+    out_dir = Path(args.out)
+    checks = doctor.run_checks(bin_dir, out_dir)
+    print(doctor.to_json(checks) if args.json else doctor.to_human(checks))
+    return doctor.exit_code(checks)
+
+
 def _cmd_run(args: argparse.Namespace) -> int:
     ctx_candidates = _parse_ctx_candidates(args.ctx)
     quant_candidates = _sort_quants_by_quality(args.quant)
@@ -264,6 +286,7 @@ _DISPATCH = {
     "run": _cmd_run,
     "detect-hw": _cmd_detect_hw,
     "list-binaries": _cmd_list_binaries,
+    "doctor": _cmd_doctor,
 }
 
 
@@ -354,6 +377,12 @@ def _selfcheck() -> None:
     lb_args = parser.parse_args(["list-binaries", "--llama-bin-dir", "/opt/llama"])
     assert lb_args.command == "list-binaries"
     assert lb_args.llama_bin_dir == "/opt/llama"
+
+    doc_args = parser.parse_args(["doctor", "--out", "/tmp/o", "--json"])
+    assert doc_args.command == "doctor"
+    assert doc_args.out == "/tmp/o"
+    assert doc_args.json is True
+    assert doc_args.llama_bin_dir is None
 
     try:
         _parse_ctx_candidates("")

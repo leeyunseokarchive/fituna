@@ -128,6 +128,23 @@ class SearchResult:
     meets_target: bool  # False면 best-effort(목표 미달) 결과
 
 
+@dataclass(frozen=True)
+class DoctorCheck:
+    """One row of ``fituna doctor`` output: a single environment check and
+    its outcome.
+
+    ``status`` is a plain str, not an Enum -- always one of "PASS" | "WARN" |
+    "FAIL" (matching the words the human formatter prints), but nothing else
+    needs to branch on it structurally, so a bare str is enough here (same
+    reasoning as HardwareProfile.os_name above).
+    """
+
+    name: str
+    status: str  # "PASS" | "WARN" | "FAIL"
+    detail: str  # one-line human-readable outcome, e.g. a version or a path
+    remedy: Optional[str] = None  # one-line fix instruction; None means "PASS"
+
+
 class FiTunaError(Exception):
     """Base class for all FiTuna errors."""
 

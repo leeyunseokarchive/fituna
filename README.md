@@ -123,6 +123,7 @@ open('kowiki-corpus.txt', 'w').write('\n'.join(texts))
 **4. Run:**
 
 ```bash
+fituna doctor                             # confirm the environment is ready
 fituna detect-hw                          # see what FiTuna detects
 fituna run --model your-model-F16.gguf \
   --target-tps 30 --max-quality-loss 5 \
@@ -224,6 +225,7 @@ fituna/
 ├── config.py      # frozen-dataclass interface contract (single source of truth)
 ├── hardware.py    # GPU/VRAM/CPU/RAM auto-detection + manual override
 ├── binaries.py    # llama.cpp binary discovery + capability introspection
+├── doctor.py      # environment self-diagnosis (fituna doctor subcommand)
 ├── model_info.py  # direct GGUF header parsing (struct), HF-dir conversion
 ├── quantize.py    # llama-quantize wrapper (idempotent, atomic writes)
 ├── quality.py     # llama-perplexity wrapper (quality-loss measurement)
@@ -233,7 +235,7 @@ fituna/
 └── report.py      # human/JSON result rendering + run-command builder
 ```
 
-80 unit tests (mocked subprocess layer) + per-module runnable self-checks +
+118 unit tests (mocked subprocess layer) + per-module runnable self-checks +
 3-OS × 2-Python CI matrix. Real-binary E2E validated on macOS (Apple
 Silicon/Metal) and Linux (NVIDIA T4/CUDA); see
 [Known limitations](#known-limitations).
