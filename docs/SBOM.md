@@ -24,10 +24,11 @@ FiTuna의 런타임 파이썬 의존성은 **0개**입니다 (표준 라이브�
 | 16 | typing (stdlib) | 3.11 내장 | PSF License | https://github.com/python/cpython | Optional/Callable 등 타입 힌트 |
 | 17 | urllib (stdlib) | 3.11 내장 | PSF License | https://github.com/python/cpython | `fituna fetch-corpus`의 HuggingFace dataset-viewer API 호출 (`urllib.request`/`urllib.error`/`urllib.parse`) |
 | 18 | pytest (dev-only) | latest | MIT | https://github.com/pytest-dev/pytest | 테스트(설치 산출물에는 미포함) |
-| 19 | llama.cpp (외부 실행 도구, 서브프로세스) | 사용자 빌드 버전 | MIT | https://github.com/ggml-org/llama.cpp | `llama-quantize`/`llama-bench`/`llama-perplexity`/(선택)`llama-imatrix`/(선택)`convert_hf_to_gguf.py` 실행 — 실제 양자화·벤치마크·perplexity 연산 수행 |
+| 19 | llama.cpp (외부 실행 도구, 서브프로세스) | 사용자 빌드 버전 | MIT | https://github.com/ggml-org/llama.cpp | `llama-quantize`/`llama-bench`/`llama-perplexity`/(선택)`convert_hf_to_gguf.py` 실행 — 실제 양자화·벤치마크·perplexity 연산 수행. `llama-cli`·`llama-imatrix`는 경로 탐색·보고만 하고 실행하지 않음(아래 비고) |
 | 20 | nvidia-smi (선택, OS 드라이버 유틸) | 드라이버 종속 | NVIDIA 독점 (연동만, 재배포 없음) | https://developer.nvidia.com | NVIDIA GPU/VRAM 감지 |
 | 21 | rocm-smi (선택, OS 드라이버 유틸) | ROCm 종속 | MIT | https://github.com/ROCm/rocm_smi_lib | AMD GPU/VRAM 감지 |
 | 22 | system_profiler (선택, macOS 내장) | macOS 종속 | Apple 독점 (연동만, 재배포 없음) | https://www.apple.com | Apple Silicon 통합메모리(VRAM) 감지 |
+| 23 | sysctl (선택, macOS/BSD 내장) | macOS 종속 | Apple 제공, 상류 라이선스 미확인 (연동만, 재배포 없음) | https://www.apple.com | macOS 전체 RAM(`hw.memsize`) 감지 |
 
 ## 비고
 
@@ -35,18 +36,23 @@ FiTuna의 런타임 파이썬 의존성은 **0개**입니다 (표준 라이브�
   런타임 의존성은 **0개**입니다(`pyproject.toml`의 `dependencies = []`).
 - 18번(pytest)은 개발/테스트 전용이며 `pip install fituna`로 설치되는 패키지에는
   포함되지 않습니다 (`pyproject.toml`의 `[project.optional-dependencies].dev`).
-- 19~22번은 파이썬 패키지가 아니라 OS PATH 상(또는 `--llama-bin-dir`로 지정한
+- 19~23번은 파이썬 패키지가 아니라 OS PATH 상(또는 `--llama-bin-dir`로 지정한
   경로)에서 subprocess로 호출하는 외부 실행 파일입니다. 소스 코드를 포함하거나
   재배포하지 않으며, 사용자가 자신의 환경에 별도로 설치했다고 가정합니다.
   FiTuna는 이들을 항상 별도 OS 프로세스로 실행하고 표준출력만 파싱합니다.
   자세한 고지는 `THIRD_PARTY_NOTICES.md` 참고.
 - 19번 llama.cpp는 단일 저장소이며 빌드 산출물인 여러 바이너리
-  (`llama-quantize`, `llama-bench`, `llama-perplexity`, 선택적으로
-  `llama-imatrix`와 HF→GGUF 변환 스크립트)를 하나의 SBOM 항목으로 묶어
-  표기했습니다 — 모두 동일 저장소·동일 라이선스(MIT)에서 비롯됩니다.
-- 20번(nvidia-smi)과 22번(system_profiler)은 각각 NVIDIA 드라이버 패키지,
-  macOS 운영체제에 기본 포함된 독점 유틸리티입니다. FiTuna는 이를 호출만 할
-  뿐 코드를 포함하지 않으므로 재배포 의무가 발생하지 않습니다. 두 도구 모두
+  (`llama-quantize`, `llama-bench`, `llama-perplexity`, 선택적으로 HF→GGUF
+  변환 스크립트)를 하나의 SBOM 항목으로 묶어 표기했습니다 — 모두 동일
+  저장소·동일 라이선스(MIT)에서 비롯됩니다. `llama-cli`와 `llama-imatrix`도
+  같은 저장소 산출물이지만 **FiTuna가 실행하지는 않습니다**: `llama-cli`는
+  최종 결과의 `run command:` 줄에 실제 경로를 넣기 위해
+  `fituna/report.py`가 경로만 찾고(그리고 `fituna doctor`가 선택 점검
+  항목으로 보고), `llama-imatrix`는 `fituna/binaries.py`가 경로를 찾아
+  `fituna list-binaries`가 출력할 뿐 호출하는 코드 경로가 현재 없습니다.
+- 20번(nvidia-smi)과 22·23번(system_profiler, sysctl)은 각각 NVIDIA 드라이버
+  패키지, macOS 운영체제에 기본 포함된 유틸리티입니다. FiTuna는 이를 호출만
+  할 뿐 코드를 포함하지 않으므로 재배포 의무가 발생하지 않습니다. 모두
   없을 경우 `fituna/hardware.py`는 `platform` 모듈 기반 CPU-only
   `HardwareProfile`로 자동 폴백합니다.
 - `fituna fetch-corpus`(17번, `urllib`)가 내려받는 코퍼스 자체(WikiText-2,
