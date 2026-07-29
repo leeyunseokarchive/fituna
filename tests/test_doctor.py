@@ -16,7 +16,6 @@ import pytest
 
 from fituna import cli, doctor
 from fituna.config import BinaryPaths, DoctorCheck, GPUVendor, HardwareProfile
-from fituna.errors import BinaryNotFoundError
 
 
 # ---------------------------------------------------------------------------
@@ -31,8 +30,7 @@ def test_run_checks_isolates_a_crash_to_its_own_row(monkeypatch, tmp_path):
         raise RuntimeError("boom")
 
     monkeypatch.setattr(doctor.hardware, "detect_hardware", _boom)
-    monkeypatch.setattr(doctor.binaries, "locate_binaries", _boom)
-    monkeypatch.setattr(doctor.binaries, "_find_exe", _boom)
+    monkeypatch.setattr(doctor.binaries, "find_exe", _boom)
     monkeypatch.setattr(doctor.shutil, "disk_usage", _boom)
     monkeypatch.setattr(doctor.os, "access", _boom)
 
@@ -66,22 +64,20 @@ def test_safe_converts_exception_to_fail_row_not_a_raise():
         raise ValueError("simulated bug")
 
     row = doctor._safe("some-check", _boom)
-    assert row == DoctorCheck(
-        "some-check", "FAIL", "check crashed unexpectedly: simulated bug", row.remedy
-    )
+    assert row.name == "some-check"
+    assert row.status == "FAIL"
+    assert row.detail == "check crashed unexpectedly: simulated bug"
     assert row.remedy is not None
 
 
-def test_safe_required_binaries_converts_exception_to_three_fail_rows(monkeypatch):
-    def _boom(_bin_dir):
-        raise RuntimeError("kaboom")
+def test_safe_forces_its_name_onto_the_returned_row_even_if_fn_disagrees():
+    # the row name has exactly one source of truth: _safe's own argument --
+    # not whatever DoctorCheck a check function independently constructs.
+    def _mismatched_name():
+        return DoctorCheck("wrong-name", "PASS", "ok", None)
 
-    monkeypatch.setattr(doctor.binaries, "locate_binaries", _boom)
-    rows, paths = doctor._safe_required_binaries(None)
-
-    assert paths is None
-    assert [r.name for r in rows] == ["llama-quantize", "llama-bench", "llama-perplexity"]
-    assert all(r.status == "FAIL" and "kaboom" in r.detail for r in rows)
+    row = doctor._safe("right-name", _mismatched_name)
+    assert row.name == "right-name"
 
 
 # ---------------------------------------------------------------------------
@@ -113,14 +109,16 @@ def test_check_python_fail_when_too_old():
 
 def test_check_binary_required_pass(monkeypatch):
     monkeypatch.setattr(
-        doctor.binaries, "_find_exe", lambda name, bin_dir: Path(f"/opt/bin/{name}")
+        doctor.binaries, "find_exe", lambda name, bin_dir: Path(f"/opt/bin/{name}")
     )
     row = doctor._check_binary("llama-quantize", None, required=True)
-    assert row == DoctorCheck("llama-quantize", "PASS", "/opt/bin/llama-quantize", None)
+    assert row == DoctorCheck(
+        "llama-quantize", "PASS", str(Path("/opt/bin/llama-quantize")), None
+    )
 
 
 def test_check_binary_required_fail_mentions_brew_and_bin_dir_flag(monkeypatch):
-    monkeypatch.setattr(doctor.binaries, "_find_exe", lambda name, bin_dir: None)
+    monkeypatch.setattr(doctor.binaries, "find_exe", lambda name, bin_dir: None)
     row = doctor._check_binary("llama-bench", None, required=True)
     assert row.status == "FAIL"
     assert "brew install llama.cpp" in row.remedy
@@ -128,39 +126,36 @@ def test_check_binary_required_fail_mentions_brew_and_bin_dir_flag(monkeypatch):
 
 
 def test_check_binary_optional_llama_cli_warns_not_fails(monkeypatch):
-    monkeypatch.setattr(doctor.binaries, "_find_exe", lambda name, bin_dir: None)
+    monkeypatch.setattr(doctor.binaries, "find_exe", lambda name, bin_dir: None)
     row = doctor._check_binary("llama-cli", None, required=False)
     assert row.status == "WARN"  # missing llama-cli must never be FAIL
     assert "llama-cli" in row.remedy
 
 
-def test_required_binaries_success_uses_locate_binaries(monkeypatch):
-    fake_paths = BinaryPaths(
-        llama_quantize=Path("/x/llama-quantize"),
-        llama_bench=Path("/x/llama-bench"),
-        llama_perplexity=Path("/x/llama-perplexity"),
+def test_check_required_binaries_all_present_returns_rows_and_paths(monkeypatch):
+    monkeypatch.setattr(
+        doctor.binaries, "find_exe", lambda name, bin_dir: Path(f"/x/{name}")
     )
-    monkeypatch.setattr(doctor.binaries, "locate_binaries", lambda bin_dir: fake_paths)
 
     rows, paths = doctor._check_required_binaries(None)
 
-    assert paths is fake_paths
     assert rows == [
         DoctorCheck("llama-quantize", "PASS", str(Path("/x/llama-quantize")), None),
         DoctorCheck("llama-bench", "PASS", str(Path("/x/llama-bench")), None),
         DoctorCheck("llama-perplexity", "PASS", str(Path("/x/llama-perplexity")), None),
     ]
+    assert paths == BinaryPaths(
+        llama_quantize=Path("/x/llama-quantize"),
+        llama_bench=Path("/x/llama-bench"),
+        llama_perplexity=Path("/x/llama-perplexity"),
+    )
 
 
-def test_required_binaries_failure_falls_back_per_binary(monkeypatch):
-    def _raise(_bin_dir):
-        raise BinaryNotFoundError("not all found")
-
-    monkeypatch.setattr(doctor.binaries, "locate_binaries", _raise)
+def test_check_required_binaries_mixed_pass_and_fail(monkeypatch):
     # only llama-quantize actually resolves; bench/perplexity are missing.
     monkeypatch.setattr(
         doctor.binaries,
-        "_find_exe",
+        "find_exe",
         lambda name, bin_dir: Path("/x/llama-quantize") if name == "llama-quantize" else None,
     )
 
@@ -169,7 +164,7 @@ def test_required_binaries_failure_falls_back_per_binary(monkeypatch):
     assert paths is None
     by_name = {r.name: r for r in rows}
     assert by_name["llama-quantize"].status == "PASS"
-    assert by_name["llama-quantize"].detail == "/x/llama-quantize"
+    assert by_name["llama-quantize"].detail == str(Path("/x/llama-quantize"))
     assert by_name["llama-bench"].status == "FAIL"
     assert by_name["llama-perplexity"].status == "FAIL"
 
@@ -189,7 +184,7 @@ def test_llama_version_pass_reuses_supplied_paths_without_extra_lookups(monkeypa
     def _must_not_be_called(*_a, **_k):
         raise AssertionError("must not re-probe when paths were already resolved")
 
-    monkeypatch.setattr(doctor.binaries, "_find_exe", _must_not_be_called)
+    monkeypatch.setattr(doctor.binaries, "find_exe", _must_not_be_called)
     monkeypatch.setattr(
         doctor.binaries,
         "get_llama_cpp_version",
@@ -221,7 +216,7 @@ def test_llama_version_falls_back_to_individual_probe_when_paths_missing(monkeyp
     # reusing that one real path for both required BinaryPaths fields.
     monkeypatch.setattr(
         doctor.binaries,
-        "_find_exe",
+        "find_exe",
         lambda name, bin_dir: Path("/x/llama-perplexity") if name == "llama-perplexity" else None,
     )
 
@@ -238,12 +233,12 @@ def test_llama_version_falls_back_to_individual_probe_when_paths_missing(monkeyp
     assert row.detail == "1234 (deadbee)"
     # the missing llama-bench field was filled with the one real path found,
     # not a fabricated/nonexistent one.
-    assert str(seen["paths"].llama_bench) == "/x/llama-perplexity"
-    assert str(seen["paths"].llama_perplexity) == "/x/llama-perplexity"
+    assert str(seen["paths"].llama_bench) == str(Path("/x/llama-perplexity"))
+    assert str(seen["paths"].llama_perplexity) == str(Path("/x/llama-perplexity"))
 
 
 def test_llama_version_warn_when_nothing_resolvable_and_paths_none(monkeypatch):
-    monkeypatch.setattr(doctor.binaries, "_find_exe", lambda name, bin_dir: None)
+    monkeypatch.setattr(doctor.binaries, "find_exe", lambda name, bin_dir: None)
 
     def _must_not_be_called(_paths):
         raise AssertionError("get_llama_cpp_version must not be called with nothing to probe")
@@ -396,34 +391,24 @@ def test_summarize_counts_each_status():
     assert doctor.summarize(checks) == (2, 1, 1)
 
 
-def test_exit_code_zero_when_all_pass():
+def test_exit_code_zero_when_no_fail():
     assert doctor.exit_code([_mk("a", "PASS")]) == 0
-
-
-def test_exit_code_zero_when_warn_only():
     assert doctor.exit_code([_mk("a", "PASS"), _mk("hardware", "WARN")]) == 0
 
 
 def test_exit_code_one_for_non_binary_fail():
+    # a FAIL row whose name isn't one of the three required binaries maps to
+    # 1 -- including a stray "llama-cli" FAIL: llama-cli is WARN-only in
+    # normal operation, but exit_code's binary check is scoped to the
+    # required three regardless of what else might show up as FAIL.
     assert doctor.exit_code([_mk("python", "FAIL"), _mk("a", "PASS")]) == 1
-
-
-def test_exit_code_two_for_binary_fail():
-    assert doctor.exit_code([_mk("llama-bench", "FAIL")]) == 2
-
-
-def test_exit_code_two_takes_precedence_over_other_fail():
-    checks = [_mk("python", "FAIL"), _mk("llama-quantize", "FAIL")]
-    assert doctor.exit_code(checks) == 2
-
-
-def test_exit_code_llama_cli_fail_does_not_trigger_binary_precedence():
-    # llama-cli is never actually reported as FAIL (only WARN) in normal
-    # operation, but exit_code's binary-name check must be scoped to the
-    # three *required* binaries regardless -- a stray FAIL row named
-    # "llama-cli" (e.g. from a future bug) must fall through to the
-    # generic-FAIL branch (1), not the binary-FAIL branch (2).
     assert doctor.exit_code([_mk("llama-cli", "FAIL")]) == 1
+
+
+def test_exit_code_two_for_binary_fail_takes_precedence():
+    assert doctor.exit_code([_mk("llama-bench", "FAIL")]) == 2
+    # a required-binary FAIL wins even alongside another, unrelated FAIL.
+    assert doctor.exit_code([_mk("python", "FAIL"), _mk("llama-quantize", "FAIL")]) == 2
 
 
 # ---------------------------------------------------------------------------

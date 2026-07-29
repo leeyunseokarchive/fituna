@@ -35,8 +35,13 @@ _VERSION_RE_BARE = re.compile(r"^llama\.cpp\s+(\d+)\s*$", re.MULTILINE)
 _VERSION_RE_LOOSE = re.compile(r"(?:build|version)\s*[:=]\s*(\S+)")
 
 
-def _find_exe(name: str, bin_dir: Optional[Path]) -> Optional[Path]:
-    """Resolve an executable by name: restricted to bin_dir if given, else PATH."""
+def find_exe(name: str, bin_dir: Optional[Path]) -> Optional[Path]:
+    """Resolve an executable by name: restricted to bin_dir if given, else PATH.
+
+    Public (not ``_``-prefixed): ``fituna.doctor`` calls this directly for
+    its per-binary checks -- a supported single-binary lookup, not just an
+    internal helper of ``locate_binaries()``.
+    """
     found = shutil.which(name, path=str(bin_dir) if bin_dir is not None else None)
     return Path(found) if found else None
 
@@ -69,7 +74,7 @@ def locate_binaries(bin_dir: Optional[Path] = None) -> BinaryPaths:
     Raises BinaryNotFoundError with an install-guide message if any of the
     three required binaries is missing.
     """
-    resolved = {name: _find_exe(name, bin_dir) for name in _REQUIRED}
+    resolved = {name: find_exe(name, bin_dir) for name in _REQUIRED}
     missing = [name for name, path in resolved.items() if path is None]
     if missing:
         where = f"under --llama-bin-dir {bin_dir}" if bin_dir is not None else "on PATH"
@@ -84,7 +89,7 @@ def locate_binaries(bin_dir: Optional[Path] = None) -> BinaryPaths:
         llama_quantize=resolved["llama-quantize"],
         llama_bench=resolved["llama-bench"],
         llama_perplexity=resolved["llama-perplexity"],
-        llama_imatrix=_find_exe(_OPTIONAL_BIN, bin_dir),
+        llama_imatrix=find_exe(_OPTIONAL_BIN, bin_dir),
         convert_script=_find_script(_CONVERT_SCRIPT, bin_dir),
     )
 

@@ -12,24 +12,21 @@ A third party running FiTuna for the first time (e.g. a competition judging
 agency working from the docs alone) needs a single command that tells them,
 up front and precisely, what is missing and how to fix it.
 
-Never raises: every individual check is guarded (see ``_safe`` /
-``_safe_required_binaries``) so a bug in one check can only ever turn into a
-FAIL row for that check -- it can never abort the rest of the diagnosis or
-crash the process. A diagnostic tool that crashes mid-diagnosis is worse than
-useless for a user with no other context.
+Never raises: every individual check is guarded (see ``_safe``) so a bug in
+one check can only ever turn into a FAIL row for that check -- it can never
+abort the rest of the diagnosis or crash the process. A diagnostic tool that
+crashes mid-diagnosis is worse than useless for a user with no other context.
 
 Binary discovery: the three required binaries (llama-quantize/llama-bench/
-llama-perplexity) are looked up via ``fituna.binaries.locate_binaries()`` in
-the common case (all found), which is *the* discovery entry point for this
-package -- reused, not reimplemented. That call is all-or-nothing by
-contract, though, so it cannot say *which* binary is missing when it fails --
-for that (rarer) branch, and for llama-cli (which ``fituna.binaries`` does
-not model at all; see its own module docstring), we call
-``fituna.binaries._find_exe`` directly -- the exact single-binary lookup
-``locate_binaries()`` itself uses internally, reused rather than
-re-wrapped. Version detection -- the one piece of real, non-trivial logic in
-this area, with its regex-based probing of --version/--help across binaries
-and llama.cpp release eras -- is reused via
+llama-perplexity), plus llama-cli (which ``fituna.binaries`` does not model
+at all; see its own module docstring), are each looked up individually via
+``fituna.binaries.find_exe()`` -- the same single-binary lookup
+``fituna.binaries.locate_binaries()`` itself uses internally, reused rather
+than re-wrapped. Checking one binary at a time (rather than delegating to
+``locate_binaries()``, which is all-or-nothing by contract) is what lets a
+FAIL row say *which* binary is missing. Version detection -- the one piece
+of real, non-trivial logic in this area, with its regex-based probing of
+--version/--help across binaries and llama.cpp release eras -- is reused via
 ``fituna.binaries.get_llama_cpp_version()`` unconditionally, never
 duplicated.
 """
@@ -47,11 +44,10 @@ from typing import Callable, Optional
 
 from fituna import binaries, hardware
 from fituna.config import BinaryPaths, DoctorCheck, GPUVendor
-from fituna.errors import BinaryNotFoundError
 
 _MIN_PYTHON = (3, 11)
 _MIN_FREE_DISK_GB = 20.0
-_REQUIRED_BINARIES = ("llama-quantize", "llama-bench", "llama-perplexity")
+_REQUIRED_BINARIES = binaries._REQUIRED  # single source of truth: fituna.binaries
 
 _NAME_WIDTH = 18  # fixed-width name column in the human report
 _WRAP_WIDTH = 76  # remedy line-wrap width (indent included); matches the task brief's example exactly
@@ -65,10 +61,12 @@ _BINARY_REMEDY = (
 
 
 # ---------------------------------------------------------------------------
-# individual checks -- each one is a pure function returning a DoctorCheck
-# (or, for the required binaries, a list of them); no check here catches its
-# own exceptions -- that is _safe()'s / _safe_required_binaries()'s job, so
-# each check's happy-path logic stays readable.
+# individual checks -- each one is a pure function returning a DoctorCheck;
+# no check here catches its own exceptions -- that is _safe()'s job, applied
+# at each check's run_checks() call site, so each check's happy-path logic
+# stays readable. _check_required_binaries is the one exception: it produces
+# three rows instead of one, so it calls _safe itself, once per binary,
+# rather than being wrapped externally like everything else.
 # ---------------------------------------------------------------------------
 
 
@@ -86,10 +84,10 @@ def _check_python(version_info: tuple = sys.version_info) -> DoctorCheck:
 
 
 def _check_binary(name: str, bin_dir: Optional[Path], *, required: bool) -> DoctorCheck:
-    # Reuses fituna.binaries._find_exe -- the same single-binary lookup
+    # Reuses fituna.binaries.find_exe -- the same single-binary lookup
     # locate_binaries() itself calls internally -- rather than duplicating
     # its shutil.which(...) wrapping here (see module docstring).
-    path = binaries._find_exe(name, bin_dir)
+    path = binaries.find_exe(name, bin_dir)
     if path is not None:
         return DoctorCheck(name, "PASS", str(path), None)
     if required:
@@ -109,17 +107,28 @@ def _check_required_binaries(
     """PASS/FAIL rows for the three required llama.cpp binaries, plus the
     resolved BinaryPaths for the version check to reuse (None if any are
     missing, since BinaryPaths' required fields would then have nothing
-    real to hold)."""
-    try:
-        paths = binaries.locate_binaries(bin_dir)
-    except BinaryNotFoundError:
-        rows = [_check_binary(name, bin_dir, required=True) for name in _REQUIRED_BINARIES]
-        return rows, None
+    real to hold).
 
+    Guards each row with _safe individually, so this function itself never
+    raises -- no bespoke "guard the whole batch" wrapper needed (see the
+    checks-section banner above). `paths` is read back from the rows' own
+    already-resolved detail strings (== str(path) for a PASS row -- see
+    _check_binary) rather than by calling find_exe a second time, so it
+    stays a pure, can't-fail step even once every row is a verified PASS.
+    """
     rows = [
-        DoctorCheck(name, "PASS", str(getattr(paths, name.replace("-", "_"))), None)
+        _safe(name, lambda name=name: _check_binary(name, bin_dir, required=True))
         for name in _REQUIRED_BINARIES
     ]
+    if any(row.status != "PASS" for row in rows):
+        return rows, None
+
+    by_name = {row.name: row.detail for row in rows}
+    paths = BinaryPaths(
+        llama_quantize=Path(by_name["llama-quantize"]),
+        llama_bench=Path(by_name["llama-bench"]),
+        llama_perplexity=Path(by_name["llama-perplexity"]),
+    )
     return rows, paths
 
 
@@ -135,8 +144,8 @@ def _probe_paths_for_version(
     on PATH."""
     if paths is not None:
         return paths
-    bench_path = binaries._find_exe("llama-bench", bin_dir)
-    ppl_path = binaries._find_exe("llama-perplexity", bin_dir)
+    bench_path = binaries.find_exe("llama-bench", bin_dir)
+    ppl_path = binaries.find_exe("llama-perplexity", bin_dir)
     if bench_path is None and ppl_path is None:
         return None
     return BinaryPaths(
@@ -181,11 +190,14 @@ def _check_hardware() -> DoctorCheck:
     )
 
 
-def _nearest_existing_dir(path: Path) -> Path:
+def _nearest_existing_ancestor(path: Path) -> Path:
     """Walk up from ``path`` to the nearest ancestor that actually exists,
     without creating anything -- used to check "could this be created" and
     "how much free space is available" for a --out directory that may not
-    exist yet."""
+    exist yet. Returns ``path`` itself when it already exists -- which may
+    be a file, not a directory (hence "ancestor", not "dir", in the name);
+    callers that care about that distinction check it themselves (see
+    _check_out_dir)."""
     current = path
     while not current.exists():
         parent = current.parent
@@ -204,7 +216,7 @@ def _check_out_dir(out_dir: Path) -> DoctorCheck:
             "Pass a different --out path (the existing one is a file).",
         )
 
-    existing = _nearest_existing_dir(out_dir)
+    existing = _nearest_existing_ancestor(out_dir)
     writable = os.access(existing, os.W_OK)
     if out_dir.exists():
         detail = f"{out_dir} ({'writable' if writable else 'not writable'})"
@@ -221,7 +233,7 @@ def _check_out_dir(out_dir: Path) -> DoctorCheck:
 
 
 def _check_disk_space(out_dir: Path) -> DoctorCheck:
-    existing = _nearest_existing_dir(out_dir)
+    existing = _nearest_existing_ancestor(out_dir)
     usage = shutil.disk_usage(existing)
     free_gb = usage.free / (1024**3)
     detail = f"{free_gb:.1f} GB free at {existing}"
@@ -243,9 +255,15 @@ def _check_disk_space(out_dir: Path) -> DoctorCheck:
 
 def _safe(name: str, fn: Callable[[], DoctorCheck]) -> DoctorCheck:
     """Run one check, converting any exception into a FAIL row instead of
-    letting it propagate. See module docstring: doctor must never crash."""
+    letting it propagate (see module docstring: doctor must never crash).
+
+    ``name`` is forced onto the returned row either way -- the single
+    source of truth for a row's name, so it can never silently drift from
+    whatever a check function happens to hardcode internally between its
+    normal and crashed forms.
+    """
     try:
-        return fn()
+        row = fn()
     except Exception as exc:  # noqa: BLE001 -- deliberately broad, see above
         return DoctorCheck(
             name,
@@ -253,27 +271,7 @@ def _safe(name: str, fn: Callable[[], DoctorCheck]) -> DoctorCheck:
             f"check crashed unexpectedly: {exc}",
             "This looks like a fituna bug; please file an issue with this output.",
         )
-
-
-def _safe_required_binaries(
-    bin_dir: Optional[Path],
-) -> tuple[list[DoctorCheck], Optional[BinaryPaths]]:
-    """Same never-raises guarantee as _safe(), but for the one check that
-    produces multiple rows -- on crash, every required binary gets its own
-    FAIL row so the report's row count/shape stays stable either way."""
-    try:
-        return _check_required_binaries(bin_dir)
-    except Exception as exc:  # noqa: BLE001 -- deliberately broad, see _safe()
-        rows = [
-            DoctorCheck(
-                name,
-                "FAIL",
-                f"check crashed unexpectedly: {exc}",
-                "This looks like a fituna bug; please file an issue with this output.",
-            )
-            for name in _REQUIRED_BINARIES
-        ]
-        return rows, None
+    return dataclasses.replace(row, name=name)
 
 
 def run_checks(bin_dir: Optional[Path], out_dir: Path) -> list[DoctorCheck]:
@@ -281,7 +279,7 @@ def run_checks(bin_dir: Optional[Path], out_dir: Path) -> list[DoctorCheck]:
     in report order. Never raises."""
     checks: list[DoctorCheck] = [_safe("python", _check_python)]
 
-    binary_rows, paths = _safe_required_binaries(bin_dir)
+    binary_rows, paths = _check_required_binaries(bin_dir)
     checks.extend(binary_rows)
     checks.append(_safe("llama-cli", lambda: _check_binary("llama-cli", bin_dir, required=False)))
     checks.append(_safe("llama.cpp version", lambda: _check_llama_version(bin_dir, paths)))
