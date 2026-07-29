@@ -37,5 +37,6 @@ jobs:
           python -m fituna.hardware
           python -m fituna.binaries
           python -m fituna.report
+          python -m fituna.doctor --selfcheck
           python -m fituna.cli --selfcheck
           python -m fituna.mcp_server --selfcheck
