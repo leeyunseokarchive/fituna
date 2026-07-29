@@ -14,6 +14,8 @@ actually hits the numbers on **your** machine.*
 [![Zero dependencies](https://img.shields.io/badge/runtime%20deps-0-brightgreen.svg)](docs/SBOM.md)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
+**심사위원 · 검증기관용 한국어 재현 가이드 → [REVIEWERS.md](REVIEWERS.md)** *(Korean reproduction guide for competition judges & verification agency)*
+
 </div>
 
 ---
