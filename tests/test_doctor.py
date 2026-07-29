@@ -80,6 +80,18 @@ def test_safe_forces_its_name_onto_the_returned_row_even_if_fn_disagrees():
     assert row.name == "right-name"
 
 
+def test_safe_converts_non_doctorcheck_return_to_fail_row_not_a_raise():
+    # a check function that breaks its own contract (returns something that
+    # isn't a DoctorCheck) must still come back as a FAIL row, not raise --
+    # the name-reconciliation step (dataclasses.replace) is guarded too, not
+    # just fn()'s own body.
+    row = doctor._safe("some-check", lambda: None)
+    assert row.name == "some-check"
+    assert row.status == "FAIL"
+    assert "check crashed unexpectedly" in row.detail
+    assert row.remedy is not None
+
+
 # ---------------------------------------------------------------------------
 # _check_python
 # ---------------------------------------------------------------------------
@@ -167,6 +179,28 @@ def test_check_required_binaries_mixed_pass_and_fail(monkeypatch):
     assert by_name["llama-quantize"].detail == str(Path("/x/llama-quantize"))
     assert by_name["llama-bench"].status == "FAIL"
     assert by_name["llama-perplexity"].status == "FAIL"
+
+
+def test_check_required_binaries_survives_a_renamed_required_tuple(monkeypatch):
+    # Regression: _check_required_binaries's final BinaryPaths build indexes
+    # by_name with the literal names "llama-quantize"/"llama-bench"/
+    # "llama-perplexity". If _REQUIRED_BINARIES (doctor.py's alias for
+    # fituna.binaries.REQUIRED_BINARIES) is ever renamed/reordered/extended,
+    # those rows all still PASS but by_name won't have those exact keys --
+    # this must degrade to paths=None, not KeyError out of run_checks.
+    monkeypatch.setattr(
+        doctor.binaries, "find_exe", lambda name, bin_dir: Path(f"/x/{name}")
+    )
+    monkeypatch.setattr(
+        doctor,
+        "_REQUIRED_BINARIES",
+        ("llama-quantize-v2", "llama-bench", "llama-perplexity"),
+    )
+
+    rows, paths = doctor._check_required_binaries(None)  # must not raise
+
+    assert paths is None
+    assert all(row.status == "PASS" for row in rows)
 
 
 # ---------------------------------------------------------------------------

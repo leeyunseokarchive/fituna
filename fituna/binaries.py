@@ -17,7 +17,13 @@ from typing import Optional
 
 from fituna.config import BinaryNotFoundError, BinaryPaths
 
-_REQUIRED = ("llama-quantize", "llama-bench", "llama-perplexity")
+REQUIRED_BINARIES = ("llama-quantize", "llama-bench", "llama-perplexity")
+"""The three llama.cpp binaries FiTuna cannot run without.
+
+Public (not ``_``-prefixed): ``fituna.doctor`` imports this directly as its
+own single source of truth for which binaries are required, the same
+reasoning as ``find_exe`` being public (see its docstring).
+"""
 _OPTIONAL_BIN = "llama-imatrix"
 _CONVERT_SCRIPT = "convert_hf_to_gguf.py"
 
@@ -74,7 +80,7 @@ def locate_binaries(bin_dir: Optional[Path] = None) -> BinaryPaths:
     Raises BinaryNotFoundError with an install-guide message if any of the
     three required binaries is missing.
     """
-    resolved = {name: find_exe(name, bin_dir) for name in _REQUIRED}
+    resolved = {name: find_exe(name, bin_dir) for name in REQUIRED_BINARIES}
     missing = [name for name, path in resolved.items() if path is None]
     if missing:
         where = f"under --llama-bin-dir {bin_dir}" if bin_dir is not None else "on PATH"

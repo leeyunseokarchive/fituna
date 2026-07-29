@@ -47,7 +47,7 @@ from fituna.config import BinaryPaths, DoctorCheck, GPUVendor
 
 _MIN_PYTHON = (3, 11)
 _MIN_FREE_DISK_GB = 20.0
-_REQUIRED_BINARIES = binaries._REQUIRED  # single source of truth: fituna.binaries
+_REQUIRED_BINARIES = binaries.REQUIRED_BINARIES  # single source of truth: fituna.binaries (public)
 
 _NAME_WIDTH = 18  # fixed-width name column in the human report
 _WRAP_WIDTH = 76  # remedy line-wrap width (indent included); matches the task brief's example exactly
@@ -115,6 +115,12 @@ def _check_required_binaries(
     already-resolved detail strings (== str(path) for a PASS row -- see
     _check_binary) rather than by calling find_exe a second time, so it
     stays a pure, can't-fail step even once every row is a verified PASS.
+
+    The final `by_name[...]` lookups below assume `_REQUIRED_BINARIES`
+    still spells out exactly these three names; guarded by a KeyError
+    catch (rather than a second _safe-style wrapper) so a future rename or
+    reordering of `_REQUIRED_BINARIES` degrades to paths=None instead of
+    raising out of this function.
     """
     rows = [
         _safe(name, lambda name=name: _check_binary(name, bin_dir, required=True))
@@ -124,11 +130,14 @@ def _check_required_binaries(
         return rows, None
 
     by_name = {row.name: row.detail for row in rows}
-    paths = BinaryPaths(
-        llama_quantize=Path(by_name["llama-quantize"]),
-        llama_bench=Path(by_name["llama-bench"]),
-        llama_perplexity=Path(by_name["llama-perplexity"]),
-    )
+    try:
+        paths = BinaryPaths(
+            llama_quantize=Path(by_name["llama-quantize"]),
+            llama_bench=Path(by_name["llama-bench"]),
+            llama_perplexity=Path(by_name["llama-perplexity"]),
+        )
+    except KeyError:
+        return rows, None
     return rows, paths
 
 
@@ -256,6 +265,11 @@ def _check_disk_space(out_dir: Path) -> DoctorCheck:
 def _safe(name: str, fn: Callable[[], DoctorCheck]) -> DoctorCheck:
     """Run one check, converting any exception into a FAIL row instead of
     letting it propagate (see module docstring: doctor must never crash).
+    The name-reconciliation step below is inside the same try -- a check
+    that breaks its own contract (returns something other than a
+    DoctorCheck) fails ``dataclasses.replace`` with a TypeError, which is
+    just another exception this same guard catches, so it becomes a FAIL
+    row instead of escaping.
 
     ``name`` is forced onto the returned row either way -- the single
     source of truth for a row's name, so it can never silently drift from
@@ -264,6 +278,7 @@ def _safe(name: str, fn: Callable[[], DoctorCheck]) -> DoctorCheck:
     """
     try:
         row = fn()
+        row = dataclasses.replace(row, name=name)
     except Exception as exc:  # noqa: BLE001 -- deliberately broad, see above
         return DoctorCheck(
             name,
@@ -271,7 +286,7 @@ def _safe(name: str, fn: Callable[[], DoctorCheck]) -> DoctorCheck:
             f"check crashed unexpectedly: {exc}",
             "This looks like a fituna bug; please file an issue with this output.",
         )
-    return dataclasses.replace(row, name=name)
+    return row
 
 
 def run_checks(bin_dir: Optional[Path], out_dir: Path) -> list[DoctorCheck]:
