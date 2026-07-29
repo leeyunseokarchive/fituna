@@ -4,6 +4,11 @@
 out/
 .fituna_cache.sqlite3
 
+# `fituna fetch-corpus` output (downloaded corpora, not project sources --
+# see README Quickstart step 3)
+wikitext-2-raw-test.txt
+kowiki-corpus.txt
+
 # Python
 __pycache__/
 *.py[cod]

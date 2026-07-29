@@ -96,29 +96,20 @@ pip install -e .
 on a plain-text corpus — and it's only meaningful on text resembling your
 actual workload. Any UTF-8 text file works (`--quality-corpus`).
 
-English default — wikitext-2 test split (CC BY-SA):
-
 ```bash
-pip install datasets  # one-time, only to fetch corpora
-python -c "
-from datasets import load_dataset
-ds = load_dataset('Salesforce/wikitext', 'wikitext-2-raw-v1', split='test')
-open('wikitext-2-raw-test.txt', 'w').write('\n'.join(ds['text']))
-"
+fituna fetch-corpus --lang en --out wikitext-2-raw-test.txt        # wikitext-2 test split
+fituna fetch-corpus --lang ko --out kowiki-corpus.txt --rows 500   # Korean Wikipedia
 ```
 
-Korean models — Korean Wikipedia (CC BY-SA), so the quality gate measures
-what actually degrades for Korean users (English perplexity can rank quants
-differently than Korean perplexity — measure the language you'll run):
-
-```bash
-python -c "
-from datasets import load_dataset
-ds = load_dataset('wikimedia/wikipedia', '20231101.ko', split='train', streaming=True)
-texts = [row['text'] for _, row in zip(range(500), ds)]
-open('kowiki-corpus.txt', 'w').write('\n'.join(texts))
-"
-```
+Pulls rows straight from HuggingFace's public dataset-viewer REST API via
+stdlib `urllib` — no `pip install datasets` (which drags in pyarrow/pandas)
+needed. Korean models should use the Korean corpus so the quality gate
+measures what actually degrades for Korean users (English perplexity can
+rank quants differently than Korean perplexity — measure the language
+you'll run). Both presets are CC BY-SA 3.0; `fetch-corpus` prints the
+attribution/share-alike notice and source URL to stdout when it finishes.
+Have your own dataset in mind? `--dataset/--config/--split` override the
+preset (`fituna fetch-corpus --help`).
 
 **4. Run:**
 
@@ -226,6 +217,7 @@ fituna/
 ├── hardware.py    # GPU/VRAM/CPU/RAM auto-detection + manual override
 ├── binaries.py    # llama.cpp binary discovery + capability introspection
 ├── doctor.py      # environment self-diagnosis (fituna doctor subcommand)
+├── corpus.py      # quality-corpus download (fituna fetch-corpus, stdlib urllib)
 ├── model_info.py  # direct GGUF header parsing (struct), HF-dir conversion
 ├── quantize.py    # llama-quantize wrapper (idempotent, atomic writes)
 ├── quality.py     # llama-perplexity wrapper (quality-loss measurement)
@@ -235,8 +227,8 @@ fituna/
 └── report.py      # human/JSON result rendering + run-command builder
 ```
 
-118 unit tests (mocked subprocess layer) + per-module runnable self-checks +
-3-OS × 2-Python CI matrix. Real-binary E2E validated on macOS (Apple
+147 unit tests (mocked subprocess/network layer) + per-module runnable
+self-checks + 3-OS × 2-Python CI matrix. Real-binary E2E validated on macOS (Apple
 Silicon/Metal) and Linux (NVIDIA T4/CUDA); see
 [Known limitations](#known-limitations).
 

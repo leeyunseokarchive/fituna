@@ -2,7 +2,7 @@
 =============
 
 argparse-based CLI. Subcommands: ``run``, ``detect-hw``, ``list-binaries``,
-``doctor``.
+``doctor``, ``fetch-corpus``.
 
 CLI <-> dataclass field mapping (see fituna/config.py for the dataclasses):
 
@@ -37,7 +37,7 @@ from dataclasses import asdict, fields
 from pathlib import Path
 from typing import Optional, Sequence
 
-from fituna import binaries, doctor, hardware, model_info, report, search
+from fituna import binaries, corpus, doctor, hardware, model_info, report, search
 from fituna.cache import ResultCache
 from fituna.config import BinaryPaths, HardwareProfile, TargetSpec
 from fituna.errors import BinaryNotFoundError, FiTunaError, NoFeasibleConfigError
@@ -89,8 +89,9 @@ def _build_parser() -> argparse.ArgumentParser:
             "plain-text corpus for perplexity-based quality measurement. "
             "Any UTF-8 text works: wikitext-2 (English default), Korean "
             "Wikipedia for Korean models, your own domain text -- quality "
-            "loss is only meaningful on text resembling your workload. See "
-            "README 'Quality corpus' for export snippets."
+            "loss is only meaningful on text resembling your workload. Run "
+            "`fituna fetch-corpus` to download one, or see README 'Get a "
+            "quality corpus' for details."
         ),
     )
     run.add_argument(
@@ -127,6 +128,30 @@ def _build_parser() -> argparse.ArgumentParser:
     doc.add_argument("--llama-bin-dir", default=None, dest="llama_bin_dir")
     doc.add_argument("--out", default="./out", help="directory to check for write access and free disk space")
     doc.add_argument("--json", action="store_true", help="emit JSON report to stdout")
+
+    fc = sub.add_parser(
+        "fetch-corpus",
+        help="download a plain-text quality-evaluation corpus (HuggingFace "
+        "dataset-viewer API, stdlib urllib only -- no pip install needed)",
+    )
+    fc.add_argument("--lang", choices=["en", "ko"], default="en")
+    fc.add_argument("--out", required=True, help="output UTF-8 text file path")
+    fc.add_argument(
+        "--rows", type=int, default=None,
+        help="number of rows to fetch (default: 1000 for en, 500 for ko)",
+    )
+    fc.add_argument(
+        "--dataset", default=None,
+        help="override HuggingFace dataset id (must be given together with --config/--split)",
+    )
+    fc.add_argument(
+        "--config", default=None, dest="hf_config", metavar="CONFIG",
+        help="override dataset config name (must be given together with --dataset/--split)",
+    )
+    fc.add_argument(
+        "--split", default=None,
+        help="override dataset split name (must be given together with --dataset/--config)",
+    )
 
     return parser
 
@@ -227,6 +252,37 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
     return doctor.exit_code(checks)
 
 
+def _cmd_fetch_corpus(args: argparse.Namespace) -> int:
+    """No try/except of its own: network/HTTP/schema failures surface as a
+    plain FiTunaError (see fituna/corpus.py), which propagates up to
+    main()'s generic FiTunaError branch (log + exit 1) -- a network failure
+    here is a generic error, not one of the special-cased exit codes."""
+    out_path = Path(args.out)
+    count = corpus.fetch_corpus(
+        out_path,
+        lang=args.lang,
+        rows=args.rows,
+        dataset=args.dataset,
+        config=args.hf_config,
+        split=args.split,
+        progress_cb=logger.info,
+    )
+    print(f"Wrote {count} rows to {out_path}")
+    if args.dataset is None:
+        print(corpus.PRESETS[args.lang].license_note)
+    else:
+        # A custom --dataset/--config/--split override may point at a
+        # dataset under any license -- printing the preset's CC BY-SA
+        # notice here would be an unverified (and likely false) claim
+        # about someone else's dataset, so this stays generic instead.
+        print(
+            f"Corpus: {args.dataset} ({args.hf_config}/{args.split}) -- not "
+            "a built-in preset; check this dataset's own license before "
+            f"redistributing: https://huggingface.co/datasets/{args.dataset}"
+        )
+    return 0
+
+
 def _cmd_run(args: argparse.Namespace) -> int:
     ctx_candidates = _parse_ctx_candidates(args.ctx)
     quant_candidates = _sort_quants_by_quality(args.quant)
@@ -287,6 +343,7 @@ _DISPATCH = {
     "detect-hw": _cmd_detect_hw,
     "list-binaries": _cmd_list_binaries,
     "doctor": _cmd_doctor,
+    "fetch-corpus": _cmd_fetch_corpus,
 }
 
 
@@ -383,6 +440,28 @@ def _selfcheck() -> None:
     assert doc_args.out == "/tmp/o"
     assert doc_args.json is True
     assert doc_args.llama_bin_dir is None
+
+    fc_args = parser.parse_args(["fetch-corpus", "--out", "corpus.txt"])
+    assert fc_args.command == "fetch-corpus"
+    assert fc_args.lang == "en"  # default
+    assert fc_args.rows is None  # resolved from the --lang preset inside fituna.corpus
+    assert fc_args.dataset is None and fc_args.hf_config is None and fc_args.split is None
+
+    fc_ko_args = parser.parse_args(
+        ["fetch-corpus", "--lang", "ko", "--out", "kowiki.txt", "--rows", "500"]
+    )
+    assert fc_ko_args.lang == "ko"
+    assert fc_ko_args.rows == 500
+
+    fc_override_args = parser.parse_args(
+        [
+            "fetch-corpus", "--out", "custom.txt",
+            "--dataset", "org/name", "--config", "cfg", "--split", "train",
+        ]
+    )
+    assert fc_override_args.dataset == "org/name"
+    assert fc_override_args.hf_config == "cfg"
+    assert fc_override_args.split == "train"
 
     try:
         _parse_ctx_candidates("")
