@@ -38,8 +38,12 @@ FiTuna는 로컬 LLM(llama.cpp)을 돌릴 때 **어떤 양자화 레벨(quant)�
 |---|---|---|
 | 필요한 것 | 웹 브라우저 + 구글 계정 | macOS 또는 Linux, Python 3.11+ |
 | 설치 | 없음 (Colab 무료 T4 GPU 사용) | llama.cpp + FiTuna 설치 필요 |
-| 소요 시간 | 약 20~30분 (대부분 llama.cpp CUDA 빌드) | 약 10~15분 (llama.cpp 설치 시간 제외) |
+| 소요 시간 | 약 20~30분 (대부분 llama.cpp CUDA 빌드) | 약 3분 (llama.cpp 설치 시간 제외) |
 | 검증 대상 하드웨어 | NVIDIA Tesla T4 / Linux / CUDA | 검증자의 실제 기기 |
+
+경로 B의 "약 3분"은 4장의 실측 단계(코퍼스 내려받기 4-4 + 모델 내려받기 4-5 +
+탐색 실행 4-6 + 재현 확인 4-7)를 합산한 값이다. 설치(4-2)·점검(4-3)은 수 초 내로
+끝나 반올림에 흡수된다.
 
 설치를 전혀 하지 않고 확인하려면 **경로 A**, 로컬에 llama.cpp를 설치할 수 있는
 환경이면 **경로 B**가 더 빠르다. 둘 중 하나만 수행해도 기능 확인에는 충분하다.
@@ -123,25 +127,34 @@ cmake --build llama.cpp/build --target llama-quantize llama-bench llama-perplexi
 
 ### 4-2. FiTuna 설치 (Python 3.11 이상)
 
+가상환경을 만들어 그 안에 설치한다(이유는 아래 참고):
+
 ```bash
-python3 -m pip install git+https://github.com/leeyunseokarchive/fituna
+python3.13 -m venv .venv
+source .venv/bin/activate
+pip install git+https://github.com/leeyunseokarchive/fituna
 ```
 
 또는 소스에서 설치:
 
 ```bash
 git clone https://github.com/leeyunseokarchive/fituna
-python3 -m pip install -e fituna
+python3.13 -m venv .venv
+source .venv/bin/activate
+pip install -e fituna
 ```
 
 - 런타임 의존성이 0개(표준 라이브러리만 사용)라 설치는 수 초면 끝난다.
 - **`pip install fituna`(PyPI)는 아직 동작하지 않는다.** 이 프로젝트는 PyPI에
   등록 전이며, 위의 GitHub 주소 설치가 유일한 정식 경로다.
 - 시스템 `python3`가 3.11 미만이면(예: macOS 기본 python3는 3.9.6) 3.11 이상
-  인터프리터를 명시해야 한다. 예: `python3.13 -m pip install ...`.
-- 설치 후 `fituna: command not found`가 나오면 콘솔 스크립트 경로가 `PATH`에
-  없는 것이다. **`python3 -m fituna` 로 완전히 동일하게 사용할 수 있다**
-  (6장 참고).
+  인터프리터로 가상환경을 만들어야 한다. 위처럼 `python3.13 -m venv .venv`.
+- **가상환경 없이 시스템 `python3`에 그대로 `pip install`하면 최신 Homebrew·
+  Debian/Ubuntu 파이썬에서 `error: externally-managed-environment`로 실패한다**
+  (PEP 668 — 직접 재현 확인, 6장 참고). 위 가상환경 절차가 이를 피하는 방법이다.
+- 가상환경을 활성화한 채로는 `fituna` 명령이 곧바로 PATH에 잡힌다. 활성화를
+  깜빡했거나 `--user`로 전역 설치해 `fituna: command not found`가 나오면,
+  **`python3 -m fituna` 로 완전히 동일하게 사용할 수 있다**(6장 참고).
 
 ### 4-3. 환경 점검 — `fituna doctor`
 
@@ -180,7 +193,7 @@ FiTuna doctor
 fituna fetch-corpus --lang en --out wikitext-2-raw-test.txt
 ```
 
-실제 출력 (직접 실행, 종료 코드 0, 약 38초, 결과 파일 316,241 바이트):
+실제 출력 (직접 실행, 종료 코드 0, 결과 파일 316,241 바이트):
 
 ```
 2026-07-30 03:08:17,471 INFO fituna: fetched 100/1000 rows
@@ -189,6 +202,10 @@ fituna fetch-corpus --lang en --out wikitext-2-raw-test.txt
 Wrote 1000 rows to wikitext-2-raw-test.txt
 Corpus: Salesforce/wikitext (wikitext-2-raw-v1, test split). License: CC BY-SA 3.0 (also dual-licensed GFDL) -- attribution and share-alike apply. Source: https://huggingface.co/datasets/Salesforce/wikitext
 ```
+
+최초 실행은 위처럼 38초 걸렸으나, 곧바로 재실행하면 4~5초로 끝난다(직접
+재확인: 결과 파일은 동일하게 316,241 바이트). **네트워크·HuggingFace API 상태에
+따라 다름** — 4-5절과 같은 사정이다.
 
 한국어 코퍼스가 필요하면 `fituna fetch-corpus --lang ko --out kowiki-corpus.txt
 --rows 500` (직접 실행: 약 5초, 5.9 MB).
@@ -283,9 +300,16 @@ FiTuna result: MEETS TARGET
 | 코드 | 의미 | 정상인가 |
 |---|---|---|
 | **0** | 목표를 만족하는 구성을 찾음 (`MEETS TARGET`) | ✅ **정상** |
-| **1** | 일반 오류 — 인자 오류, 모델 파일 없음, 네트워크 실패 등 | 메시지 확인 필요 (5-3절·6장) |
-| **2** | llama.cpp 바이너리를 찾지 못함 | 환경 문제 (6장에서 해결) |
+| **1** | 일반 오류 — 모델 파일 없음, 네트워크 실패 등 | 메시지 확인 필요 (5-3절·6장) |
+| **2** | 인자 오류(argparse) **또는** llama.cpp 바이너리를 찾지 못함 — 원인 두 가지, 아래에서 구분 | 메시지로 원인 구분 (6장) |
 | **3** | 목표를 만족하는 구성이 없음 + **가장 근접한 구성 보고** | ✅ **정상** |
+
+**종료 코드 2는 원인이 두 가지다.** 필수 플래그 누락이나 오타난 플래그는
+argparse가 처리하며 stderr 첫 줄이 항상 `usage: ...`로 시작한다. 반면 llama.cpp
+바이너리를 찾지 못한 경우(`BinaryNotFoundError`)는 FiTuna 자체 로거가 남기는
+`... ERROR fituna: ...` 형태의 메시지이며 `usage:` 줄이 없다. **stderr 첫 줄이
+`usage:`면 인자 오류, 아니면 환경(바이너리) 문제다.** 두 사례의 실제 출력은
+6장 "종료 코드 2"에서 확인할 수 있다.
 
 ### 5-2. 🔴 종료 코드 3은 버그가 아니라 정직한 보고다
 
@@ -366,24 +390,30 @@ FiTuna result: BEST EFFORT (target not met)
 | Python traceback | **없음** | `Traceback (most recent call last):` 가 그대로 노출됨 |
 | 종료 코드 | 0 또는 3 | 1 (예상치 못한 예외는 `unexpected error`로 로깅) |
 
-즉 **Python traceback이 화면에 노출되었는가**가 핵심 구분선이다. 인자 오류·파일
-없음·네트워크 실패 같은 예상 가능한 실패는 traceback 없이 한 줄짜리 영문 설명
-메시지와 종료 코드 1로 처리된다(직접 확인:
+즉 **Python traceback이 화면에 노출되었는가**가 핵심 구분선이다. 파일 없음·
+네트워크 실패 같은 예상 가능한 실패는 traceback 없이 한 줄짜리 영문 설명
+메시지와 종료 코드 1로 처리된다(인자 오류는 이와 별개로 종료 코드 2이며 5-1절
+참고. 직접 확인:
 `fituna run --model nope.gguf ...` → `nope.gguf is neither a .gguf file nor an
 HF-format model directory -- nothing to convert.`, 종료 코드 1).
 
 ### 5-4. 모델·GPU 없이 할 수 있는 오프라인 점검
 
 llama.cpp나 모델 파일 없이도, 소스 저장소만 있으면 다음을 확인할 수 있다.
+**이미 4-2에서 소스 설치 경로(`git clone` + `pip install -e fituna`)를 같은
+디렉터리에서 따라왔다면 `fituna/`가 이미 있으니, 아래에서 `git clone` 줄은
+건너뛰고 `cd fituna`부터 시작한다.**
 
 ```bash
 git clone https://github.com/leeyunseokarchive/fituna
 cd fituna
-python3 -m pip install pytest
+python3.13 -m venv .venv
+source .venv/bin/activate
+pip install pytest
 python3 -m pytest -q
 ```
 
-직접 실행 결과: `151 passed in 1.06s` (이 문서 작성 시점 `main` 기준. 테스트가
+직접 실행 결과: `151 passed in 1.24s` (이 문서 작성 시점 `main` 기준. 테스트가
 추가되면 개수는 늘어난다 — 중요한 것은 **실패 0건**이다).
 
 모듈별 자체 점검도 개별 실행할 수 있다 (직접 실행, 모두 종료 코드 0):
@@ -407,9 +437,43 @@ python3 -m fituna.doctor              # -> fituna.doctor self-check OK
 - 조치 2: `python3 -m pip show -f fituna`가 알려주는 스크립트 경로를 `PATH`에
   추가한다.
 
-### 종료 코드 2 — llama.cpp 바이너리를 찾지 못함
+### `error: externally-managed-environment`
 
-아래는 빈 디렉토리(`emptybin`)를 `--llama-bin-dir`로 넘겨 직접 재현한 실제 출력이다.
+Homebrew·Debian/Ubuntu 등 최신 배포판 Python은 PEP 668에 따라 시스템 전역
+`pip install`을 막는다. 직접 재현한 실제 메시지의 첫 줄:
+
+```
+error: externally-managed-environment
+```
+
+- 조치: 4-2절의 가상환경 절차(`python3.13 -m venv .venv` →
+  `source .venv/bin/activate`)를 따른다. 이 문서의 모든 설치 명령은 이미
+  가상환경을 전제로 고쳐져 있다.
+
+### 종료 코드 2 — 원인 두 가지 (인자 오류 / llama.cpp 바이너리를 찾지 못함)
+
+**인자 오류.** 필수 플래그를 빼고 `fituna run`만 실행해 직접 재현한 실제
+출력이다. stderr 첫 줄이 `usage:`로 시작한다.
+
+```
+usage: fituna run [-h] --model MODEL --target-tps TARGET_TPS
+                  --max-quality-loss MAX_QUALITY_LOSS [--ctx CTX]
+                  [--quant QUANT] [--gpu {none,nvidia,amd,apple}]
+                  [--vram-mb VRAM_MB] [--llama-bin-dir LLAMA_BIN_DIR]
+                  --quality-corpus WIKITEXT [--ppl-chunks PPL_CHUNKS]
+                  [--out OUT] [--json] [--resume]
+fituna run: error: the following arguments are required: --model, --target-tps, --max-quality-loss, --quality-corpus/--wikitext
+```
+
+오타난 플래그(`fituna run ... --bogus-flag foo`)도 같은 종료 코드 2, 같은
+`usage:` 형태다(직접 재현): `usage: fituna [-h] [-v] {run,detect-hw,...} ...`
+다음 줄에 `fituna: error: unrecognized arguments: --bogus-flag foo`.
+
+- 조치: `usage:` 줄이 보여주는 필수 인자를 채우거나 오타난 플래그명을 고친다.
+
+**llama.cpp 바이너리를 찾지 못함(`BinaryNotFoundError`).** 아래는 빈 디렉토리
+(`emptybin`)를 `--llama-bin-dir`로 넘겨 직접 재현한 실제 출력이다. `usage:` 줄이
+없고, 대신 FiTuna 자체 로거가 남기는 메시지다.
 
 ```
 ERROR fituna: Required llama.cpp binaries not found under --llama-bin-dir emptybin: llama-quantize, llama-bench, llama-perplexity.
@@ -420,6 +484,9 @@ Build llama.cpp (https://github.com/ggml-org/llama.cpp#building-the-project) and
   보통 `llama.cpp/build/bin`이다.
 - 먼저 `fituna doctor --llama-bin-dir /path/to/bin`으로 확인하면 어떤 바이너리가
   없는지 항목별로 알려 준다. 이때 doctor 자체도 종료 코드 2를 반환한다(직접 확인).
+
+**구분법**: stderr 첫 줄이 `usage:`면 인자 오류, `ERROR fituna:`면 환경(바이너리)
+문제다.
 
 ### GPU 오검출 / GPU가 없는 환경
 
