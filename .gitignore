@@ -4,10 +4,14 @@
 out/
 .fituna_cache.sqlite3
 
-# `fituna fetch-corpus` output (downloaded corpora, not project sources --
-# see README Quickstart step 3)
-wikitext-2-raw-test.txt
-kowiki-corpus.txt
+# `fituna fetch-corpus` output: a downloaded corpus, not a project source
+# (see README Quickstart step 3) -- covers any --out path, not just the two
+# example filenames, since the tool lets users pick any name ending in .txt.
+# Also covers its atomic-write temp file, always named `.<out-name>.<random
+# suffix>.tmp` next to the destination regardless of --out name (see
+# tempfile.mkstemp() in fituna/corpus.py's fetch_corpus()).
+*.txt
+.*.tmp
 
 # Python
 __pycache__/

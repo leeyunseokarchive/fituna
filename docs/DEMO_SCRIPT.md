@@ -29,8 +29,7 @@ FiTuna가 "모델 지정 → 하드웨어/품질 제약 조건 → 최적 양자
 - [ ] 데모용 모델: `SmolLM2-135M-Instruct-f16.gguf` (F16, 258MB — HuggingFace
   `bartowski/SmolLM2-135M-Instruct-GGUF`에서 다운로드, Apache 2.0). 135M이라
   콜드 탐색이 ~76초로 3분 안에 라이브로 들어간다.
-- [ ] `wikitext-2-raw-test.txt` 준비 (README의 export 스니펫 참고, CC BY-SA).
-  perplexity 계산용 코퍼스.
+- [ ] `wikitext-2-raw-test.txt` 준비 (`fituna fetch-corpus --lang en --out wikitext-2-raw-test.txt`, CC BY-SA). perplexity 계산용 코퍼스.
 - [ ] llama.cpp 빌드 산출물(`llama-quantize`, `llama-bench`,
   `llama-perplexity`, `llama-cli`)이 `PATH`에 있거나 `--llama-bin-dir`로
   넘길 디렉토리를 파악해 둔다. `fituna list-binaries`로 사전 확인.
@@ -190,7 +189,7 @@ FiTuna result: MEETS TARGET
 ## 준비물 요약
 
 - SmolLM2-135M-Instruct-f16.gguf (라이브 탐색용, Apache 2.0).
-- `wikitext-2-raw-test.txt` (README의 export 스니펫 참고, CC BY-SA 라이선스).
+- `wikitext-2-raw-test.txt` (`fituna fetch-corpus --lang en --out wikitext-2-raw-test.txt`, CC BY-SA 라이선스).
 - llama.cpp 빌드 산출물이 PATH에 있거나 `--llama-bin-dir`로 지정 가능한 상태.
 - 리허설 1회 완료 + `./out`, `.fituna_cache.sqlite3` 초기화(`rm -rf ./out`)
   한 상태로 본 촬영 시작.

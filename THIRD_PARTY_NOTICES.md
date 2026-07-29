@@ -106,9 +106,10 @@ HuggingFace's public dataset-viewer API on request:
   to the `--out` path the user chose; from then on it is read-only, passed
   straight through to `llama-perplexity -f <corpus_path>` by
   `fituna/quality.py`. It is never bundled, modified, or redistributed by
-  FiTuna itself — the corpus file lives entirely outside the repository
-  (see `.gitignore`) and the user fetches or supplies it separately (see
-  `README.md` → Quickstart).
+  FiTuna itself — `.gitignore` keeps any `--out` path ending in `.txt` (the
+  convention every documented example uses) out of the repository, and the
+  user fetches or supplies the corpus separately (see `README.md` →
+  Quickstart).
 
 ---
 

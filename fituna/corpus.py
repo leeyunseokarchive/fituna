@@ -178,13 +178,16 @@ def fetch_corpus(
     Write is atomic: content is written to a temp file in ``out``'s own
     directory and only ``os.replace``-d into ``out`` after every requested
     row is fetched successfully. Any failure (network, HTTP, malformed
-    response) deletes the temp file and re-raises -- ``out`` is never left
-    holding a partial download.
+    response, or the final rename itself) deletes the temp file and
+    re-raises as ``FiTunaError`` -- ``out`` is never left holding a partial
+    download and no temp file is ever left behind.
 
     ``rows`` defaults to the ``lang`` preset's ``default_rows`` (1000 for
     en, 500 for ko) when not given -- even when ``dataset``/``config``/
     ``split`` override the preset's source, since ``--lang`` is still the
-    only signal for which default row count applies.
+    only signal for which default row count applies. A resolved row count
+    that is not positive (``rows=0`` or negative) raises ``FiTunaError``
+    immediately, before any file or network I/O.
 
     Reports progress via ``progress_cb(str)`` if given, once per page
     fetched (e.g. ``"fetched 300/1000 rows"``).
@@ -197,6 +200,12 @@ def fetch_corpus(
         lang, dataset, config, split
     )
     total = rows if rows is not None else PRESETS[lang].default_rows
+    if total <= 0:
+        # Reject before touching the filesystem or network at all -- a
+        # 0-byte file with a full CC BY-SA license notice printed over it
+        # would otherwise be the (silent, misleading) result of `--rows 0`
+        # or a negative --rows.
+        raise FiTunaError(f"--rows must be positive, got {total}")
     progress: Callable[[str], None] = progress_cb or (lambda _msg: None)
 
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -239,11 +248,30 @@ def fetch_corpus(
                 written += len(page_rows)
                 offset += len(page_rows)
                 progress(f"fetched {written}/{total} rows")
+
+        # Rename must stay inside this try: a `run`/`doctor` habit of
+        # pointing `--out` at a directory (that flag means a directory for
+        # those subcommands, a file here) makes os.replace raise
+        # IsADirectoryError; a read-only destination directory or -- on
+        # Windows -- the destination being open elsewhere raises
+        # PermissionError instead. Either way this must land in the
+        # `except BaseException` below so the temp file is always cleaned
+        # up, and become a FiTunaError so the user gets guidance instead of
+        # a raw traceback.
+        try:
+            os.replace(tmp_path, out)
+        except OSError as exc:
+            raise FiTunaError(
+                f"could not save the fetched corpus to {out}: {exc}. Check "
+                "that --out names a file path, not an existing directory, "
+                "and that its parent directory is writable (on Windows, "
+                "also make sure the destination isn't open in another "
+                "program), then try again."
+            ) from exc
     except BaseException:
         tmp_path.unlink(missing_ok=True)
         raise
 
-    os.replace(tmp_path, out)
     return written
 
 

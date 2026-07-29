@@ -96,6 +96,9 @@ def test_fetch_corpus_assembles_multiple_pages(fake_urlopen, tmp_path):
     assert n == 250
     lines = out.read_text(encoding="utf-8").splitlines()
     assert lines == [f"row{i}" for i in range(250)]
+    # nothing else left behind in the directory besides the final file --
+    # the atomic-write temp file is gone once the fetch succeeds.
+    assert [p.name for p in tmp_path.iterdir()] == ["corpus.txt"]
 
 
 def test_fetch_corpus_reports_progress_once_per_page(fake_urlopen, tmp_path):
@@ -241,17 +244,45 @@ def test_fetch_corpus_does_not_clobber_an_existing_file_on_failure(fake_urlopen,
     assert out.read_text(encoding="utf-8") == "previous successful fetch\n"
 
 
-def test_fetch_corpus_writes_utf8_with_no_partial_file_possible_mid_write(fake_urlopen, tmp_path):
-    """The file that ends up at `out` is only ever the fully-fetched temp
-    file, renamed -- never something opened and partially written in place."""
-    fake_urlopen(_fake_urlopen_factory(total=3))
+def test_fetch_corpus_wraps_os_replace_failure_as_fituna_error_when_out_is_a_directory(
+    fake_urlopen, tmp_path
+):
+    """`--out` means a directory for `run`/`doctor` but a file here -- an easy
+    habit to carry over. Pointing it at an existing directory makes the final
+    `os.replace` raise IsADirectoryError (PermissionError on a read-only
+    directory, or on Windows when the destination is open/is a directory);
+    this must surface as a clean FiTunaError, not a raw traceback, and must
+    not leave the atomic-write temp file behind."""
+    fake_urlopen(_fake_urlopen_factory(total=10))
+    out = tmp_path / "corpus_dir"
+    out.mkdir()
+
+    with pytest.raises(FiTunaError):
+        corpus.fetch_corpus(out, lang="en", rows=5)
+
+    assert out.is_dir()  # the pre-existing directory itself is untouched
+    assert list(tmp_path.iterdir()) == [out], "no leftover atomic-write temp file"
+
+
+# ---------------------------------------------------------------------------
+# --rows must be positive: `--rows 0`/negative must not write a 0-byte file
+# or print a license notice for content that was never fetched
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("rows", [0, -3])
+def test_fetch_corpus_rejects_non_positive_rows(rows, monkeypatch, tmp_path):
+    def _unexpected_urlopen(url, timeout=None):
+        raise AssertionError("must reject a non-positive --rows before any request")
+
+    monkeypatch.setattr(urllib.request, "urlopen", _unexpected_urlopen)
     out = tmp_path / "corpus.txt"
 
-    corpus.fetch_corpus(out, lang="en", rows=3)
+    with pytest.raises(FiTunaError):
+        corpus.fetch_corpus(out, lang="en", rows=rows)
 
-    assert out.read_text(encoding="utf-8") == "row0\nrow1\nrow2\n"
-    # nothing else left behind in the directory besides the final file
-    assert [p.name for p in tmp_path.iterdir()] == ["corpus.txt"]
+    assert not out.exists()
+    assert list(tmp_path.iterdir()) == []  # no 0-byte file, nothing left behind
 
 
 # ---------------------------------------------------------------------------
@@ -304,8 +335,23 @@ def test_resolve_source_rejects_unknown_lang():
         corpus._resolve_source("de", None, None, None)
 
 
-def test_fetch_corpus_uses_custom_dataset_when_fully_overridden(fake_urlopen, tmp_path):
-    fake_urlopen(_fake_urlopen_factory(total=10))
+def test_fetch_corpus_builds_the_request_url_with_documented_param_names(monkeypatch, tmp_path):
+    """Pins the actual query-parameter names/values `_fetch_page` sends.
+    Every other test's fake `urlopen` reads only `offset`/`length` from the
+    URL, so e.g. renaming `dataset=` to `dataset_id=` in `_fetch_page` would
+    leave all of them green -- this task's whole premise was verifying the
+    real API's schema instead of guessing it, so at least one test must
+    check the request it actually builds. Using a full --dataset/--config/
+    --split override (rather than a preset) also proves the override
+    actually reaches the URL instead of being silently dropped somewhere
+    between `_resolve_source` and the request."""
+    seen_queries: list = []
+
+    def _fake_urlopen(url, timeout=None):
+        seen_queries.append(urllib.parse.parse_qs(urllib.parse.urlparse(url).query))
+        return io.BytesIO(json.dumps(_page(total=10, offset=0, length=10)).encode("utf-8"))
+
+    monkeypatch.setattr(urllib.request, "urlopen", _fake_urlopen)
     out = tmp_path / "corpus.txt"
 
     n = corpus.fetch_corpus(
@@ -313,6 +359,15 @@ def test_fetch_corpus_uses_custom_dataset_when_fully_overridden(fake_urlopen, tm
     )
 
     assert n == 10
+    assert seen_queries == [
+        {
+            "dataset": ["org/name"],
+            "config": ["cfg"],
+            "split": ["train"],
+            "offset": ["0"],
+            "length": ["10"],
+        }
+    ]
 
 
 # ---------------------------------------------------------------------------
