@@ -214,6 +214,15 @@ ready-made BF16 GGUF from `mykor/Midm-2.0-Mini-Instruct-gguf`
 (`Midm-2.0-Mini-Instruct-BF16.gguf`, 4,617,053,184 bytes = 4.30 GB), so no
 `convert_hf_to_gguf.py`, torch or transformers was involved.
 
+The redistributor gets its own licence check, because it is the party that
+actually shipped us the bytes. `mykor/Midm-2.0-Mini-Instruct-gguf` declares
+`license: mit` in its model-card front-matter, carries its own `LICENSE.txt`
+that is the verbatim MIT text with the same "Copyright (c) 2025 KT
+Corporation" notice as upstream, and declares
+`base_model: K-intelligence/Midm-2.0-Mini-Instruct`. The HuggingFace API
+reports `gated: false`, `private: false` for it. Both the upstream weights
+and the GGUF conversion we actually ran are therefore MIT.
+
 Corpora were fetched with the built-in stdlib downloader — no
 `pip install datasets`:
 
@@ -240,8 +249,8 @@ exited 3 (`BEST EFFORT`), and produced the measured full-offload band:
 **40 tok/s** sits inside that band — above three candidates and below
 exactly one. So it cannot be trivially passed (Q8_0, Q6_K and Q5_K_M all
 genuinely miss) nor trivially failed (Q4_K_M genuinely clears it), and it is
-a defensible interactive-chat figure for a 2.3B assistant. Every number
-below is from `--target-tps 40`.
+a figure that splits the measured band rather than sitting outside it. Every
+number below is from `--target-tps 40`.
 
 ### The two runs
 
@@ -267,7 +276,12 @@ fituna run --model Midm-2.0-Mini-Instruct-BF16.gguf \
 | **Q4_K_M** | **1.33 GB** | **+2.58 %** | **+3.78 %** | **44.62** | **PASS (ngl=48)** |
 
 Baseline perplexity of the BF16 base: **9.9511** on Korean, **8.7900** on
-English. Both runs end identically:
+English. Every quality figure in that table is a `--ppl-chunks 32` estimate
+carrying an error bar that `llama-perplexity` reports and FiTuna does not
+store — ±0.295 on the Korean perplexities at this chunk count, about ±3
+percentage points once expressed as loss. Read "How big is a perplexity gap?"
+below before drawing conclusions from the gaps between adjacent rows. Both
+runs end identically:
 
 ```
 FiTuna result: MEETS TARGET
@@ -283,26 +297,107 @@ FiTuna result: MEETS TARGET
   quality loss    : 2.58%
 ```
 
+### How big is a perplexity gap? (the error bar we had been discarding)
+
+Every quality figure above is a 32-chunk estimate, and `llama-perplexity`
+prints an error bar next to each one that FiTuna never stored — its output
+line is `Final estimate: PPL = 10.0099 +/- 0.29529`, and `quality.py`'s regex
+captures the PPL and drops the `+/-`. Re-reading this run we could not say
+whether the ranking difference below was signal, so we measured it: called the
+binary directly on the same four files and both corpora, and repeated the
+sweep at **128 chunks** — 4× what the runs used, and the largest power of two
+the English corpus supports (wikitext-2 test holds 143 chunks at `n_ctx=512`;
+kowiki holds 2368).
+
+```bash
+llama-perplexity -m out/...-3e6680866409-Q6_K.gguf -f kowiki-corpus.txt --chunks 128
+```
+
+Invoked at `--chunks 32` it reproduces FiTuna's cached numbers exactly
+(Korean Q6_K `PPL = 10.0099 +/- 0.29529`, Q5_K_M `10.0037 +/- 0.29372`), so
+this is the same measurement the tool makes, just with the error bar kept.
+
+| Korean (kowiki) | PPL @128 chunks | loss @32 | loss @128 |
+|---|---|---|---|
+| BF16 baseline | 10.6238 ± 0.16350 | — | — |
+| Q8_0 | 10.6187 ± 0.16335 | −0.02 % | −0.05 % |
+| **Q5_K_M** | **10.7413 ± 0.16504** | **+0.53 %** | **+1.11 %** |
+| **Q6_K** | **10.7470 ± 0.16569** | **+0.59 %** | **+1.16 %** |
+| Q4_K_M | 11.0577 ± 0.17044 | +2.58 % | +4.08 % |
+
+| English (wikitext-2) | PPL @128 chunks | loss @32 | loss @128 |
+|---|---|---|---|
+| BF16 baseline | 9.9155 ± 0.14863 | — | — |
+| Q8_0 | 9.9217 ± 0.14873 | +0.15 % | +0.06 % |
+| **Q6_K** | **9.9778 ± 0.14975** | **+0.46 %** | **+0.63 %** |
+| **Q5_K_M** | **10.0197 ± 0.15035** | **+1.00 %** | **+1.05 %** |
+| Q4_K_M | 10.2945 ± 0.15471 | +3.78 % | +3.82 % |
+
+Four things follow, in order of how much they change the story:
+
+- **Both orderings replicated at 4× the data.** Korean still ranks Q5_K_M
+  above Q6_K; English still ranks Q6_K above Q5_K_M. The direction did not
+  wander and neither did the magnitude much: the Korean margin went 0.062 →
+  0.054 percentage points, the English margin 0.543 → 0.423.
+- **But neither margin clears the error bar, and the two are nowhere near
+  equal.** At 128 chunks each perplexity carries ±0.15–0.17, which is ±1.5
+  percentage points once expressed as loss. The English margin (0.423 pp) is
+  about a quarter of that; the Korean margin (0.054 pp) is about a
+  twenty-ninth. The Korean half of the flip is ~8× weaker than the English
+  half, and the first version of this section presented the two as one finding
+  of equal strength. That was the mistake.
+- **The `+/-` we can quote is not quite the one we want.** It is the
+  corpus-sampling error on an absolute perplexity — how much this number would
+  move on a *different* sample of Korean text. Comparing two quants scored on
+  *identical* chunks is a paired comparison whose error is much smaller, which
+  is how a 0.054 pp margin can replicate at 4× the data while sitting 1/29 of
+  an error bar wide. `llama-perplexity` does not report that paired error, so
+  we cannot attach a confidence level to either margin. What we can do is stop
+  presenting the weaker one as a headline.
+- **Absolute loss is strongly chunk-count dependent — always quote the chunk
+  count.** Q4_K_M's Korean loss is 2.58 % at 32 chunks and 4.08 % at 128;
+  Q6_K's goes 0.59 % → 1.16 %. The 32-chunk figures in the table above are
+  exactly what the documented commands produced and what the cache holds, but
+  they are estimates over 32×512 tokens, not properties of the quant. Of the
+  four, only Q4_K_M's degradation is big enough to clear its own error bar
+  (Δppl 0.434 against ±0.17 at 128 chunks).
+
 ### What a lookup table cannot know
 
-- **The corpus flipped the measured quality ranking.** Sorted by measured
-  loss, the search walks Q8_0 → **Q5_K_M → Q6_K** → Q4_K_M on Korean, but
-  Q8_0 → **Q6_K → Q5_K_M** → Q4_K_M on English. Run 3 measured the same
-  comparison on an English-trained model and reported honestly that "the
-  ranking happened to stay the same — we do not claim the order always
-  flips." Here, on a Korean model, **it did flip**: Q5_K_M measured *better*
-  than the larger Q6_K on Korean text (0.53 % vs 0.59 %) and *worse* on
-  English (1.00 % vs 0.46 %). Same two files, same machine, same 32 chunks —
-  only the language of the evaluation text changed.
-- **Q8_0 changed sign.** It scored −0.02 % on Korean (very slightly *better*
-  perplexity than the BF16 base it was quantized from) and +0.15 % on
-  English. A table that stores "Q8_0 ≈ lossless" hides which side of zero
-  you land on, and that sign is corpus-dependent.
+- **The corpus reordered the middle of the ranking — reproducibly, but by
+  less than we can resolve.** Sorted by measured loss the search walks
+  Q8_0 → **Q5_K_M → Q6_K** → Q4_K_M on Korean and Q8_0 → **Q6_K → Q5_K_M** →
+  Q4_K_M on English, and that holds at 32 chunks *and* at 128. Run 3 measured
+  the same comparison on an English-trained model and reported honestly that
+  "the ranking happened to stay the same — we do not claim the order always
+  flips"; here the mid-table order does differ by language, and it replicates.
+  What we will **not** do is call it strong evidence. The Korean margin
+  between Q6_K and Q5_K_M is 0.05–0.06 percentage points against a ±1.5 pp
+  error bar — the smallest gap in this entire document, and we hold it to the
+  same standard as the 0.20 tok/s speed inversion further down this list,
+  which we also decline to score. The English margin (0.42–0.54 pp) is ~8×
+  stronger and
+  still inside the bar. Details and both full tables in "How big is a
+  perplexity gap?" above. An earlier version of this section led with "the
+  corpus flipped the measured quality ranking" and gave the Korean and English
+  halves equal weight; the ordering survived re-measurement, the equal weight
+  did not.
+- **Q8_0 changed sign, at both chunk counts.** It scored −0.02 % (32 chunks)
+  and −0.05 % (128) on Korean — very slightly *better* perplexity than the
+  BF16 base it was quantized from — against +0.15 % and +0.06 % on English. A
+  table that stores "Q8_0 ≈ lossless" hides which side of zero you land on.
+  The sign difference replicates, but on a Δppl of 0.005–0.013 against a
+  ±0.16 error bar it is a consistent observation, not a resolved result.
 - **Run 3's "Korean losses are smaller" pattern does not generalize.** In
-  Run 3 every Korean figure was smaller than its English counterpart. Here
-  that holds for Q5_K_M (0.53 vs 1.00) and Q4_K_M (2.58 vs 3.78) but is
-  **reversed for Q6_K** (0.59 Korean vs 0.46 English) and for Q8_0. The
-  direction of the corpus effect is itself per-quant and has to be measured.
+  Run 3 the Korean figure was smaller than its English counterpart in three
+  of four rows — Q6_K is already the exception there (−0.06 % Korean vs
+  −0.30 % English). Here the pattern holds for Q5_K_M (0.53 vs 1.00) and
+  Q4_K_M (2.58 vs 3.78) but is **reversed for Q6_K** (0.59 Korean vs 0.46
+  English) and for Q8_0. So it was never a clean rule, and it is not one
+  here: the direction of the corpus effect is per-quant and has to be
+  measured. (Both reversed rows differ by ~0.15 pp across the two corpora,
+  well inside the ±1.5 pp error bars — see "How big is a perplexity gap?"
+  above.)
 - **The verdict did *not* flip this time — and we say so.** Unlike Run 3,
   where a 1 % budget let the corpus alone decide feasibility, here at
   `--max-quality-loss 5` all four candidates clear the gate on *both*
@@ -315,13 +410,42 @@ FiTuna result: MEETS TARGET
 
   | ngl | 0 | 24 | 36 | 42 | 45 | 47 | 48 |
   |---|---|---|---|---|---|---|---|
-  | gen tok/s | timed out | 10.86 | 17.56 | 23.53 | 32.43 | **39.32** | **44.62** |
+  | gen tok/s | timed out | 10.86 | 17.56 | 23.53 ⚠ | 32.43 | **39.32** | **44.62** |
+  | llama-bench std-dev | — | ±0.05 | ±0.37 | **±4.94** ⚠ | ±0.26 | ±0.15 | ±1.25 |
 
-  Moving a **single** layer of 48 off the GPU costs 5.30 tok/s — 11.9 % of
-  throughput — and lands at 39.32, missing the 40 target by 0.68. The curve
-  is nowhere near linear in layer count either: half the layers on GPU
-  (ngl=24) buys 10.86 tok/s, which is 24 % of full-offload speed, not 50 %.
-  No static rule of thumb reproduces that shape.
+  Moving a **single** layer of 48 off the GPU costs 5.30 ± 1.26 tok/s — call
+  it 4.0 to 6.6, or 11.9 % ± 2.8 pp of throughput — and lands at 39.32,
+  missing the 40 target by 0.68 (that one *is* sharp: 4.5σ against ngl=47's
+  ±0.15). The curve is nowhere near linear in layer count either: half the
+  layers on GPU (ngl=24) buys 10.86 tok/s, which is 24 % of full-offload
+  speed, not 50 %. No static rule of thumb reproduces that shape.
+
+  ⚠ **The ngl=42 point is thermally contaminated and we are not going to
+  publish it as clean.** Its five llama-bench samples were
+  `[25.81, 25.69, 25.59, 25.84, 14.69]` — four tightly clustered at 25.73
+  ±0.12 plus one collapsed run, which drags the reported mean down 8.6 % to
+  23.53 and blows the std-dev out to ±4.94, roughly 4× the worst of any other
+  point in the curve. This is the same signature Run 4's "Run-to-run variance"
+  section documents. Three direct re-runs of the identical command
+  (`llama-bench -m ...-Q4_K_M.gguf -ngl 42 -d 3456 -p 512 -n 128`) reproduced
+  the instability rather than resolving it, but they were taken with the
+  machine already hot from an hour of continuous perplexity work, so they
+  establish only that the config is genuinely thermally marginal — not the
+  cool-machine value:
+
+  ```
+  19.84 ± 3.96      18.64 ± 3.57      19.32 ± 4.44
+  ```
+
+  Every one of the three collapsed the same way inside its own five samples
+  (e.g. `[21.97, 22.40, 23.13, 15.55, 13.53]`).
+
+  Prompt processing at the same setting fell from 100.55 tok/s in the
+  original session to ~80 in all three repeats, i.e. the whole machine was
+  throttled ~20 %, which is why we flag the point rather than substituting a
+  new number for it. Treat 23.53 as a lower bound with a bad error bar; the
+  binary search's decision (ngl=42 is below target 40) is unaffected either
+  way, since even the four clean samples average 25.73.
 - **One speed inversion, honestly qualified.** Q6_K (1.77 GB) measured
   *faster* than the smaller Q5_K_M (1.54 GB), 38.96 vs 38.76 — the
   size-implies-speed heuristic pointing the wrong way again. But llama-bench's
@@ -336,15 +460,22 @@ FiTuna result: MEETS TARGET
 | | |
 |---|---|
 | Target-selection probe (cold: baseline PPL + 4× quantize + 4× PPL + 4× bench) | **4 m 59.81 s** |
-| Korean run at target 40 (cold `-ngl` binary search, 7 extra benches) | **12 m 54.93 s** |
+| Korean run at target 40 (cold `-ngl` binary search, 6 new benches — the 7th curve point, ngl=48, was a cache hit from the probe) | **12 m 54.93 s** |
 | ↳ of which the deliberate `ngl=0` bench timeout | 5 m 00 s |
 | English run at target 40 (cold quality stage, all benches cached) | **1 m 53.19 s** |
-| Korean re-run with `--resume` | **0.955 s** |
-| English re-run with `--resume` | **0.908 s** |
+| Korean re-run with `--resume` | **1.47 s** |
+| English re-run with `--resume` | **1.42 s** |
 
-Both `--resume` re-runs reproduced their full reports byte-for-byte from
-`out/.fituna_cache.sqlite3`. Disk: **6.9 GB** for the four quantized files
-plus the 4.30 GB BF16 base (11 GB total working set).
+Both `--resume` re-runs reproduce their full reports byte-for-byte from
+`out/.fituna_cache.sqlite3`, and this time we kept the artifact: the report
+block from each resumed run was `diff -u`'d against the report block captured
+in the original cold-run logs (`run5-ko.log`, `run5-en.log`) and came back
+identical — 434 bytes Korean, 433 bytes English, both exit 0. The two
+`--resume` timings above are from that verification run, on a machine hot from
+an hour of continuous benching; an earlier session recorded 0.955 s / 0.908 s
+but left no artifact on disk, so we quote the numbers we can show. Disk:
+**6.9 GB** for the four quantized files plus the 4.30 GB BF16 base (11 GB
+total working set).
 
 The `ngl=0` CPU-only probe of this 2.3B model could not finish a bench inside
 the 300 s timeout, and FiTuna logged

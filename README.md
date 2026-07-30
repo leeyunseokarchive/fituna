@@ -106,9 +106,10 @@ fituna fetch-corpus --lang ko --out kowiki-corpus.txt --rows 500   # Korean Wiki
 Pulls rows straight from HuggingFace's public dataset-viewer REST API via
 stdlib `urllib` — no `pip install datasets` (which drags in pyarrow/pandas)
 needed. Korean models should use the Korean corpus so the quality gate
-measures what actually degrades for Korean users (English perplexity can
-rank quants differently than Korean perplexity — measure the language
-you'll run). Both presets are CC BY-SA 3.0; `fetch-corpus` prints the
+measures what actually degrades for Korean users — the same quant can
+measure 2–3× different loss on the two corpora, which in Run 3 was enough to
+flip a feasibility verdict. Measure the language you'll run. Both presets are
+CC BY-SA 3.0; `fetch-corpus` prints the
 attribution/share-alike notice and source URL to stdout when it finishes.
 Have your own dataset in mind? `--dataset/--config/--split` override the
 preset (`fituna fetch-corpus --help`).
@@ -180,7 +181,7 @@ contract: [`fituna/config.py`](fituna/config.py)
 |---|---|---|---|
 | Qwen3-4B-Instruct (Apache 2.0) | 30 tok/s, ≤5% loss | Q8_0: 24.22 tok/s ❌ (and measured *worse* quality than Q6_K) | **Q4_K_M @ ngl=33 → 30.81 tok/s, 1.73% loss** ✅ |
 | SmolLM2-135M (Apache 2.0) | 240 tok/s, ≤5% loss | Q8_0: 205.91 tok/s ❌ | **Q6_K → 249.50 tok/s, 0.53% loss** ✅ (and Q4_K_M measured *slower* than Q6_K) |
-| Midm-2.0-Mini-Instruct, Korean (MIT) | 40 tok/s, ≤5% loss | Q8_0: 34.26 tok/s ❌ | **Q4_K_M @ ngl=48 → 44.62 tok/s, 2.58% loss** ✅ (Korean vs English corpus *flipped* the Q6_K/Q5_K_M quality ranking) |
+| Midm-2.0-Mini-Instruct, Korean (MIT) | 40 tok/s, ≤5% loss | Q8_0: 34.26 tok/s ❌ | **Q4_K_M @ ngl=48 → 44.62 tok/s, 2.58% loss** ✅ (Korean vs English corpus reordered Q6_K/Q5_K_M mid-table — reproducible at 32 *and* 128 chunks, but the Korean margin is 1/29 of the perplexity error bar, so we [report it, not headline it](docs/RESULTS.md#how-big-is-a-perplexity-gap-the-error-bar-we-had-been-discarding)) |
 
 Environment: Apple M3 Pro, llama.cpp build 9960. Full logs, timings,
 run-to-run variance analysis (including a thermal-throttle outlier we caught
@@ -246,7 +247,9 @@ Silicon/Metal) and Linux (NVIDIA T4/CUDA); see
 - [x] NVIDIA/Linux measured run (Tesla T4 via the Colab notebook —
   [Run 4](docs/RESULTS.md#run-4--nvidia-tesla-t4-linux-google-colab):
   the quality-gate verdict itself flipped between Metal and CUDA)
-- [ ] Surface llama-bench std-dev to auto-flag marginal verdicts
+- [ ] Surface llama-bench std-dev *and* llama-perplexity's `+/-` standard
+  error to auto-flag marginal verdicts (`quality.py` currently parses the PPL
+  and discards the error bar — see Run 5's "How big is a perplexity gap?")
 - [ ] Multi-GPU `--tensor-split` support
 
 ## Known limitations
