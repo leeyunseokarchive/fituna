@@ -36,7 +36,7 @@ FiTuna는 로컬 LLM(llama.cpp)을 돌릴 때 **어떤 양자화 레벨(quant)�
 
 | | **경로 A · 브라우저만** | **경로 B · 로컬 실행** |
 |---|---|---|
-| 필요한 것 | 웹 브라우저 + 구글 계정 | macOS 또는 Linux, Python 3.11+ |
+| 필요한 것 | 웹 브라우저 + 구글 계정 | macOS 또는 Linux, Python 3.11+, 그리고 llama.cpp 설치 수단 — Homebrew(`brew install llama.cpp`) 또는 소스 빌드용 `git` + `cmake`(4-1 참고) |
 | 설치 | 없음 (Colab 무료 T4 GPU 사용) | llama.cpp + FiTuna 설치 필요 |
 | 소요 시간 | 약 20~30분 (대부분 llama.cpp CUDA 빌드) | 약 3분 (llama.cpp 설치 시간 제외) |
 | 검증 대상 하드웨어 | NVIDIA Tesla T4 / Linux / CUDA | 검증자의 실제 기기 |
@@ -154,7 +154,7 @@ pip install -e fituna
   (PEP 668 — 직접 재현 확인, 6장 참고). 위 가상환경 절차가 이를 피하는 방법이다.
 - 가상환경을 활성화한 채로는 `fituna` 명령이 곧바로 PATH에 잡힌다. 활성화를
   깜빡했거나 `--user`로 전역 설치해 `fituna: command not found`가 나오면,
-  **`python3 -m fituna` 로 완전히 동일하게 사용할 수 있다**(6장 참고).
+  **`python3.13 -m fituna` 로 완전히 동일하게 사용할 수 있다**(6장 참고).
 
 ### 4-3. 환경 점검 — `fituna doctor`
 
@@ -268,7 +268,10 @@ FiTuna result: MEETS TARGET
   품질이 좋은 순서로 벤치하고, 목표를 만족하면 **즉시 멈춘다**(조기종료). 이때
   `-ngl`은 전량 오프로드(30)가 아니라 **목표를 만족하는 최소값(28)**을 이진
   탐색으로 찾은 결과다.
-- 마지막 `run command:` 줄은 그대로 복사해 실행할 수 있다.
+- 마지막 `run command:` 줄은 그대로 복사해 실행할 수 있다. 이 줄에는 프롬프트
+  플래그가 없어 `llama-cli`가 대화형 입력을 기다린다 — 스크립트로 비대화형
+  실행할 때는 `-p "..." -n 64 -no-cnv` 같은 플래그를 덧붙여야 stdin에서
+  멈추지 않는다.
 - 작업 디렉토리 `./out`에 양자화된 GGUF 4개가 생성된다(직접 측정: 합계 478 MB).
 
 > **주의 — 승자 quant와 절대 수치는 기기·세션마다 다르다.** 위 실행에서는
@@ -372,6 +375,14 @@ FiTuna result: BEST EFFORT (target not met)
 3
 ```
 
+> **주의 — 여기서도 승자 quant와 절대 수치는 기기·세션마다 다르다.** 위
+> 출력은 Q8_0을 최선으로 보고하지만, 이는 고정된 기대 출력이 아니라 이
+> 세션에서 관측된 값이다. 목표 미달일 때 어느 후보가 "가장 근접"으로 뽑히는지는
+> 4-6과 똑같이 발열·부하에 민감한 벤치 수치로 결정되므로, 다른 기기·다른
+> 세션에서는 다른 quant와 다른 품질손실이 나올 수 있다. 4-6의 주의사항이 그대로 적용된다 —
+> **판정 기준은 절대값 일치가 아니라, 종료 코드 3과 함께 완결된 best-effort
+> 결과 블록이 나오는가**이다.
+
 `ERROR` 로그가 한 줄 찍히지만, 그 뒤에 **`closest best-effort attempt:`와 완결된
 결과 블록, 실행 가능한 커맨드가 정상적으로 출력**된다. 즉 사용자는 빈손으로
 끝나지 않는다. 위 실행은 11.7초가 걸렸다(4-6에서 만든 캐시를 재사용한 상태).
@@ -394,33 +405,51 @@ FiTuna result: BEST EFFORT (target not met)
 네트워크 실패 같은 예상 가능한 실패는 traceback 없이 한 줄짜리 영문 설명
 메시지와 종료 코드 1로 처리된다(인자 오류는 이와 별개로 종료 코드 2이며 5-1절
 참고. 직접 확인:
-`fituna run --model nope.gguf ...` → `nope.gguf is neither a .gguf file nor an
-HF-format model directory -- nothing to convert.`, 종료 코드 1).
+아래 명령은 그대로 붙여넣을 수 있고, 모델 파일이 없어도 즉시 끝난다 — 직접 실행:
+
+```bash
+fituna run --model nope.gguf \
+  --target-tps 30 --max-quality-loss 5 --ctx 4096 \
+  --quality-corpus wikitext-2-raw-test.txt --out ./out
+echo $?
+```
+
+```
+2026-07-30 12:19:44,866 ERROR fituna: nope.gguf is neither a .gguf file nor an HF-format model directory -- nothing to convert.
+1
+```
+
 
 ### 5-4. 모델·GPU 없이 할 수 있는 오프라인 점검
 
 llama.cpp나 모델 파일 없이도, 소스 저장소만 있으면 다음을 확인할 수 있다.
-**이미 4-2에서 소스 설치 경로(`git clone` + `pip install -e fituna`)를 같은
-디렉터리에서 따라왔다면 `fituna/`가 이미 있으니, 아래에서 `git clone` 줄은
-건너뛰고 `cd fituna`부터 시작한다.**
+**이미 4-2에서 소스 설치 경로(`git clone` + `pip install -e fituna`)를 따라왔다면
+`fituna/`와 `.venv/`가 이미 있으니, 아래에서 `git clone`·`python3.13 -m venv`
+줄은 건너뛴다.**
 
 ```bash
 git clone https://github.com/leeyunseokarchive/fituna
-cd fituna
-python3.13 -m venv .venv
+python3.13 -m venv .venv          # 4-2와 같은 위치(저장소 바깥)에 만든다
 source .venv/bin/activate
 pip install pytest
-python3 -m pytest -q
+cd fituna
+python3.13 -m pytest -q
 ```
 
-직접 실행 결과: `151 passed in 1.24s` (이 문서 작성 시점 `main` 기준. 테스트가
+직접 실행 결과: `152 passed in 1.55s` (이 문서 작성 시점 `main` 기준. 테스트가
 추가되면 개수는 늘어난다 — 중요한 것은 **실패 0건**이다).
+
+> **`python3`가 아니라 `python3.13`인 이유.** macOS 기본 `python3`는 3.9.6이고,
+> FiTuna는 3.11 이상을 요구한다. 가상환경을 활성화했다면 `python3`도 3.13을
+>가리키지만, 새 셸을 열었거나 `source`를 빠뜨리면 시스템 3.9.6이 잡혀
+> 테스트 1건이 실패한다(직접 재현: `python3 -m pytest -q` →
+> `1 failed, 150 passed`). 인터프리터를 명시하면 이 함정 자체가 사라진다.
 
 모듈별 자체 점검도 개별 실행할 수 있다 (직접 실행, 모두 종료 코드 0):
 
 ```bash
-python3 -m fituna.cli --selfcheck     # -> fituna.cli self-check OK
-python3 -m fituna.doctor              # -> fituna.doctor self-check OK
+python3.13 -m fituna.cli --selfcheck     # -> fituna.cli self-check OK
+python3.13 -m fituna.doctor              # -> fituna.doctor self-check OK
 ```
 
 ---
@@ -432,9 +461,11 @@ python3 -m fituna.doctor              # -> fituna.doctor self-check OK
 파이썬 콘솔 스크립트 디렉토리가 `PATH`에 없는 경우다(특히 `pip install --user`
 형태로 설치되면 자주 발생한다. 이 문서 작성 환경에서도 실제로 발생했다).
 
-- 조치 1: `fituna` 대신 **`python3 -m fituna`** 를 쓴다. 완전히 동일한 CLI다.
-  예: `python3 -m fituna doctor`
-- 조치 2: `python3 -m pip show -f fituna`가 알려주는 스크립트 경로를 `PATH`에
+- 조치 1: `fituna` 대신 **`python3.13 -m fituna`** 를 쓴다. 완전히 동일한
+  CLI다. 예: `python3.13 -m fituna doctor`. 여기서 `python3`가 아니라
+  `python3.13`인 것이 중요하다 — 이 오류의 흔한 원인이 가상환경 미활성화인데,
+  그 상태의 `python3`는 macOS 기본 3.9.6이라 FiTuna가 아예 실행되지 않는다.
+- 조치 2: `python3.13 -m pip show -f fituna`가 알려주는 스크립트 경로를 `PATH`에
   추가한다.
 
 ### `error: externally-managed-environment`
@@ -585,6 +616,11 @@ ERROR fituna: could not reach the HuggingFace dataset-viewer API: The read opera
 
 이 6단계가 순서대로 나타나면, 숫자가 무엇이든 정상 동작이다.
 
+**단, `--resume`으로 캐시가 적중한 재실행에서는 1번과 2번의
+`evaluating quality`가 아예 나타나지 않는다** — 품질은 이미 측정돼 캐시에
+있으므로 다시 재지 않는다(4-7·5-2가 그 경우다). 캐시 적중 실행에서 이 두 항목이
+없는 것은 누락이 아니라 `--resume`이 동작한 증거다.
+
 ### 실측 기준값
 
 | 환경 | 명령 | 결과 | 콜드 탐색 | 출처 |
@@ -613,7 +649,7 @@ quant가 다르다.** 벤치마크 수치가 발열·부하 상태에 민감하�
 | 문서 | 내용 |
 |---|---|
 | [README.md](README.md) | 프로젝트 개요, 기능, 설계 요약 (영어) |
-| [docs/RESULTS.md](docs/RESULTS.md) | 실측 결과 전문 — 4회 실기 측정, 타이밍, 편차 분석 (영어) |
+| [docs/RESULTS.md](docs/RESULTS.md) | 실측 결과 전문 — 5회 실기 측정, 타이밍, 편차 분석 (영어) |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 모듈 구조, 탐색 알고리즘, 오류·종료 코드 처리 (영어) |
 | [docs/USE_CASES.md](docs/USE_CASES.md) | 사용 시나리오 (영어) |
 | [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md) | 3분 시연 영상 컷 단위 시나리오 (한국어) |

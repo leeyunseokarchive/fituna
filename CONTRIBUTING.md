@@ -24,7 +24,7 @@ python -m fituna.cli --selfcheck
 ```
 
 Real-binary integration testing requires a llama.cpp build on PATH (or
-`--llama-bin-dir`); see README "Verify your setup".
+`--llama-bin-dir`); see README Quickstart step 4.
 
 ## Making changes
 

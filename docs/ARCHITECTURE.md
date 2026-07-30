@@ -16,7 +16,8 @@ search, and caching. It has zero runtime Python dependencies (stdlib only).
                               ┌───────────┐
                               │  cli.py   │  argparse entry point (run /
                               └─────┬─────┘  detect-hw / list-binaries /
-                                    │ doctor); builds TargetSpec, dispatches
+                                    │ doctor / fetch-corpus); builds
+                                    │ TargetSpec, dispatches
         ┌───────────────┬──────────┼───────────┬──────────────────┐
         ▼                ▼          ▼           ▼                  ▼
   hardware.py      binaries.py  model_info.py  quantize.py    report.py
@@ -48,8 +49,9 @@ search, and caching. It has zero runtime Python dependencies (stdlib only).
            fituna/config.py — frozen dataclasses/Enum/exceptions used by
            every module above (HardwareProfile, TargetSpec, BinaryPaths,
            ModelInfo, CandidateConfig, BenchResult, QualityResult,
-           SearchResult, FiTunaError hierarchy). No module defines its own
-           cross-module type; everyone imports from here.
+           SearchResult, DoctorCheck, CorpusPreset, FiTunaError hierarchy).
+           No module defines its own cross-module type; everyone imports
+           from here.
 ```
 
 Arrows show call direction, not import direction: `search.py` *calls*
@@ -155,8 +157,9 @@ elapses mid-search, the best result found so far is returned with
 `meets_target=False` instead of raising.
 
 Upper bound on `llama-bench` calls: `N_quant_survived × (2 + ngl_max_calls +
-len(ctx_candidates))` — worst case ~48 with defaults (6 quants,
-`ngl_max_calls=6`); early exits typically end the search in well under 10.
+len(ctx_candidates))` — worst case 54 with the `TargetSpec` defaults in
+`fituna/config.py` (6 quants, `ngl_max_calls=6`, a single ctx candidate:
+6 × (2 + 6 + 1)); early exits typically end the search in well under 10.
 
 ## Filesystem artifacts
 

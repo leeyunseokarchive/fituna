@@ -227,6 +227,18 @@ def _check_out_dir(out_dir: Path) -> DoctorCheck:
         )
 
     existing = _nearest_existing_ancestor(out_dir)
+    if not existing.is_dir():
+        # os.access(<regular file>, W_OK) is True, so without this the check
+        # would PASS on a path like `somefile.txt/out` that mkdir cannot
+        # create (ENOTDIR) -- a false PASS on the one check whose job is to
+        # catch this before a multi-hour run.
+        return DoctorCheck(
+            "out-dir",
+            "FAIL",
+            f"{out_dir} cannot be created: {existing} exists and is not a directory",
+            "Pass a different --out path (an ancestor of this one is a file).",
+        )
+
     writable = os.access(existing, os.W_OK)
     if out_dir.exists():
         detail = f"{out_dir} ({'writable' if writable else 'not writable'})"

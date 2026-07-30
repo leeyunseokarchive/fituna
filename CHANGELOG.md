@@ -65,7 +65,7 @@ separate from CI.
   holds; exposes `fituna_detect_hardware` and `fituna_recommend`.
 - **Per-module runnable self-checks** (`python -m fituna.<module>`), executed
   in CI alongside the test suite.
-- **151 unit tests** over a mocked subprocess/network layer, and a
+- **152 unit tests** over a mocked subprocess/network layer, and a
   3-OS × 2-Python (Ubuntu/macOS/Windows × 3.11/3.13) CI matrix.
 - **Warning when `--model` is already a quantized GGUF** (double-quantization
   and a skewed baseline).

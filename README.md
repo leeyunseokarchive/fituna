@@ -84,14 +84,17 @@ your hardware, reproducible from cache.
 ```bash
 brew install llama.cpp        # macOS/Linux Homebrew — ships all needed binaries
 # or build from source (any platform):
-git clone https://github.com/ggml-org/llama.cpp && cd llama.cpp
-cmake -B build && cmake --build build --config Release
+git clone https://github.com/ggml-org/llama.cpp
+cmake -S llama.cpp -B llama.cpp/build && cmake --build llama.cpp/build --config Release
 ```
 
-**2. Install FiTuna:**
+**2. Install FiTuna** (into a virtualenv built with Python 3.11+ —
+macOS's system `python3` is 3.9):
 
 ```bash
-pip install -e .
+git clone https://github.com/leeyunseokarchive/fituna
+python3.13 -m venv .venv && source .venv/bin/activate
+pip install -e fituna
 ```
 
 **3. Get a quality corpus.** Quality loss is measured as perplexity increase
@@ -227,6 +230,8 @@ fituna/
 ├── binaries.py    # llama.cpp binary discovery + capability introspection
 ├── doctor.py      # environment self-diagnosis (fituna doctor subcommand)
 ├── corpus.py      # quality-corpus download (fituna fetch-corpus, stdlib urllib)
+├── errors.py      # re-export shim for the FiTunaError hierarchy (defined in config.py)
+├── mcp_server.py  # MCP stdio server (JSON-RPC 2.0, fituna-mcp entry point)
 ├── model_info.py  # direct GGUF header parsing (struct), HF-dir conversion
 ├── quantize.py    # llama-quantize wrapper (idempotent, atomic writes)
 ├── quality.py     # llama-perplexity wrapper (quality-loss measurement)
@@ -236,7 +241,7 @@ fituna/
 └── report.py      # human/JSON result rendering + run-command builder
 ```
 
-151 unit tests (mocked subprocess/network layer) + per-module runnable
+152 unit tests (mocked subprocess/network layer) + per-module runnable
 self-checks + 3-OS × 2-Python CI matrix. Real-binary E2E validated on macOS (Apple
 Silicon/Metal) and Linux (NVIDIA T4/CUDA); see
 [Known limitations](#known-limitations).
@@ -287,6 +292,13 @@ first issue) and documenting how `--ppl-chunks` moves the quality figure
   (`--quality-corpus`; measured EN-vs-KO comparison — real verdict flip,
   underlying gap inside the estimator's resolution — in
   [docs/RESULTS.md](docs/RESULTS.md)).
+- **The quality verdict depends on `--ppl-chunks`** — perplexity loss is an
+  estimate over `chunks × 512` tokens, and its absolute value grows with the
+  chunk count (measured: the same Korean Q4_K_M reads 2.58 % at 32 chunks and
+  4.08 % at 128, shrinking the margin against a 5 % gate from 2.42 pp to
+  0.92 pp). A candidate close to your budget should be re-measured with more
+  chunks before the PASS is trusted; see
+  [docs/RESULTS.md](docs/RESULTS.md).
 - **Benchmarks are thermally sensitive** — verdicts within a few tok/s of
   the target are marginal; see the
   [variance analysis](docs/RESULTS.md#run-to-run-variance-measured-not-hidden).

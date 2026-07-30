@@ -40,9 +40,13 @@ python -m fituna.search          # search-order and early-exit logic
 python -m fituna.cli --selfcheck # entry points take an explicit flag
 ```
 
-The four modules that are entry points or take arguments (`cli`, `mcp_server`,
-`doctor`, `corpus`) use an explicit `--selfcheck` flag; the rest run their
-check when executed as `__main__`. These are assertion-based checks embedded
+The two modules whose `__main__` is a real entry point (`cli`, `mcp_server`)
+gate their check behind an explicit `--selfcheck` flag, so that
+`python -m fituna.cli` still runs the CLI. Every other module — `doctor` and
+`corpus` included — runs its check unconditionally under
+`if __name__ == "__main__":` and ignores any argument. CI passes
+`--selfcheck` to `doctor` and `corpus` too, which is harmless and keeps the
+four argument-taking modules' invocations uniform. These are assertion-based checks embedded
 next to the code they cover, not a second test framework — they exist so that a
 single module can be verified in isolation, including on a machine that has not
 installed pytest.
@@ -53,7 +57,7 @@ matrix, alongside the test suite. A self-check that fails fails the build.
 
 ## 3. Mocked-subprocess unit tests
 
-The suite is 151 tests across `tests/`, and it is designed to pass on a machine
+The suite is 152 tests across `tests/`, and it is designed to pass on a machine
 with **no llama.cpp installed and no network access**. Every external effect is
 monkeypatched at its boundary:
 
@@ -69,7 +73,7 @@ monkeypatched at its boundary:
 
 Real tool output is preserved as a fixture
 (`tests/fixtures/llama_bench_sample.json`), but its only consumer is
-`fituna/bench.py`'s own `_self_check()` (`bench.py:157`) — that's Section 2's
+`fituna/bench.py`'s own `_self_check()` (`bench.py:147`) — that's Section 2's
 per-module self-check mechanism, not this pytest suite. No `tests/` file
 loads it. The substance still holds — the parser this fixture drives is
 tested against text llama.cpp actually printed rather than text we

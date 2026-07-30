@@ -371,6 +371,18 @@ def test_out_dir_fail_when_path_is_a_file_not_a_directory(tmp_path):
     assert "not a directory" in row.detail
 
 
+def test_out_dir_fail_when_an_ancestor_is_a_file(tmp_path):
+    # os.access(<file>, W_OK) is True, so the nearest existing ancestor being
+    # a regular file used to report PASS; creating it would fail with ENOTDIR.
+    blocking_file = tmp_path / "somefile.txt"
+    blocking_file.write_text("not a directory")
+    row = doctor._check_out_dir(blocking_file / "out")
+    assert row.status == "FAIL"
+    assert row.remedy is not None
+    assert "not a directory" in row.detail
+    assert not (blocking_file / "out").exists()
+
+
 # ---------------------------------------------------------------------------
 # _check_disk_space
 # ---------------------------------------------------------------------------
