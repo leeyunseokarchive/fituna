@@ -256,10 +256,25 @@ Silicon/Metal) and Linux (NVIDIA T4/CUDA); see
 - [x] NVIDIA/Linux measured run (Tesla T4 via the Colab notebook —
   [Run 4](docs/RESULTS.md#run-4--nvidia-tesla-t4-linux-google-colab):
   the quality-gate verdict itself flipped between Metal and CUDA)
-- [ ] Surface llama-bench std-dev *and* llama-perplexity's `+/-` standard
-  error to auto-flag marginal verdicts (`quality.py` currently parses the PPL
-  and discards the error bar — see Run 5's "How big is a perplexity gap?")
+- [ ] Surface llama-bench std-dev ([#9](https://github.com/leeyunseokarchive/fituna/issues/9))
+  *and* llama-perplexity's `+/-` standard error
+  ([#8](https://github.com/leeyunseokarchive/fituna/issues/8)) to auto-flag
+  marginal verdicts — `quality.py` currently parses the PPL and discards the
+  error bar, which is how Run 5 came to publish a claim it later had to
+  withdraw
 - [ ] Multi-GPU `--tensor-split` support
+  ([#11](https://github.com/leeyunseokarchive/fituna/issues/11) — help wanted:
+  we have no multi-GPU machine to measure on)
+- [ ] Real-hardware validation on Windows
+  ([#12](https://github.com/leeyunseokarchive/fituna/issues/12) — CI runs
+  there, but nothing has been run against real llama.cpp binaries)
+
+Everything above is tracked in the
+[v0.2.0 milestone](https://github.com/leeyunseokarchive/fituna/milestone/1),
+along with the smaller items — pytest coverage for the llama.cpp output
+parsers ([#10](https://github.com/leeyunseokarchive/fituna/issues/10), good
+first issue) and documenting how `--ppl-chunks` moves the quality figure
+([#13](https://github.com/leeyunseokarchive/fituna/issues/13)).
 
 ## Known limitations
 
