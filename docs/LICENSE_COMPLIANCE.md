@@ -182,8 +182,8 @@ $ unzip -p dist/fituna-0.1.0-py3-none-any.whl fituna-0.1.0.dist-info/METADATA \
     | grep -E '^(Name|Version|Requires-Python|License|License-File|Provides-Extra|Requires-Dist):'
 Name: fituna
 Version: 0.1.0
-Requires-Python: >=3.11
 License: MIT
+Requires-Python: >=3.11
 License-File: LICENSE
 Provides-Extra: dev
 Requires-Dist: pytest; extra == "dev"
@@ -343,9 +343,16 @@ derivative work of it. The FSF's own GPL FAQ states the criterion
 
 > By contrast, pipes, sockets and command-line arguments are communication
 > mechanisms normally used between two separate programs. So when they are
-> used for communication, the modules normally are separate programs.
+> used for communication, the modules normally are separate programs. But if
+> the semantics of the communication are intimate enough, exchanging complex
+> internal data structures, that too could be a basis to consider the two
+> parts as combined into a larger program.
 
-Command-line arguments and stdout are exactly and only what crosses this
+The FAQ's own qualifier is exactly the question worth answering here, not
+one to quote around: what crosses the `git` boundary is an argv list in, and
+stdout/stderr/exit-code out — no complex internal data structure, no shared
+memory, no callback. Command-line arguments and stdout are exactly and only
+what crosses this
 boundary — the same boundary described for llama.cpp in §2.1 — and FiTuna's
 relationship with `git` is more distant still: the notebook, not the
 package, runs it. This is stated rather than omitted because the
@@ -383,6 +390,11 @@ Every license FiTuna combines with, and the outcome:
 | pytest | MIT | dev extra only | No — not installed by `pip install fituna` |
 | `rocm-smi`, `sysctl` | MIT, BSD-3-Clause | optional subprocess | No — permissive; invoked, never redistributed |
 | `git` (notebook only) | GPL-2.0 | subprocess, dev/notebook | No — see §2.4 |
+| CMake (notebook only) | BSD-3-Clause | subprocess, dev/notebook | No — permissive; builds llama.cpp inside Colab, never installed |
+| `pip` (notebook only) | MIT | subprocess, dev/notebook | No — permissive; installs FiTuna and `huggingface_hub` inside Colab |
+| `huggingface_hub` (notebook only) | Apache-2.0 | `pip install`-ed, dev/notebook | No — permissive; downloads the demo GGUF, not a FiTuna dependency |
+| Jupyter notebook format (`nbformat`) | BSD-3-Clause | file format, dev/notebook | No — permissive; the `.ipynb` file itself conforms to the format |
+| `actions/checkout`, `actions/setup-python` | MIT | CI action, dev only | No — permissive; runs in GitHub Actions, never shipped |
 
 Non-open-source components FiTuna invokes but never redistributes
 (`nvidia-smi`, `system_profiler`, the CUDA toolkit, and the hosted GitHub
@@ -477,7 +489,7 @@ own transitive dependencies, resolved by pip — FiTuna declares only
 ```
 $ git grep -c -i -E 'GPL|AGPL|LGPL|copyleft|CDDL|EPL-|MPL-|SSPL|Commons Clause|proprietary|All Rights Reserved' -- .
 THIRD_PARTY_NOTICES.md:4
-docs/LICENSE_COMPLIANCE.md:24
+docs/LICENSE_COMPLIANCE.md:25
 docs/OPEN_SOURCE_USAGE.md:13
 ```
 
@@ -549,8 +561,8 @@ $ /tmp/buildenv/bin/reuse lint
 * Used licenses: MIT
 * Read errors: 0
 * Invalid SPDX License Expressions: 2
-* Files with copyright information: 3 / 45
-* Files with license information: 22 / 45
+* Files with copyright information: 4 / 45
+* Files with license information: 23 / 45
 
 Unfortunately, your project is not compliant with version 3.3 of the REUSE Specification :-(
 ```
@@ -582,14 +594,14 @@ one of them is a real finding:
   only place their exact spelling appears in this file, deliberately: naming
   the closing token anywhere in the prose would end the ignore block right
   there and re-expose everything below it.
-- **`Files with license information: 22 / 45`** — 23 `.py` files carry the
-  tag (§4), and 22 of them are counted. The missing one is
-  **`fituna/config.py`, and the cause is a tool limitation worth recording**:
-  `reuse` sniffs the encoding of only the first 2048 bytes of a file
+- **`Files with license information: 23 / 45`** — all 23 `.py` files that
+  carry the tag (§4) are counted. That includes `fituna/config.py`, which
+  needs an explanation because `reuse` cannot read its own header: `reuse`
+  sniffs the encoding of only the first 2048 bytes of a file
   (`HEURISTICS_CHUNK_SIZE`), and in `config.py` byte 2048 falls in the middle
   of a multi-byte UTF-8 Korean comment. `charset-normalizer` cannot decode
-  the truncated chunk, `reuse` concludes the file is binary, and skips it
-  without an error. Verified directly:
+  the truncated chunk, `reuse` concludes the file is binary, and skips
+  reading it without an error. Verified directly:
 
   ```
   $ /tmp/buildenv/bin/python -c "
@@ -605,16 +617,25 @@ one of them is a real finding:
   whole file  -> utf_8
   ```
 
-  The tag *is* present — `head -1 fituna/config.py` prints
+  The tag *is* present in the file — `head -1 fituna/config.py` prints
   `# SPDX-License-Identifier: MIT`, and §4's independent check confirms 23 of
-  23. `reuse` also excludes two further files from its 45: `LICENSE` itself
-  (it is the license) and the empty `fituna/py.typed` marker; 45 + 2 = 47 =
-  `git ls-files | wc -l`. The upstream mitigation is to install `libmagic`
-  so `reuse` uses `python-magic` instead of `charset-normalizer` for
-  encoding detection; that is a system package, not installed here. A
-  reviewer's own SCA tool may or may not share this quirk — it is recorded
-  so that a single "unknown license" file in someone else's report has a
-  documented cause.
+  23 — but since `reuse` cannot see it directly, `REUSE.toml` supplies the
+  same `MIT` identifier as a file-level annotation instead. This is REUSE's
+  own documented mechanism for exactly this situation, and it does not
+  depend on where in the file the annotation would otherwise sit: `reuse`
+  reads `REUSE.toml` before it ever tries to sniff `config.py`'s encoding, so
+  the 2048-byte heuristic never gets a chance to misfire. `reuse` also
+  excludes two further files from its 45: `LICENSE` itself (it is the
+  license) and the empty `fituna/py.typed` marker — plus `REUSE.toml` itself,
+  which is its own configuration, not a file needing an annotation;
+  45 + 3 = 48 = `git ls-files | wc -l`. The upstream mitigation for the
+  underlying heuristic — installing `libmagic` so `reuse` uses `python-magic`
+  instead of `charset-normalizer` for encoding detection — is a system
+  package and was not installed here; `REUSE.toml` fixes the same symptom
+  without it. A reviewer's own SCA tool may or may not share this quirk — it
+  is recorded so that a single "unknown license" file in someone else's
+  report has a documented cause, even where that reviewer's tool has no
+  `REUSE.toml`-equivalent remedy.
 
 `reuse` itself is GPL-3.0-licensed. It was installed into a throwaway venv
 outside the repository, invoked as a separate process, and is not a
@@ -667,8 +688,11 @@ fituna/search.py         # SPDX-License-Identifier: MIT
 
 Why it matters: without the tag, a scanner classifies each file as *unknown
 license* and reports it as an unresolved item even though the repository has
-a perfectly good root `LICENSE`. With it, every source file self-identifies
-and the SCA report has nothing to flag.
+a perfectly good root `LICENSE`. With it, every source file self-identifies —
+22 directly via this header, and `fituna/config.py` via the `REUSE.toml`
+annotation described in §3.5, because `reuse` cannot read its own header —
+and this project's own SCA scan (§3.5) has nothing left to flag under "no
+copyright and licensing information."
 
 **Regression check.** Adding a line to every file shifts every line number
 below it. Both consequences were checked and handled:
@@ -678,7 +702,7 @@ below it. Both consequences were checked and handled:
 - `docs/OPEN_SOURCE_USAGE.md` cites source locations as `file.py:NNN` in 38
   places. Each was verified — by comparing the cited line in the pre-change
   file (`git show HEAD:<path>`) against line *N*+1 in the post-change file —
-  to be a clean one-line shift, 32 distinct references, 0 mismatches, and
+  to be a clean one-line shift, 30 distinct `file:line` references, 0 mismatches, and
   then bumped by one. No other file in the repository uses `file.py:NNN`
   citations.
 
@@ -745,7 +769,7 @@ does.
 | Item | Status |
 |---|---|
 | Code-similarity / license-text matching (ScanCode, FOSSology) | **Not run** — disproportionate for 47 tracked files; see §3.1 for what stands in its place and what that leaves uncovered |
-| `reuse` skips `fituna/config.py` | **Tool limitation, diagnosed** (§3.5). The tag is present; `reuse`'s 2 KB encoding heuristic truncates a multi-byte character. Not fixed in source — contorting a file's byte layout to satisfy one scanner's heuristic would be fragile in both directions |
+| `reuse` can't read `fituna/config.py`'s own header | **Tool limitation, diagnosed and worked around** (§3.5). `reuse`'s 2 KB encoding heuristic truncates a multi-byte character, so it never reads the in-file tag. Not fixed by reshaping the file's byte layout — that would be fragile in both directions and dependent on comment length staying clear of byte 2048. Fixed instead with a `REUSE.toml` file-level annotation, REUSE's own documented mechanism for this case, which does not depend on byte position |
 | REUSE 3.3 full compliance (`LICENSES/` directory, per-file copyright tags) | **Not adopted** — a stricter standard than this verification asks for; the root `LICENSE` plus per-file SPDX tags is the conventional position |
 | `pyproject.toml` uses `license = { text = "MIT" }` | **Deprecated by setuptools**, which warns during the build in §1.1 that PEP 639 `license = "MIT"` (an SPDX expression) is preferred, with a **2027-02-18** deadline. Not changed here: it would require raising the build-backend floor from `setuptools>=68` to `>=77`, which is a packaging decision, not a license one. The metadata already carries `License: MIT` and the OSI classifier, both machine-readable today |
 | HuggingFace dataset-viewer **service** terms of use | **Unverified**, as `docs/OPEN_SOURCE_USAGE.md` §7 already states. The server implementation's Apache-2.0 license was verified; the hosted service's terms were not reviewed |
