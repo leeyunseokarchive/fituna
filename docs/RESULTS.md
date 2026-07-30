@@ -135,6 +135,21 @@ Two honest observations:
   Korean, gate on Korean text (`--quality-corpus kowiki-corpus.txt`, fetched
   via `fituna fetch-corpus --lang ko --out kowiki-corpus.txt`).
 
+**One qualification, added after Run 5.** These are `--ppl-chunks 32`
+estimates, and Run 5 went back and measured the error bar FiTuna was
+discarding at that chunk count — roughly ±3 percentage points of loss (see
+"How big is a perplexity gap?"). That was measured on Run 5's model and files;
+we no longer hold Run 3's quantized Qwen3-4B files to re-measure it here, so
+for this run treat ±3 pp as inferred rather than measured. The flip above is
+a fact about what the tool did — a user running those two commands gets those
+two verdicts, and that remains the point of the experiment. What is **not**
+established is that the underlying quality difference is larger than the
+estimator can resolve: EN 1.73 % vs KO 0.77 % is a 0.96 pp cross-corpus gap,
+unpaired, of the same order as that bar, with both figures straddling the 1 %
+gate. So read it as "the corpus you gate on decides the verdict at this
+budget", not as "Korean text provably degrades less" — Run 5 measured the
+same comparison on a Korean model and could not establish the latter.
+
 Incidentally, designing this experiment caught a real cache bug: quality
 results were keyed by (model, quant, chunks) but not by corpus, so the
 second corpus would silently reuse the first corpus's numbers. The cache
@@ -166,7 +181,12 @@ Three cross-platform facts a lookup table cannot know:
 - **The quality gate verdict flipped between platforms.** Q4_K_M measured
   4.74 % loss under Metal (passes the 5 % budget) but 5.22 % under CUDA
   (killed at the gate). Same file, same corpus — different backend
-  numerics, different feasible set.
+  numerics, different feasible set. Same qualification as Run 3: 0.48 pp
+  between two 32-chunk estimates is the same order as the ±3 pp bar Run 5
+  measured on its own files, so what is established is that the two backends
+  produced different verdicts here, not that a 0.48 pp gap would reproduce.
+  This comparison is at least partly paired — identical corpus, identical
+  file, only the backend differs — which the cross-corpus one in Run 3 is not.
 - **The speed ranking is platform-specific.** On the T4, Q6_K outruns
   Q8_0 *and* Q5_K_M (which is slowest of the three); the M3 Pro ordering
   is different again.
@@ -205,6 +225,11 @@ Runs 1–4 all used models trained primarily on English. Run 5 repeats the
 Run 3 experiment — English vs Korean quality corpus, same model, same
 quantized files — on a **Korean** open-weight model, to see whether the
 corpus-sensitivity story holds up when the model itself is Korean.
+
+The measured answer, stated up front: the loss *magnitudes* differ by corpus,
+the final verdict does not, and the mid-table ranking difference we initially
+reported as a finding **did not survive a stability check against our own
+logs**. Details in "How big is a perplexity gap?" below.
 
 Base model: `K-intelligence/Midm-2.0-Mini-Instruct` — 2,305,517,312
 parameters, 48 layers. Its HuggingFace `license` field is `mit`, and
@@ -278,10 +303,12 @@ fituna run --model Midm-2.0-Mini-Instruct-BF16.gguf \
 Baseline perplexity of the BF16 base: **9.9511** on Korean, **8.7900** on
 English. Every quality figure in that table is a `--ppl-chunks 32` estimate
 carrying an error bar that `llama-perplexity` reports and FiTuna does not
-store — ±0.295 on the Korean perplexities at this chunk count, about ±3
-percentage points once expressed as loss. Read "How big is a perplexity gap?"
-below before drawing conclusions from the gaps between adjacent rows. Both
-runs end identically:
+store. We went back and measured it for every Korean row at this chunk count
+rather than quoting one and assuming the rest: **±0.29318** (BF16 baseline),
+**±0.29307** (Q8_0), **±0.29529** (Q6_K), **±0.29372** (Q5_K_M), **±0.30055**
+(Q4_K_M) — about ±3 percentage points once expressed as loss, in every row.
+Read "How big is a perplexity gap?" below before drawing conclusions from the
+gaps between adjacent rows. Both runs end identically:
 
 ```
 FiTuna result: MEETS TARGET
@@ -304,18 +331,22 @@ prints an error bar next to each one that FiTuna never stored — its output
 line is `Final estimate: PPL = 10.0099 +/- 0.29529`, and `quality.py`'s regex
 captures the PPL and drops the `+/-`. Re-reading this run we could not say
 whether the ranking difference below was signal, so we measured it: called the
-binary directly on the same four files and both corpora, and repeated the
-sweep at **128 chunks** — 4× what the runs used, and the largest power of two
+binary directly on the same four files and both corpora, and extended the
+sweep to **128 chunks** — 4× what the runs used, and the largest power of two
 the English corpus supports (wikitext-2 test holds 143 chunks at `n_ctx=512`;
-kowiki holds 2368).
+kowiki holds 2368). Extended, not repeated: as the second bullet below shows,
+a 128-chunk run *contains* the 32-chunk one, so these two columns are not
+independent replicates of each other.
 
 ```bash
 llama-perplexity -m out/...-3e6680866409-Q6_K.gguf -f kowiki-corpus.txt --chunks 128
 ```
 
-Invoked at `--chunks 32` it reproduces FiTuna's cached numbers exactly
-(Korean Q6_K `PPL = 10.0099 +/- 0.29529`, Q5_K_M `10.0037 +/- 0.29372`), so
-this is the same measurement the tool makes, just with the error bar kept.
+Invoked at `--chunks 32` it reproduces every cached Korean number exactly
+(`9.9511`, `9.9488`, `10.0099`, `10.0037`, `10.2082`), so this is the same
+measurement the tool makes, just with the error bar kept. That agreement is
+a check on our plumbing, not a replication — the computation is deterministic
+and, per the second bullet below, is the same one.
 
 | Korean (kowiki) | PPL @128 chunks | loss @32 | loss @128 |
 |---|---|---|---|
@@ -333,27 +364,52 @@ this is the same measurement the tool makes, just with the error bar kept.
 | **Q5_K_M** | **10.0197 ± 0.15035** | **+1.00 %** | **+1.05 %** |
 | Q4_K_M | 10.2945 ± 0.15471 | +3.78 % | +3.82 % |
 
-Four things follow, in order of how much they change the story:
+Five things follow, in order of how much they change the story:
 
-- **Both orderings replicated at 4× the data.** Korean still ranks Q5_K_M
-  above Q6_K; English still ranks Q6_K above Q5_K_M. The direction did not
-  wander and neither did the magnitude much: the Korean margin went 0.062 →
-  0.054 percentage points, the English margin 0.543 → 0.423.
-- **But neither margin clears the error bar, and the two are nowhere near
-  equal.** At 128 chunks each perplexity carries ±0.15–0.17, which is ±1.5
-  percentage points once expressed as loss. The English margin (0.423 pp) is
-  about a quarter of that; the Korean margin (0.054 pp) is about a
-  twenty-ninth. The Korean half of the flip is ~8× weaker than the English
-  half, and the first version of this section presented the two as one finding
-  of equal strength. That was the mistake.
+- **The English ordering is stable across the whole run. The Korean ordering
+  is not — it oscillates.** `llama-perplexity` prints a running perplexity
+  after every chunk, so each of these runs is also 128 nested estimates, and
+  reading them is a free stability test. On English, the margin between the
+  two contested quants turns positive at n=4 and stays positive for all 125
+  remaining points: Q6_K ranks above Q5_K_M at **every** chunk count we can
+  read, zero sign changes. On Korean the same margin changes sign **nine
+  times** after n=16, alternating between the two orderings in ten runs:
+
+  | Korean, n = | 5–16 | 17–22 | 23–24 | 25–66 | 67 | 68–76 | 77–99 | 100–106 | 107–108 | 109–128 |
+  |---|---|---|---|---|---|---|---|---|---|---|
+  | ahead | Q6_K | Q5_K_M | Q6_K | Q5_K_M | Q6_K | Q5_K_M | **Q6_K** | Q5_K_M | Q6_K | **Q5_K_M** |
+
+  This is not a near-tie quietly settling down. Over n=77–99 — 23 consecutive
+  points holding the *opposite* order to the one we publish — the mean absolute
+  Korean margin is **0.0545 pp**, slightly *larger* than the **0.0537 pp** at
+  n=128. The opposite ordering is held with equal or greater strength. At n=96
+  the two corpora agree (both put Q6_K ahead) and there is no corpus reorder at
+  all. Which order the Korean column reports is a function of where the run
+  happens to stop.
+- **Our 32- and 128-chunk numbers are one measurement, not two.**
+  `llama-perplexity` always walks the corpus from the start, so a 128-chunk run
+  *contains* its own 32-chunk run. Chunk `[32]` of the Korean Q8_0 trace is
+  `9.9488` — exactly the value FiTuna cached at `--ppl-chunks 32` — and the
+  same identity holds for Q6_K (`10.0099`), Q5_K_M (`10.0037`) and both
+  baselines (`9.9511` Korean, `8.7900` English). "Reproduced at 32 chunks and
+  again at 128" would be one nested measurement quoted twice; an earlier
+  version of this section presented it as two independent confirmations. It
+  is not evidence of stability. The per-chunk trace above is.
+- **Neither margin clears the error bar, and the two are nowhere near equal.**
+  At 128 chunks each perplexity carries ±0.15–0.17, which is ±1.5 percentage
+  points once expressed as loss. The English margin (0.423 pp) is about a
+  quarter of that; the Korean margin at n=128 (0.054 pp) is about a
+  twenty-ninth. So the English half of the ordering difference is ~8× stronger
+  than the Korean half — and, unlike it, holds its sign everywhere.
 - **The `+/-` we can quote is not quite the one we want.** It is the
   corpus-sampling error on an absolute perplexity — how much this number would
   move on a *different* sample of Korean text. Comparing two quants scored on
   *identical* chunks is a paired comparison whose error is much smaller, which
-  is how a 0.054 pp margin can replicate at 4× the data while sitting 1/29 of
-  an error bar wide. `llama-perplexity` does not report that paired error, so
-  we cannot attach a confidence level to either margin. What we can do is stop
-  presenting the weaker one as a headline.
+  is how the English margin can sit at a quarter of an error bar and still hold
+  its sign over 125 consecutive chunk counts. `llama-perplexity` does not report
+  that paired error, so we cannot attach a confidence level to either margin.
+  What the per-chunk traces give us instead is a direct stability test that
+  needs no error model at all — and the Korean margin fails it.
 - **Absolute loss is strongly chunk-count dependent — always quote the chunk
   count.** Q4_K_M's Korean loss is 2.58 % at 32 chunks and 4.08 % at 128;
   Q6_K's goes 0.59 % → 1.16 %. The 32-chunk figures in the table above are
@@ -364,46 +420,55 @@ Four things follow, in order of how much they change the story:
 
 ### What a lookup table cannot know
 
-- **The corpus reordered the middle of the ranking — reproducibly, but by
-  less than we can resolve.** Sorted by measured loss the search walks
-  Q8_0 → **Q5_K_M → Q6_K** → Q4_K_M on Korean and Q8_0 → **Q6_K → Q5_K_M** →
-  Q4_K_M on English, and that holds at 32 chunks *and* at 128. Run 3 measured
-  the same comparison on an English-trained model and reported honestly that
-  "the ranking happened to stay the same — we do not claim the order always
-  flips"; here the mid-table order does differ by language, and it replicates.
-  What we will **not** do is call it strong evidence. The Korean margin
-  between Q6_K and Q5_K_M is 0.05–0.06 percentage points against a ±1.5 pp
-  error bar — the smallest gap in this entire document, and we hold it to the
-  same standard as the 0.20 tok/s speed inversion further down this list,
-  which we also decline to score. The English margin (0.42–0.54 pp) is ~8×
-  stronger and
-  still inside the bar. Details and both full tables in "How big is a
-  perplexity gap?" above. An earlier version of this section led with "the
-  corpus flipped the measured quality ranking" and gave the Korean and English
-  halves equal weight; the ordering survived re-measurement, the equal weight
-  did not.
-- **Q8_0 changed sign, at both chunk counts.** It scored −0.02 % (32 chunks)
-  and −0.05 % (128) on Korean — very slightly *better* perplexity than the
-  BF16 base it was quantized from — against +0.15 % and +0.06 % on English. A
-  table that stores "Q8_0 ≈ lossless" hides which side of zero you land on.
-  The sign difference replicates, but on a Δppl of 0.005–0.013 against a
-  ±0.16 error bar it is a consistent observation, not a resolved result.
+- **A corpus-driven reorder was not demonstrated.** Sorted by measured loss
+  the two runs do report different mid-table orders — Q8_0 → **Q5_K_M → Q6_K**
+  → Q4_K_M on Korean, Q8_0 → **Q6_K → Q5_K_M** → Q4_K_M on English — and that
+  is genuinely what a user gets from these commands. But a reorder needs both
+  halves to be real, and only the English half survives measurement. English
+  puts Q6_K ahead of Q5_K_M at every chunk count from 4 to 128, without a
+  single sign change. The Korean order between those same two quants changes
+  sign nine times over the same trace, and holds the *English* order over
+  n=77–99 at least as strongly as it holds the opposite one at n=128; at n=96
+  the two corpora agree outright and there is no reorder to report. So we
+  cannot say the corpus reordered the ranking — we can only say the Korean
+  column is not stable enough to be ordered. Run 3 measured this same
+  comparison on an English-trained model and reported plainly that "the ranking
+  happened to stay the same — we do not claim the order always flips"; Run 5
+  does not get to claim it either. Earlier versions of this section led with
+  "the corpus flipped the measured quality ranking" and then called the flip
+  reproducible; the per-chunk trace in "How big is a perplexity gap?" above
+  refutes both — and it is our own log that does it. That is the tool working
+  as intended: a plausible assumption of ours failed under our own measurement.
+- **Q8_0 changed sign — and this one *is* stable across the trace.** It
+  scored −0.02 % (32 chunks) and −0.05 % (128) on Korean — very slightly
+  *better* perplexity than the BF16 base it was quantized from — against
+  +0.15 % and +0.06 % on English. Unlike the Q6_K/Q5_K_M ordering above, this
+  holds up when read chunk by chunk: Korean Q8_0 is below its baseline at
+  117 of the 125 points from n=4 to n=128 (one sign change, early), and
+  English Q8_0 is above its baseline at all 125. A table that stores "Q8_0 ≈
+  lossless" hides which side of zero you land on. On a Δppl of 0.005–0.013
+  against a ±0.16 error bar we still will not call it a resolved result — but
+  it is a consistent observation, which is more than the ranking difference
+  managed.
 - **Run 3's "Korean losses are smaller" pattern does not generalize.** In
   Run 3 the Korean figure was smaller than its English counterpart in three
   of four rows — Q6_K is already the exception there (−0.06 % Korean vs
-  −0.30 % English). Here the pattern holds for Q5_K_M (0.53 vs 1.00) and
-  Q4_K_M (2.58 vs 3.78) but is **reversed for Q6_K** (0.59 Korean vs 0.46
-  English) and for Q8_0. So it was never a clean rule, and it is not one
-  here: the direction of the corpus effect is per-quant and has to be
-  measured. (Both reversed rows differ by ~0.15 pp across the two corpora,
-  well inside the ±1.5 pp error bars — see "How big is a perplexity gap?"
-  above.)
+  −0.30 % English). In the 32-chunk table above the pattern holds for Q8_0
+  (−0.02 vs +0.15), Q5_K_M (0.53 vs 1.00) and Q4_K_M (2.58 vs 3.78), and is
+  **reversed for Q6_K** alone (0.59 Korean vs 0.46 English, a 0.14 pp
+  difference well inside the ±1.5 pp error bars). Read chunk by chunk it is
+  weaker still: across n=4–128 the Korean figure is the smaller one at 125 of
+  125 points for Q8_0, but only 73/125 for Q4_K_M, 50/125 for Q5_K_M and
+  4/125 for Q6_K. So it was never a clean rule, and only Q8_0 obeys it
+  robustly here: the direction of the corpus effect is per-quant and has to be
+  measured.
 - **The verdict did *not* flip this time — and we say so.** Unlike Run 3,
   where a 1 % budget let the corpus alone decide feasibility, here at
   `--max-quality-loss 5` all four candidates clear the gate on *both*
   corpora, and both runs pick the identical winning config. The corpus moved
-  the numbers and the middle of the ranking, not the final answer. That is
-  what we measured; we are not going to dress it up as a flip.
+  the numbers, not the final answer — and, per the bullet above, not
+  demonstrably the ranking either. That is what we measured; we are not going
+  to dress it up as a flip.
 - **The "minimal ngl" answer was `all of them`, and the margin is one
   layer.** FiTuna's binary search over `-ngl` returned the full 48 because
   nothing smaller works. The measured offload curve for Q4_K_M:

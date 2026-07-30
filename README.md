@@ -107,8 +107,13 @@ Pulls rows straight from HuggingFace's public dataset-viewer REST API via
 stdlib `urllib` — no `pip install datasets` (which drags in pyarrow/pandas)
 needed. Korean models should use the Korean corpus so the quality gate
 measures what actually degrades for Korean users — the same quant can
-measure 2–3× different loss on the two corpora, which in Run 3 was enough to
-flip a feasibility verdict. Measure the language you'll run. Both presets are
+measure 2–3× different loss on the two corpora, and in Run 3 that was enough
+to change the verdict the tool returned. (The gap that did it, 0.96 pp, sits
+inside the error bar a 32-chunk estimate carries — so the corpus you gate on
+decides the answer here, but we do not claim the underlying quality
+difference is resolved; see the
+[qualification on Run 3](docs/RESULTS.md#run-3--english-vs-korean-quality-corpus-same-model-same-quants).)
+Measure the language you'll run. Both presets are
 CC BY-SA 3.0; `fetch-corpus` prints the
 attribution/share-alike notice and source URL to stdout when it finishes.
 Have your own dataset in mind? `--dataset/--config/--split` override the
@@ -181,7 +186,7 @@ contract: [`fituna/config.py`](fituna/config.py)
 |---|---|---|---|
 | Qwen3-4B-Instruct (Apache 2.0) | 30 tok/s, ≤5% loss | Q8_0: 24.22 tok/s ❌ (and measured *worse* quality than Q6_K) | **Q4_K_M @ ngl=33 → 30.81 tok/s, 1.73% loss** ✅ |
 | SmolLM2-135M (Apache 2.0) | 240 tok/s, ≤5% loss | Q8_0: 205.91 tok/s ❌ | **Q6_K → 249.50 tok/s, 0.53% loss** ✅ (and Q4_K_M measured *slower* than Q6_K) |
-| Midm-2.0-Mini-Instruct, Korean (MIT) | 40 tok/s, ≤5% loss | Q8_0: 34.26 tok/s ❌ | **Q4_K_M @ ngl=48 → 44.62 tok/s, 2.58% loss** ✅ (Korean vs English corpus reordered Q6_K/Q5_K_M mid-table — reproducible at 32 *and* 128 chunks, but the Korean margin is 1/29 of the perplexity error bar, so we [report it, not headline it](docs/RESULTS.md#how-big-is-a-perplexity-gap-the-error-bar-we-had-been-discarding)) |
+| Midm-2.0-Mini-Instruct, Korean (MIT) | 40 tok/s, ≤5% loss | Q8_0: 34.26 tok/s ❌ | **Q4_K_M @ ngl=48 → 44.62 tok/s, 2.58% loss** ✅ (the two corpora report different Q6_K/Q5_K_M mid-table orders, but reading the per-chunk trace the English order never changes sign in 125 points while the Korean one changes nine times — so a corpus-driven reorder is [not something we could establish](docs/RESULTS.md#how-big-is-a-perplexity-gap-the-error-bar-we-had-been-discarding)) |
 
 Environment: Apple M3 Pro, llama.cpp build 9960. Full logs, timings,
 run-to-run variance analysis (including a thermal-throttle outlier we caught
