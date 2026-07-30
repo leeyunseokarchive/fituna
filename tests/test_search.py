@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """search() orchestration tests -- quantize/bench/quality are faked so this
 suite exercises only the early-exit / binary-search / grid-search logic, no
 real llama.cpp binaries required.

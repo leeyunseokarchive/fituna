@@ -155,9 +155,13 @@ template.
 | 2 | `rocm-smi` | MIT | No | `subprocess` (optional) |
 | 2 | `system_profiler` | Apple proprietary | No | `subprocess` (optional) |
 | 2 | `sysctl` | BSD-3-Clause | No | `subprocess` (optional) |
-| 3 | WikiText-2 corpus | CC-BY-SA | No | read as file input |
+| 3 | WikiText-2 (EN) and Korean Wikipedia corpora | CC BY-SA 3.0 / GFDL | No | read as file input |
 | 4 | User-selected LLM weights | Varies by model | No | read as file input |
 | 5 | pytest (dev-only) | MIT | No (optional-deps, dev only) | not invoked at runtime |
 
-See `docs/SBOM.md` for the FiTuna Python standard-library module list and
-`LICENSE` for FiTuna's own license (MIT).
+See `docs/SBOM.md` for the FiTuna Python standard-library module list,
+`docs/OPEN_SOURCE_USAGE.md` for the area-by-area account of every
+open-source component and how each license was verified,
+`docs/LICENSE_COMPLIANCE.md` for the executed scans and the build-artifact
+evidence that none of the above is redistributed, and `LICENSE` for
+FiTuna's own license (MIT).

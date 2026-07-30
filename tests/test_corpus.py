@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Tests for fituna.corpus (the `fituna fetch-corpus` subcommand).
 
 `urllib.request.urlopen` is monkeypatched throughout -- CI has no network

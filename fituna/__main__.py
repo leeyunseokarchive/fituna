@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """``python -m fituna`` entry point."""
 
 import sys

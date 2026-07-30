@@ -1,0 +1,14 @@
+version = 1
+
+# fituna/config.py carries the same "# SPDX-License-Identifier: MIT" line-1
+# tag as every other fituna/*.py file (see docs/LICENSE_COMPLIANCE.md §3.5),
+# but reuse's encoding heuristic only inspects the first 2048 bytes of a
+# file, and in this file byte 2048 lands mid-character in a multi-byte UTF-8
+# Korean comment. charset-normalizer fails to decode the truncated chunk,
+# reuse concludes the file is binary, and skips reading its own header.
+# This file-level annotation is REUSE's documented mechanism for that case:
+# it does not depend on byte position, unlike any fix to the file itself.
+[[annotations]]
+path = "fituna/config.py"
+SPDX-FileCopyrightText = "NONE"
+SPDX-License-Identifier = "MIT"

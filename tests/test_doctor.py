@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Tests for fituna.doctor (the `fituna doctor` subcommand).
 
 Every underlying dependency (subprocess-backed hardware/binaries detection,
