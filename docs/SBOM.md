@@ -33,8 +33,8 @@ grep이 아니라 실제 import 문만 집계한 결과입니다.
 | 23 | tempfile (stdlib) | 3.11 내장 | PSF License | https://github.com/python/cpython | 임시 파일 작성 후 교체(rename)하는 원자적 쓰기 패턴 (여러 모듈) |
 | 24 | textwrap (stdlib) | 3.11 내장 | PSF License | https://github.com/python/cpython | `fituna doctor` 출력 포맷팅 (`doctor.py`) |
 | 25 | time (stdlib) | 3.11 내장 | PSF License | https://github.com/python/cpython | 탐색 소요 시간 측정 (`search.py`) |
-| 26 | tomllib (stdlib) | 3.11 내장 | PSF License | https://github.com/python/cpython | `__init__.py` 버전-드리프트 self-check가 `pyproject.toml` 파싱 — 3.11+ 전용 모듈로, 본 프로젝트 Python 하한선(`>=3.11`)의 실제 근거 |
-| 27 | unittest.mock (stdlib, self-check 전용) | 3.11 내장 | PSF License | https://github.com/python/cpython | 각 모듈의 assert 기반 self-check(`_self_check()`/`demo()`)가 `subprocess.run` 등을 모킹 |
+| 26 | tomllib (stdlib, self-check 전용) | 3.11 내장 | PSF License | https://github.com/python/cpython | `__init__.py` 버전-드리프트 self-check(`python -m fituna.__init__`에서만 실행)가 `pyproject.toml` 파싱 — 3.11+ 전용 모듈이지만 설치된 패키지의 런타임 경로에는 없어 하한선을 강제하는 근거는 아님 |
+| 27 | unittest.mock (stdlib, self-check 전용) | 3.11 내장 | PSF License | https://github.com/python/cpython | `bench.py`의 assert 기반 self-check(`_self_check()`)가 `subprocess.run`을 모킹 — unittest.mock을 쓰는 유일한 모듈 |
 | 28 | pytest (dev-only) | latest | MIT | https://github.com/pytest-dev/pytest | 테스트(설치 산출물에는 미포함) |
 | 29 | llama.cpp (외부 실행 도구, 서브프로세스) | 사용자 빌드 버전 | MIT | https://github.com/ggml-org/llama.cpp | `llama-quantize`/`llama-bench`/`llama-perplexity`/(선택)`convert_hf_to_gguf.py` 실행 — 실제 양자화·벤치마크·perplexity 연산 수행. `llama-cli`·`llama-imatrix`는 경로 탐색·보고만 하고 실행하지 않음(아래 비고) |
 | 30 | nvidia-smi (선택, OS 드라이버 유틸) | 드라이버 종속 | NVIDIA 독점 (연동만, 재배포 없음) | https://developer.nvidia.com | NVIDIA GPU/VRAM 감지 |
@@ -46,8 +46,9 @@ grep이 아니라 실제 import 문만 집계한 결과입니다.
 
 - 1~27번은 Python 3.11 표준 라이브러리이며 별도 설치가 필요 없습니다. FiTuna의
   런타임 의존성은 **0개**입니다(`pyproject.toml`의 `dependencies = []`). 이
-  중 27번(`unittest.mock`)은 각 모듈의 self-check 전용이며, 설치된 패키지가
-  실제로 벤치마크를 수행하는 런타임 경로에서는 쓰이지 않습니다.
+  중 26번(`tomllib`)과 27번(`unittest.mock`)은 각각 `__init__.py`와 `bench.py`의
+  self-check 전용이며, 설치된 패키지가 실제로 벤치마크를 수행하는 런타임
+  경로에서는 쓰이지 않습니다.
 - 28번(pytest)은 개발/테스트 전용이며 `pip install fituna`로 설치되는 패키지에는
   포함되지 않습니다 (`pyproject.toml`의 `[project.optional-dependencies].dev`).
 - 29~33번은 파이썬 패키지가 아니라 OS PATH 상(또는 `--llama-bin-dir`로 지정한

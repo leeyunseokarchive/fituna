@@ -62,12 +62,12 @@ library. That is what "zero runtime dependencies" actually means.
 | 14 | GPU/RAM detection | `rocm-smi` (ROCm) | MIT | subprocess (optional) | `hardware.py:110` |
 
 Non-open-source components FiTuna also invokes but never redistributes —
-`nvidia-smi`, `system_profiler`, the CUDA toolkit, and the hosted
-GitHub Actions and Google Colab services — are listed in §14 for
-completeness, because an honest stack description includes the parts that
-are not open source. `sysctl` is deliberately not in that list: §14 verifies
-it as BSD-3-Clause open-source, invoked but never redistributed like the
-others.
+`nvidia-smi` and `system_profiler` (§14), the CUDA toolkit (§13), and the
+hosted GitHub Actions (§11) and Google Colab (§13) services — are documented
+elsewhere in this file for completeness, because an honest stack description
+includes the parts that are not open source. `sysctl` is deliberately not
+grouped with them: §14 verifies it as BSD-3-Clause open-source, invoked but
+never redistributed like the others.
 
 ---
 
@@ -376,19 +376,31 @@ write-then-rename, spread across `corpus.py`, `quantize.py`, `binaries.py`,
 `convert_hf_to_gguf.py`; stdin/stdout in `mcp_server.py`), `time`
 (`search.py` elapsed-time tracking), `datetime` (`cache.py` result
 timestamps), `textwrap` (`doctor.py` output formatting), `unittest.mock`
-(every module's `_self_check()`/`demo()` mocks `subprocess.run` rather than
-shelling out for real), and `tomllib` (`fituna/__init__.py:10`'s
-version-drift self-check, parsing `pyproject.toml`) — `tomllib` is the one
-genuinely 3.11-only module in this list and the actual reason
-`requires-python` floors at 3.11 (see the Python-floor note two paragraphs
-down). An AST scan of every top-level import across `fituna/*.py` finds
+(patches `subprocess.run` in exactly one self-check, `bench.py:153`, for its
+three failure-mode assertions; other self-checks that touch `subprocess`
+monkeypatch this module's own names directly instead — `search.py:427-429`'s
+own docstring says it does this "rather than pulling in
+unittest.mock/pytest" — and six of the sixteen self-check modules,
+`__init__`/`errors`/`config`/`corpus`/`doctor`/`mcp_server`, never reference
+`subprocess` at all), and `tomllib` (`fituna/__init__.py:10`'s version-drift
+self-check, parsing `pyproject.toml`) — the one genuinely 3.11-only module in
+this list, though it runs only via the dev/CI-only invocation
+`python -m fituna.__init__`, never during normal `import fituna` or CLI use,
+and even there `_self_check()` returns before completing the comparison
+whenever `pyproject.toml` is absent (`fituna/__init__.py:14-15`), which is
+always true for an installed copy. Nothing on an installed package's runtime
+path imports `tomllib`, so it does not force the 3.11 floor for an
+installer; `requires-python` is simply a declared constraint (see the
+Python-floor note two paragraphs down for how it is verified in CI). An AST
+scan of every top-level import across `fituna/*.py` finds
 exactly 26 such modules (27 if `__future__` is counted, but that is a
 compiler directive processed at parse time, not a runtime import).
 **`csv` is not one of them, despite an earlier version of this document
 claiming it was**: the string `"csv"` appears only as the literal
 `nvidia-smi --format=csv,noheader,nounits` argument (`hardware.py:78`) and
 in the function name `_parse_nvidia_csv`; no module under `fituna/` imports
-the `csv` package, and both `bench.py` and `quality.py` parse JSON, not CSV.
+the `csv` package. `bench.py` parses JSON (llama-bench's `-o json`); `quality.py`
+parses plain text via a regex, `_PPL_RE` (`quality.py:22`) — neither parses CSV.
 The complete, AST-verified list is `docs/SBOM.md` rows 2–27 (row 1 being the
 interpreter itself).
 
@@ -631,7 +643,7 @@ FiTuna는 **런타임 의존성이 0개**이지만, 이는 "타 오픈소스SW�
 
 | 부문 | 활용 오픈소스SW | 라이선스(확인함) | 결합 방식 | 저장소 내 사용 위치 |
 |---|---|---|---|---|
-| 추론·양자화 엔진 | llama.cpp (`llama-quantize`/`llama-bench`/`llama-perplexity`/`convert_hf_to_gguf.py`) | MIT | **서브프로세스** (링크·포함 없음) | `quantize.py`, `bench.py`, `quality.py`, `model_info.py`, `binaries.py` |
+| 추론·양자화 엔진 | llama.cpp (`llama-quantize`/`llama-bench`/`llama-perplexity`/`convert_hf_to_gguf.py`) | MIT | **서브프로세스** (링크·포함 없음) | `quantize.py`, `bench.py`, `quality.py`, `model_info.py`, `binaries.py`, `report.py` |
 | 모델 파일 포맷 | GGUF (ggml 사양) | MIT | **파일 포맷 준수** (`struct`로 직접 파싱) | `model_info.py:200` |
 | 모델 가중치 | SmolLM2-135M-Instruct, Qwen3-4B-Instruct-2507 | 둘 다 Apache-2.0 | **사용자 제공 파일** (재배포 없음) | `docs/RESULTS.md`, `notebooks/` |
 | 평가 데이터셋 | `Salesforce/wikitext`(영), `wikimedia/wikipedia` `20231101.ko`(한) | CC BY-SA 3.0 / GFDL | **내려받아 파일로 사용** (저장소 미포함) | `corpus.py` `PRESETS` |
