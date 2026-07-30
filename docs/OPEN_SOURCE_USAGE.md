@@ -432,7 +432,7 @@ that `psutil` is the upgrade path if per-NUMA precision is ever needed);
 
 ## 10. Build backend — setuptools
 
-`pyproject.toml` `[build-system]` declares `requires = ["setuptools>=68"]`
+`pyproject.toml` `[build-system]` declares `requires = ["setuptools>=77"]`
 and `build-backend = "setuptools.build_meta"`. License: MIT, per
 `https://api.github.com/repos/pypa/setuptools/license` → SPDX `MIT`
 (2026-07-30). **Coupling: build time only** — pip provisions it in an

@@ -27,7 +27,11 @@ separate from CI.
   for the first quant that meets the throughput target.
 - **CLI** with `run`, `detect-hw`, `list-binaries` subcommands, human and
   `--json` output, and a distinct exit code per failure class (0 success,
-  1 general error, 2 missing binary, 3 no feasible config).
+  1 general error, 2 missing binary, 3 no feasible config). Exit code 2 is
+  shared with argparse's own usage-error exit code — a required flag missing
+  or an unrecognized flag also exits 2, distinguishable from a missing binary
+  by whether stderr's first line starts with `usage:` (see
+  `docs/ARCHITECTURE.md`'s exit-code table).
 - **Hardware auto-detection** — NVIDIA (`nvidia-smi`), AMD (`rocm-smi`),
   Apple Silicon unified memory (`system_profiler`), plus `--gpu`/`--vram-mb`
   manual override.
@@ -116,6 +120,12 @@ separate from CI.
   model fingerprint is now part of the output filename.
 - **A crashed `llama-quantize` could leave a truncated file that looked
   cached.** Quantization writes to a temp path and renames atomically.
+- **A present-but-unexecutable `llama-quantize`/`llama-perplexity` binary
+  (e.g. wrong permissions) crashed with a raw `PermissionError` traceback**
+  instead of the same `FiTunaError` reporting a missing binary gets.
+  `quantize.py`/`quality.py` now catch `OSError` generally, not just
+  `FileNotFoundError`, and distinguish "it's there but broken" from "go
+  install it" in the message.
 - **A corrupt or non-sqlite file at the cache path** raised a raw
   `sqlite3.DatabaseError` traceback; it now becomes a `FiTunaError` with
   concrete recovery guidance. A malformed `--ctx` value was fixed the same

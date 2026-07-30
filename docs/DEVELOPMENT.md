@@ -67,9 +67,13 @@ monkeypatched at its boundary:
   `doctor` against fake `binaries.find_exe`, `get_llama_cpp_version`,
   `detect_hardware`, `shutil.disk_usage`, `os.access`)
 
-Real tool output is preserved as fixtures (`tests/fixtures/llama_bench_sample.json`)
-so the parsers are tested against text llama.cpp actually printed rather than
-text we imagined.
+Real tool output is preserved as a fixture
+(`tests/fixtures/llama_bench_sample.json`), but its only consumer is
+`fituna/bench.py`'s own `_self_check()` (`bench.py:157`) — that's Section 2's
+per-module self-check mechanism, not this pytest suite. No `tests/` file
+loads it. The substance still holds — the parser this fixture drives is
+tested against text llama.cpp actually printed rather than text we
+imagined — it just happens outside `pytest -q`.
 
 This is a deliberate trade, and it has a known cost: **the suite cannot catch a
 bug in how FiTuna talks to llama.cpp**, because in the suite llama.cpp is a
@@ -79,9 +83,18 @@ a CPU-only bench never finishing — passed the full suite. Section 6 is the
 answer to that, and it is why it is a separate step rather than more tests.
 
 What the suite *does* cover well is everything above the subprocess boundary:
-search order and early exits, cache keying and schema migration, output
-parsing, hardware-detection fallbacks, error mapping and exit codes, and
-cross-platform path handling.
+search order and early exits, cache keying and schema migration,
+hardware-probe output parsing (`test_hardware.py`, against recorded
+`nvidia-smi`/`rocm-smi`/`system_profiler` text), hardware-detection
+fallbacks, error mapping and exit codes, and cross-platform path handling.
+It does *not* cover parsing `llama-bench`, `llama-perplexity` or
+`llama-quantize` output: `tests/` has six files
+(`test_cache`, `test_config`, `test_corpus`, `test_doctor`, `test_hardware`,
+`test_search`) and none of them exercise `bench.py`, `quality.py`,
+`quantize.py`, `model_info.py`, `report.py` or `binaries.py` directly. Those
+six modules' parsing logic is covered only by their own per-module
+self-checks (Section 2) — `bench.py`'s is the one that reads the fixture
+named above.
 
 ## 4. CI matrix: 3 OS × 2 Python
 
