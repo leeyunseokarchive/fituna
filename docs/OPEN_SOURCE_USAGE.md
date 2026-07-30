@@ -47,19 +47,19 @@ library. That is what "zero runtime dependencies" actually means.
 | # | Area | Open-source software | License (verified) | Coupling | Where in this repo |
 |---|---|---|---|---|---|
 | 1 | Inference / quantization engine | llama.cpp (`llama-quantize`, `llama-bench`, `llama-perplexity`, `convert_hf_to_gguf.py`) | MIT | subprocess (`llama-cli`: emitted in the result command, never run) | `quantize.py`, `bench.py`, `quality.py`, `model_info.py`, `binaries.py`, `report.py` |
-| 2 | Model file format | GGUF (ggml) | MIT (spec repo) | file format | `model_info.py:200` `read_model_info()` |
+| 2 | Model file format | GGUF (ggml) | MIT (spec repo) | file format | `model_info.py:201` `read_model_info()` |
 | 3 | Model weights | SmolLM2-135M-Instruct | Apache-2.0 | file format (user-supplied) | `docs/RESULTS.md` Run 1/4, `notebooks/` |
 | 4 | Model weights | Qwen3-4B-Instruct-2507 | Apache-2.0 | file format (user-supplied) | `docs/RESULTS.md` Run 2/3 |
 | 5 | Evaluation corpus (EN) | `Salesforce/wikitext`, `wikitext-2-raw-v1` | CC BY-SA 3.0 / GFDL | file format (fetched) | `corpus.py` `PRESETS["en"]` |
 | 6 | Evaluation corpus (KO) | `wikimedia/wikipedia`, `20231101.ko` | CC BY-SA 3.0 / GFDL | file format (fetched) | `corpus.py` `PRESETS["ko"]` |
-| 7 | Data-access API | HuggingFace dataset-viewer | Apache-2.0 (server impl.) | network protocol (HTTP GET) | `corpus.py:51` `API_BASE` |
+| 7 | Data-access API | HuggingFace dataset-viewer | Apache-2.0 (server impl.) | network protocol (HTTP GET) | `corpus.py:52` `API_BASE` |
 | 8 | Agent protocol | Model Context Protocol, rev. `2024-11-05`, over JSON-RPC 2.0 | Apache-2.0 / MIT (in transition) | IPC protocol (stdio) | `mcp_server.py` |
 | 9 | Language runtime | CPython 3.11+ standard library | PSF License Agreement v2 | **imported** | whole package; `pyproject.toml` |
 | 10 | Build backend | setuptools ≥ 68 | MIT | build time only | `pyproject.toml` `[build-system]` |
 | 11 | CI | `actions/checkout@v4`, `actions/setup-python@v5` | MIT | dev / CI only | `.github/workflows/ci.yml` |
 | 12 | Test framework | pytest | MIT | dev only (`[dev]` extra) | `tests/`, `pyproject.toml` |
 | 13 | Verification environment | Jupyter notebook format, git, CMake, pip, `huggingface_hub` | BSD-3-Clause, GPL-2.0, BSD-3-Clause, MIT, Apache-2.0 | dev / notebook only | `notebooks/colab_nvidia_verification.ipynb` |
-| 14 | GPU/RAM detection | `rocm-smi` (ROCm) | MIT | subprocess (optional) | `hardware.py:110` |
+| 14 | GPU/RAM detection | `rocm-smi` (ROCm) | MIT | subprocess (optional) | `hardware.py:111` |
 
 Non-open-source components FiTuna also invokes but never redistributes —
 `nvidia-smi` and `system_profiler` (§14), the CUDA toolkit (§13), and the
@@ -82,17 +82,17 @@ run through `sys.executable`):
 
 | Binary | Called from | Purpose |
 |---|---|---|
-| `llama-quantize` | `fituna/quantize.py:70` (`quantize()`) | Produce a quantized GGUF from the F16/F32 base |
-| `llama-bench` | `fituna/bench.py:113` (`run_bench()`) | Measure prompt/generation throughput, `-o json` |
-| `llama-perplexity` | `fituna/quality.py:55` (`compute_perplexity()`) | Measure perplexity for the quality-loss gate |
-| `convert_hf_to_gguf.py` | `fituna/model_info.py:165` (`ensure_base_gguf()`) | Convert an HF-format directory to a base F16 GGUF |
+| `llama-quantize` | `fituna/quantize.py:71` (`quantize()`) | Produce a quantized GGUF from the F16/F32 base |
+| `llama-bench` | `fituna/bench.py:114` (`run_bench()`) | Measure prompt/generation throughput, `-o json` |
+| `llama-perplexity` | `fituna/quality.py:56` (`compute_perplexity()`) | Measure perplexity for the quality-loss gate |
+| `convert_hf_to_gguf.py` | `fituna/model_info.py:166` (`ensure_base_gguf()`) | Convert an HF-format directory to a base F16 GGUF |
 
 Two more are *located but never executed*: `llama-cli` is resolved by
-`fituna/report.py:24` (`_find_llama_cli()`) purely so the printed
+`fituna/report.py:25` (`_find_llama_cli()`) purely so the printed
 `run command:` line names a real path, and is checked by `fituna doctor`
-(`doctor.py:299`) as an optional check; `llama-imatrix` is resolved by
-`fituna/binaries.py:98` and printed by `fituna list-binaries`
-(`cli.py:219`), and no code path invokes it today. Stating this precisely
+(`doctor.py:300`) as an optional check; `llama-imatrix` is resolved by
+`fituna/binaries.py:99` and printed by `fituna list-binaries`
+(`cli.py:220`), and no code path invokes it today. Stating this precisely
 matters — claiming FiTuna "uses llama-imatrix" would overstate the
 relationship.
 
@@ -125,15 +125,15 @@ inference runtime (Metal, CUDA, ROCm, CPU from one codebase), so tuning
 Deliberate design consequences of the subprocess boundary:
 
 - FiTuna **never hardcodes a quant list**. `list_supported_quant_types()`
-  (`binaries.py:123`) parses `llama-quantize --help` at run time, so a build
+  (`binaries.py:124`) parses `llama-quantize --help` at run time, so a build
   with a different set of quant types is handled instead of being assumed
   away.
 - FiTuna **tolerates upstream drift**. `get_llama_cpp_version()`
-  (`binaries.py:138`) tries three different banner formats because the
-  wording changed across llama.cpp releases; `bench.py:42` distinguishes
+  (`binaries.py:139`) tries three different banner formats because the
+  wording changed across llama.cpp releases; `bench.py:43` distinguishes
   llama-bench's prompt/generation records by `n_prompt`/`n_gen` rather than
   by the `"pp512"`-style label, because that label format has changed.
-  `report.py:21` accepts `main` as well as `llama-cli`, upstream's older
+  `report.py:22` accepts `main` as well as `llama-cli`, upstream's older
   binary name.
 
 **Alternative considered.** Binding to `libllama` (ctypes or a compiled
@@ -149,14 +149,14 @@ want to report.
 **What it is.** The single-file model container format used by llama.cpp,
 specified in the ggml repository.
 
-**Where it is used.** `fituna/model_info.py:200` `read_model_info()` opens
+**Where it is used.** `fituna/model_info.py:201` `read_model_info()` opens
 the file and parses the GGUF header directly with the stdlib `struct`
 module: magic, version, tensor/KV counts, the metadata KV table
 (`general.architecture`, `<arch>.block_count`, `general.file_type`) and the
 tensor-info section, summing tensor element counts to get the true
 parameter count. `n_layers` from that parse is the upper bound of the
 `-ngl` binary search, and `general.file_type` drives
-`is_already_quantized()` (`model_info.py:268`), which warns when the user
+`is_already_quantized()` (`model_info.py:269`), which warns when the user
 hands FiTuna an already-quantized file as a "baseline."
 
 **License and how it was determined.** The specification document lives at
@@ -235,14 +235,14 @@ produce the quality number the search gates on.
   500 rows by default
 
 `fituna fetch-corpus` writes the text to the user's `--out` path; from then
-on `fituna/quality.py:55` passes that path to `llama-perplexity -f`.
+on `fituna/quality.py:56` passes that path to `llama-perplexity -f`.
 
 **License and how it was determined.** Both are **CC BY-SA 3.0, also
 dual-licensed GFDL** — attribution and share-alike apply. Determined by
 querying each dataset's own metadata on 2026-07-30:
 `https://huggingface.co/api/datasets/Salesforce/wikitext` and
 `https://huggingface.co/api/datasets/wikimedia/wikipedia` both return
-`cardData.license: ["cc-by-sa-3.0", "gfdl"]`. `corpus.py:55` records the
+`cardData.license: ["cc-by-sa-3.0", "gfdl"]`. `corpus.py:56` records the
 same provenance in a comment, and each preset's `license_note` carries the
 attribution text.
 
@@ -250,7 +250,7 @@ attribution text.
 to this repository; `.gitignore` keeps `*.txt` outputs out. Because the
 corpus is downloaded to a path of the user's choosing and never
 redistributed by FiTuna, CC BY-SA's share-alike condition is not triggered
-by FiTuna itself — but the user can trigger it, so `cli.py:255`
+by FiTuna itself — but the user can trigger it, so `cli.py:256`
 (`_cmd_fetch_corpus`) **prints the license notice and source URL to stdout
 on every successful fetch**. When `--dataset/--config/--split` override a
 preset, that same code path deliberately prints a *generic* "check this
@@ -276,7 +276,7 @@ stdlib `urllib` against the public REST API.
 **What it is.** HuggingFace's public REST service that serves dataset rows
 as JSON without authentication.
 
-**Where it is used.** `fituna/corpus.py:51`
+**Where it is used.** `fituna/corpus.py:52`
 `API_BASE = "https://datasets-server.huggingface.co/rows"`, called from
 `_fetch_page()` via `urllib.request.urlopen`. `fetch_corpus()` paginates
 with `offset`/`length` (the server caps `length` at 100), validates that
@@ -376,18 +376,18 @@ write-then-rename, spread across `corpus.py`, `quantize.py`, `binaries.py`,
 `convert_hf_to_gguf.py`; stdin/stdout in `mcp_server.py`), `time`
 (`search.py` elapsed-time tracking), `datetime` (`cache.py` result
 timestamps), `textwrap` (`doctor.py` output formatting), `unittest.mock`
-(patches `subprocess.run` in exactly one self-check, `bench.py:153`, for its
+(patches `subprocess.run` in exactly one self-check, `bench.py:154`, for its
 three failure-mode assertions; other self-checks that touch `subprocess`
-monkeypatch this module's own names directly instead — `search.py:427-429`'s
+monkeypatch this module's own names directly instead — `search.py:428-430`'s
 own docstring says it does this "rather than pulling in
 unittest.mock/pytest" — and six of the sixteen self-check modules,
 `__init__`/`errors`/`config`/`corpus`/`doctor`/`mcp_server`, never reference
-`subprocess` at all), and `tomllib` (`fituna/__init__.py:10`'s version-drift
+`subprocess` at all), and `tomllib` (`fituna/__init__.py:11`'s version-drift
 self-check, parsing `pyproject.toml`) — the one genuinely 3.11-only module in
 this list, though it runs only via the dev/CI-only invocation
 `python -m fituna.__init__`, never during normal `import fituna` or CLI use,
 and even there `_self_check()` returns before completing the comparison
-whenever `pyproject.toml` is absent (`fituna/__init__.py:14-15`), which is
+whenever `pyproject.toml` is absent (`fituna/__init__.py:15-16`), which is
 always true for an installed copy. Nothing on an installed package's runtime
 path imports `tomllib`, so it does not force the 3.11 floor for an
 installer; `requires-python` is simply a declared constraint (see the
@@ -397,10 +397,10 @@ exactly 26 such modules (27 if `__future__` is counted, but that is a
 compiler directive processed at parse time, not a runtime import).
 **`csv` is not one of them, despite an earlier version of this document
 claiming it was**: the string `"csv"` appears only as the literal
-`nvidia-smi --format=csv,noheader,nounits` argument (`hardware.py:78`) and
+`nvidia-smi --format=csv,noheader,nounits` argument (`hardware.py:79`) and
 in the function name `_parse_nvidia_csv`; no module under `fituna/` imports
 the `csv` package. `bench.py` parses JSON (llama-bench's `-o json`); `quality.py`
-parses plain text via a regex, `_PPL_RE` (`quality.py:22`) — neither parses CSV.
+parses plain text via a regex, `_PPL_RE` (`quality.py:23`) — neither parses CSV.
 The complete, AST-verified list is `docs/SBOM.md` rows 2–27 (row 1 being the
 interpreter itself).
 
@@ -426,7 +426,7 @@ JSON — is already in the stdlib.
 
 **Alternatives considered.** `psutil` for hardware detection, rejected in
 favour of a ~20-line `ctypes` call to `GlobalMemoryStatusEx` on Windows and
-`/proc/meminfo`/`sysctl` elsewhere (`hardware.py:175`, with an in-code note
+`/proc/meminfo`/`sysctl` elsewhere (`hardware.py:176`, with an in-code note
 that `psutil` is the upgrade path if per-NUMA precision is ever needed);
 `requests` for the corpus fetch, rejected in favour of `urllib.request`.
 
@@ -538,12 +538,12 @@ so rather than blurring it:
 
 | Tool | Called from | Origin | License | Coupling |
 |---|---|---|---|---|
-| `rocm-smi` | `hardware.py:110` | ROCm (`ROCm/rocm_smi_lib`, `python_smi_tools/rocm_smi.py`) | **MIT** | subprocess, optional |
-| `nvidia-smi` | `hardware.py:77` | NVIDIA driver package | NVIDIA proprietary | subprocess, optional |
-| `system_profiler` | `hardware.py:154` | macOS | Apple proprietary | subprocess, optional |
-| `sysctl` | `hardware.py:186` | macOS/BSD base system (`apple-oss-distributions/system_cmds`) | **BSD-3-Clause** — see below | subprocess, optional |
-| `/proc/meminfo` | `hardware.py:179` | Linux kernel interface | n/a (kernel-provided virtual file) | file read |
-| `GlobalMemoryStatusEx` | `hardware.py:213` | Windows kernel32, via `ctypes` | Microsoft proprietary | OS API call |
+| `rocm-smi` | `hardware.py:111` | ROCm (`ROCm/rocm_smi_lib`, `python_smi_tools/rocm_smi.py`) | **MIT** | subprocess, optional |
+| `nvidia-smi` | `hardware.py:78` | NVIDIA driver package | NVIDIA proprietary | subprocess, optional |
+| `system_profiler` | `hardware.py:155` | macOS | Apple proprietary | subprocess, optional |
+| `sysctl` | `hardware.py:187` | macOS/BSD base system (`apple-oss-distributions/system_cmds`) | **BSD-3-Clause** — see below | subprocess, optional |
+| `/proc/meminfo` | `hardware.py:180` | Linux kernel interface | n/a (kernel-provided virtual file) | file read |
+| `GlobalMemoryStatusEx` | `hardware.py:214` | Windows kernel32, via `ctypes` | Microsoft proprietary | OS API call |
 
 **`rocm-smi` license determination.** `https://raw.githubusercontent.com/ROCm/rocm_smi_lib/amd-staging_deprecated/License.txt`
 — the repository's current default branch — reads `MIT License` /
@@ -580,7 +580,7 @@ the obligation set is small and fully discharged in-repo:
 | Obligation | Source | Discharged by |
 |---|---|---|
 | Preserve the MIT notice | llama.cpp, ggml | `THIRD_PARTY_NOTICES.md` §1 reproduces the full MIT text |
-| Attribution + share-alike | CC BY-SA 3.0 corpora | `fituna fetch-corpus` prints the notice and source URL on every fetch (`cli.py:255`); no corpus text is committed |
+| Attribution + share-alike | CC BY-SA 3.0 corpora | `fituna fetch-corpus` prints the notice and source URL on every fetch (`cli.py:256`); no corpus text is committed |
 | Model license compliance | User's chosen weights | Weights are never redistributed; `docs/AI_MODEL_USAGE.md` carries the disclosure template, and every model in the published results is Apache-2.0 |
 | FiTuna's own terms | MIT (`LICENSE`) | Permissive; imposes nothing on users |
 
@@ -624,6 +624,10 @@ data and a reproducible notebook, and nothing merged upstream yet.**
 
 ## Related documents
 
+- `docs/LICENSE_COMPLIANCE.md` — the compliance argument built on this
+  document: what the built sdist/wheel actually contain, why no license
+  pair conflicts, and the license scans that were executed, with their real
+  output and reproduction commands
 - `docs/SBOM.md` — the numbered SBOM (stdlib modules + external executables)
 - `THIRD_PARTY_NOTICES.md` — required license notices, incl. llama.cpp's
   full MIT text
@@ -644,17 +648,17 @@ FiTuna는 **런타임 의존성이 0개**이지만, 이는 "타 오픈소스SW�
 | 부문 | 활용 오픈소스SW | 라이선스(확인함) | 결합 방식 | 저장소 내 사용 위치 |
 |---|---|---|---|---|
 | 추론·양자화 엔진 | llama.cpp (`llama-quantize`/`llama-bench`/`llama-perplexity`/`convert_hf_to_gguf.py`) | MIT | **서브프로세스** (링크·포함 없음) | `quantize.py`, `bench.py`, `quality.py`, `model_info.py`, `binaries.py`, `report.py` |
-| 모델 파일 포맷 | GGUF (ggml 사양) | MIT | **파일 포맷 준수** (`struct`로 직접 파싱) | `model_info.py:200` |
+| 모델 파일 포맷 | GGUF (ggml 사양) | MIT | **파일 포맷 준수** (`struct`로 직접 파싱) | `model_info.py:201` |
 | 모델 가중치 | SmolLM2-135M-Instruct, Qwen3-4B-Instruct-2507 | 둘 다 Apache-2.0 | **사용자 제공 파일** (재배포 없음) | `docs/RESULTS.md`, `notebooks/` |
 | 평가 데이터셋 | `Salesforce/wikitext`(영), `wikimedia/wikipedia` `20231101.ko`(한) | CC BY-SA 3.0 / GFDL | **내려받아 파일로 사용** (저장소 미포함) | `corpus.py` `PRESETS` |
-| 데이터 조회 API | HuggingFace dataset-viewer | 서버 구현체 Apache-2.0 (FiTuna는 HTTP 호출만) | **네트워크 프로토콜** | `corpus.py:51` |
+| 데이터 조회 API | HuggingFace dataset-viewer | 서버 구현체 Apache-2.0 (FiTuna는 HTTP 호출만) | **네트워크 프로토콜** | `corpus.py:52` |
 | 에이전트 연동 프로토콜 | Model Context Protocol(`2024-11-05`) / JSON-RPC 2.0 | Apache-2.0·MIT 전환 중 | **프로토콜 자체 구현** (SDK 미사용) | `mcp_server.py` |
 | 언어·런타임 | CPython 3.11+ 표준 라이브러리 | PSF License Agreement v2 | **임포트** (유일한 링크 항목) | 패키지 전체, `pyproject.toml` |
 | 빌드 백엔드 | setuptools ≥ 68 | MIT | 빌드 시점 한정 | `pyproject.toml` |
 | CI | `actions/checkout@v4`, `actions/setup-python@v5` | 둘 다 MIT | 개발·CI 한정 | `.github/workflows/ci.yml` |
 | 테스트 | pytest | MIT | 개발 한정(`[dev]` 옵션) | `tests/`, `pyproject.toml` |
 | 검증 환경 | Jupyter 노트북 포맷, git, CMake, pip, `huggingface_hub` | BSD-3-Clause, GPL-2.0, BSD-3-Clause, MIT, Apache-2.0 | 노트북 한정 | `notebooks/colab_nvidia_verification.ipynb` |
-| GPU 감지 | `rocm-smi` (ROCm) | MIT (현행 기본 브랜치 `License.txt`) | 서브프로세스(선택) | `hardware.py:110` |
+| GPU 감지 | `rocm-smi` (ROCm) | MIT (현행 기본 브랜치 `License.txt`) | 서브프로세스(선택) | `hardware.py:111` |
 
 **라이선스 확인 방법.** 위 라이선스는 모두 2026-07-30에 1차 출처에서 직접
 확인했다 — 각 프로젝트의 `LICENSE`/`License.txt` 원문, 또는 모델·데이터셋의

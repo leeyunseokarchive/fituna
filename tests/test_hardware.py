@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Hardware detection tests.
 
 Exercises fituna.hardware by monkeypatching subprocess.run so no real

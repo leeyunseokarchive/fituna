@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Dataclass immutability / defaults sanity checks for fituna.config."""
 
 import dataclasses

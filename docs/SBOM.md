@@ -76,3 +76,8 @@ grep이 아니라 실제 import 문만 집계한 결과입니다.
 - `fituna fetch-corpus`(16번, urllib)가 내려받는 코퍼스 자체(WikiText-2,
   Korean Wikipedia)는 사용자 산출물이며 FiTuna 저장소에는 포함되지 않습니다 —
   라이선스 고지는 `THIRD_PARTY_NOTICES.md` §3 참고.
+- 위 표의 1~27번(표준 라이브러리)은 `docs/LICENSE_COMPLIANCE.md` §3.4의 AST
+  임포트 스캔 결과와 이름 단위로 일치하며(`THIRD-PARTY : NONE`), 배포물
+  (sdist·wheel)에 제3자 코드가 없다는 점은 같은 문서 §1에서 실제 빌드 산출물
+  파일 목록과 해시 대조로 증명했습니다. 결합 방식별 라이선스 충돌 분석은
+  `docs/OPEN_SOURCE_USAGE.md`와 `docs/LICENSE_COMPLIANCE.md` §2를 참고하십시오.
