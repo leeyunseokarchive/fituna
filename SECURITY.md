@@ -46,8 +46,9 @@ up to two parents above it are inputs you control.
 
 FiTuna never executes `llama-cli`: `fituna doctor`/`report.py` only locate it
 on `PATH`/`--llama-bin-dir` to report whether it's available, and
-`fituna run`'s `--json`/human output (`search.py:474`) emits a `llama-cli ...`
-command string for *you* to run afterwards — it is not run by FiTuna itself.
+`fituna run`'s `--json`/human output emits a `llama-cli ...` command string
+(`report.py`'s `build_run_command`) for *you* to run afterwards — it is not
+run by FiTuna itself.
 
 Bugs *inside* this boundary — FiTuna mishandling an untrusted path, model
 file, script, or downloaded corpus in a way that grants more than the above —

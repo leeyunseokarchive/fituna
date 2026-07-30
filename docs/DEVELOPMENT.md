@@ -91,8 +91,10 @@ It does *not* cover parsing `llama-bench`, `llama-perplexity` or
 `llama-quantize` output: `tests/` has six files
 (`test_cache`, `test_config`, `test_corpus`, `test_doctor`, `test_hardware`,
 `test_search`) and none of them exercise `bench.py`, `quality.py`,
-`quantize.py`, `model_info.py`, `report.py` or `binaries.py` directly. Those
-six modules' parsing logic is covered only by their own per-module
+`quantize.py`, `report.py` or `binaries.py` directly. `model_info.py` is the
+one exception among the subprocess wrappers: `test_config.py` covers its
+`is_already_quantized` guard, though not its GGUF header parsing. Those
+modules' parsing logic is otherwise covered only by their own per-module
 self-checks (Section 2) — `bench.py`'s is the one that reads the fixture
 named above.
 
