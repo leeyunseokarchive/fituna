@@ -36,3 +36,6 @@ htmlcov/
 
 # OS
 .DS_Store
+
+# Agent scratch workspace (task briefs, reports, backups)
+.superpowers/
