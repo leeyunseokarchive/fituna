@@ -91,7 +91,7 @@ absent:
 | `nvidia-smi` | Ships with the NVIDIA driver package | NVIDIA proprietary (not redistributed by FiTuna — invocation only) | Query NVIDIA GPU name / VRAM |
 | `rocm-smi` | ROCm (https://github.com/ROCm/rocm_smi_lib) | MIT | Query AMD GPU name / VRAM |
 | `system_profiler` | Ships with macOS | Apple proprietary (not redistributed by FiTuna — invocation only) | Query Apple Silicon unified memory |
-| `sysctl` | Ships with macOS / BSD base system | Apple-supplied; upstream license not verified (not redistributed by FiTuna — invocation only) | Query total RAM (`hw.memsize`) on macOS |
+| `sysctl` | Ships with macOS / BSD base system | BSD-3-Clause (`apple-oss-distributions/system_cmds/sysctl/sysctl.c`; not redistributed by FiTuna — invocation only) | Query total RAM (`hw.memsize`) on macOS |
 
 ---
 
@@ -154,7 +154,7 @@ template.
 | 2 | `nvidia-smi` | NVIDIA proprietary | No | `subprocess` (optional) |
 | 2 | `rocm-smi` | MIT | No | `subprocess` (optional) |
 | 2 | `system_profiler` | Apple proprietary | No | `subprocess` (optional) |
-| 2 | `sysctl` | Apple-supplied, upstream license unverified | No | `subprocess` (optional) |
+| 2 | `sysctl` | BSD-3-Clause | No | `subprocess` (optional) |
 | 3 | WikiText-2 corpus | CC-BY-SA | No | read as file input |
 | 4 | User-selected LLM weights | Varies by model | No | read as file input |
 | 5 | pytest (dev-only) | MIT | No (optional-deps, dev only) | not invoked at runtime |

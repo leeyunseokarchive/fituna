@@ -58,14 +58,16 @@ library. That is what "zero runtime dependencies" actually means.
 | 10 | Build backend | setuptools ≥ 68 | MIT | build time only | `pyproject.toml` `[build-system]` |
 | 11 | CI | `actions/checkout@v4`, `actions/setup-python@v5` | MIT | dev / CI only | `.github/workflows/ci.yml` |
 | 12 | Test framework | pytest | MIT | dev only (`[dev]` extra) | `tests/`, `pyproject.toml` |
-| 13 | Verification environment | Jupyter notebook format, CMake, `huggingface_hub` | BSD-3-Clause, BSD-3-Clause, Apache-2.0 | dev / notebook only | `notebooks/colab_nvidia_verification.ipynb` |
+| 13 | Verification environment | Jupyter notebook format, git, CMake, pip, `huggingface_hub` | BSD-3-Clause, GPL-2.0, BSD-3-Clause, MIT, Apache-2.0 | dev / notebook only | `notebooks/colab_nvidia_verification.ipynb` |
 | 14 | GPU/RAM detection | `rocm-smi` (ROCm) | MIT | subprocess (optional) | `hardware.py:110` |
 
 Non-open-source components FiTuna also invokes but never redistributes —
-`nvidia-smi`, `system_profiler`, `sysctl`, the CUDA toolkit, and the hosted
+`nvidia-smi`, `system_profiler`, the CUDA toolkit, and the hosted
 GitHub Actions and Google Colab services — are listed in §14 for
 completeness, because an honest stack description includes the parts that
-are not open source.
+are not open source. `sysctl` is deliberately not in that list: §14 verifies
+it as BSD-3-Clause open-source, invoked but never redistributed like the
+others.
 
 ---
 
@@ -173,11 +175,13 @@ spec. Reading a documented file format creates no derivative work.
 pipeline.
 
 **Alternative considered.** Asking a llama.cpp binary to dump metadata, or
-depending on the `gguf` PyPI package. Rejected for the reason recorded in
-`model_info.py`'s own module docstring: no llama.cpp binary exposes a
-"dump metadata as JSON" contract stable across versions, and a PyPI package
-would break the zero-dependency guarantee for ~100 lines of `struct`
-parsing. The parser treats the file as untrusted input — length and count
+depending on the `gguf` PyPI package. The first is rejected for the reason
+recorded in `model_info.py`'s own module docstring: no llama.cpp binary
+exposes a "dump metadata as JSON" contract stable across versions. The
+second is this document's own judgment call rather than a claim sourced
+from that docstring: a PyPI dependency for what is ~100 lines of `struct`
+parsing would cost the zero-dependency guarantee for a parser this small.
+The parser treats the file as untrusted input — length and count
 fields are bounded against the real file size before allocation
 (`_read_exact()`, `_read_value()`), because a GGUF is whatever the user
 downloaded.
@@ -326,9 +330,14 @@ documentation (excluding specifications) is CC-BY-4.0, and contributions
 whose authors have not consented to relicensing remain MIT. It is therefore
 accurate to describe MCP as Apache-2.0/MIT in transition, and inaccurate to
 call it flatly "MIT". The `2024-11-05` revision FiTuna implements exists
-upstream: both
-`https://modelcontextprotocol.io/specification/2024-11-05` and
-`.../schema/2024-11-05/schema.json` returned HTTP 200 on 2026-07-30.
+upstream: `https://modelcontextprotocol.io/specification/2024-11-05`
+returned HTTP 200 on 2026-07-30. Its JSON Schema is *not* at a
+`modelcontextprotocol.io` URL of that shape, though — both
+`.../specification/2024-11-05/schema.json` and
+`.../schema/2024-11-05/schema.json` 404 under that host (checked
+2026-07-30). The schema does resolve, at
+`https://raw.githubusercontent.com/modelcontextprotocol/modelcontextprotocol/main/schema/2024-11-05/schema.json`
+(HTTP 200, same date) — that is the URL to cite, not the two above.
 JSON-RPC 2.0 itself is a published open specification at
 `https://www.jsonrpc.org/specification`, "Copyright (C) 2007-2010 by the
 JSON-RPC Working Group"; it is a specification document rather than
@@ -361,8 +370,27 @@ header parsing), `sqlite3` (`cache.py`, the `--resume` result cache),
 (stdout parsing), `argparse` (`cli.py`), `hashlib` (model fingerprints),
 `shutil.which` (binary discovery), `dataclasses`/`enum`/`typing`
 (`config.py`'s frozen-dataclass interface contract), `ctypes` (Windows RAM
-query), `platform`/`os`/`pathlib`/`csv`/`logging`. The complete list is
-`docs/SBOM.md` rows 2–17 (row 1 being the interpreter itself).
+query), `platform`/`os`/`pathlib`/`logging`, `tempfile`/`stat`/`io` (atomic
+write-then-rename, spread across `corpus.py`, `quantize.py`, `binaries.py`,
+`cache.py`, `model_info.py`, `report.py`), `sys` (`sys.executable` to invoke
+`convert_hf_to_gguf.py`; stdin/stdout in `mcp_server.py`), `time`
+(`search.py` elapsed-time tracking), `datetime` (`cache.py` result
+timestamps), `textwrap` (`doctor.py` output formatting), `unittest.mock`
+(every module's `_self_check()`/`demo()` mocks `subprocess.run` rather than
+shelling out for real), and `tomllib` (`fituna/__init__.py:10`'s
+version-drift self-check, parsing `pyproject.toml`) — `tomllib` is the one
+genuinely 3.11-only module in this list and the actual reason
+`requires-python` floors at 3.11 (see the Python-floor note two paragraphs
+down). An AST scan of every top-level import across `fituna/*.py` finds
+exactly 26 such modules (27 if `__future__` is counted, but that is a
+compiler directive processed at parse time, not a runtime import).
+**`csv` is not one of them, despite an earlier version of this document
+claiming it was**: the string `"csv"` appears only as the literal
+`nvidia-smi --format=csv,noheader,nounits` argument (`hardware.py:78`) and
+in the function name `_parse_nvidia_csv`; no module under `fituna/` imports
+the `csv` package, and both `bench.py` and `quality.py` parse JSON, not CSV.
+The complete, AST-verified list is `docs/SBOM.md` rows 2–27 (row 1 being the
+interpreter itself).
 
 **License and how it was determined.** PSF License Agreement Version 2
 (SPDX `PSF-2.0`). Fetched
@@ -372,8 +400,10 @@ query), `platform`/`os`/`pathlib`/`csv`/`logging`. The complete list is
 imposes no copyleft on FiTuna.
 
 **Coupling.** Imported — the only such entry. The declared floor is
-`requires-python = ">=3.11"`; CI proves both ends of the supported range
-(3.11 and 3.13) across three operating systems on every push.
+`requires-python = ">=3.11"`, which carries **no declared upper bound**; CI
+proves the floor (3.11) and the newest release tested today (3.13) across
+three operating systems on every push — 3.13 is the newest version
+exercised, not a ceiling the project has declared.
 
 **Why this is appropriate.** The zero-dependency property is not asceticism
 for its own sake: FiTuna's users are people already fighting a large,
@@ -403,11 +433,16 @@ console scripts and needs nothing a modern setuptools does not already do.
 **Where it is used.** `.github/workflows/ci.yml` runs on every push to
 `main` and every pull request, over a 3 OS × 2 Python matrix
 (ubuntu/macos/windows-latest × 3.11/3.13) with `fail-fast: false`. Two
-steps: `pytest -q`, then every module's standalone self-check
-(`python -m fituna.config`, `.cache`, `.search`, `.model_info`,
+steps: `pytest -q`, then every module that ships a standalone self-check.
+All 17 files under `fituna/` have an `if __name__ == "__main__":` block, but
+only 16 of them run an assert-based check there; CI invokes exactly those
+16 (`python -m fituna.config`, `.cache`, `.search`, `.model_info`,
 `.quantize`, `.quality`, `.bench`, `.hardware`, `.binaries`, `.report`,
-`.corpus`, `.doctor`, `.cli`, `.mcp_server`) — so the assert-based checks
-embedded in each module are real CI gates, not decoration.
+`.corpus`, `.doctor`, `.cli`, `.mcp_server`, `.__init__`, `.errors`) — so the
+assert-based checks embedded in each module are real CI gates, not
+decoration. The 17th file, `fituna/__main__.py`, is the `python -m fituna`
+entry point (it just calls `cli.main()`); it has no self-check of its own,
+so excluding it from this list is correct, not an oversight.
 
 **License and how it was determined.** The two reusable actions consumed
 are open source and MIT: `https://api.github.com/repos/actions/checkout/license`
@@ -425,10 +460,10 @@ package.
 most likely to be wrong (`shutil.which` semantics, `Path.replace` vs
 `rename` on Windows, subprocess text decoding under non-UTF-8 locales), and
 each of those has a matching defensive line in the source. A three-OS
-matrix is what keeps those honest. Note the limit, stated plainly in the
-README: CI has no GPU and no llama.cpp build, so it exercises FiTuna's
-logic, not real benchmark runs — those are `docs/RESULTS.md` and the Colab
-notebook.
+matrix is what keeps those honest. Note the limit — verifiable directly
+from `.github/workflows/ci.yml` itself, which has no GPU runner and no
+llama.cpp build step: CI exercises FiTuna's logic, not real benchmark
+runs — those are `docs/RESULTS.md` and the Colab notebook.
 
 ## 12. Test framework — pytest
 
@@ -466,7 +501,9 @@ that path:
 | Component | Role in the notebook | License | How determined |
 |---|---|---|---|
 | Jupyter notebook format (`nbformat`) | The `.ipynb` file itself | BSD-3-Clause | `https://api.github.com/repos/jupyter/nbformat/license` → SPDX `BSD-3-Clause` (2026-07-30) |
+| `git` | Cell 2 clones llama.cpp (`git clone --depth 1`); cell 3's `pip install git+https://...` also invokes it to clone this repository | GPL-2.0 | `https://raw.githubusercontent.com/git/git/master/COPYING` — the text itself, "GNU GENERAL PUBLIC LICENSE Version 2, June 1991" (2026-07-30). GitHub's license-detection API returns `NOASSERTION` for `git/git`, so the raw file was read directly instead of trusting that endpoint |
 | CMake | Cell 2 builds llama.cpp with `-DGGML_CUDA=ON` | BSD-3-Clause | `https://api.github.com/repos/Kitware/CMake/license` → SPDX `BSD-3-Clause` (2026-07-30) |
+| `pip` | Cells 3 and 5 install FiTuna and `huggingface_hub` into the Colab runtime | MIT | `https://api.github.com/repos/pypa/pip/license` → SPDX `MIT` (2026-07-30) |
 | `huggingface_hub` | Cell 5 downloads the demo GGUF | Apache-2.0 | `https://api.github.com/repos/huggingface/huggingface_hub/license` → SPDX `Apache-2.0` (2026-07-30) |
 | llama.cpp | Cell 2 clones and builds it from source | MIT | §1 |
 
@@ -483,16 +520,16 @@ claimed for Run 4; the macOS runs in `docs/RESULTS.md` state their build
 ## 14. Hardware detection utilities
 
 `fituna/hardware.py:detect_hardware()` shells out to whatever is present
-and falls back to a CPU-only profile via `platform` when nothing is. Only
-one of these is open source, and this document says so rather than blurring
-it:
+and falls back to a CPU-only profile via `platform` when nothing is. Two
+of these are open source (`rocm-smi` and `sysctl`), and this document says
+so rather than blurring it:
 
 | Tool | Called from | Origin | License | Coupling |
 |---|---|---|---|---|
 | `rocm-smi` | `hardware.py:110` | ROCm (`ROCm/rocm_smi_lib`, `python_smi_tools/rocm_smi.py`) | **MIT** | subprocess, optional |
 | `nvidia-smi` | `hardware.py:77` | NVIDIA driver package | NVIDIA proprietary | subprocess, optional |
 | `system_profiler` | `hardware.py:154` | macOS | Apple proprietary | subprocess, optional |
-| `sysctl` | `hardware.py:186` | macOS/BSD base system | **unverified** — see below | subprocess, optional |
+| `sysctl` | `hardware.py:186` | macOS/BSD base system (`apple-oss-distributions/system_cmds`) | **BSD-3-Clause** — see below | subprocess, optional |
 | `/proc/meminfo` | `hardware.py:179` | Linux kernel interface | n/a (kernel-provided virtual file) | file read |
 | `GlobalMemoryStatusEx` | `hardware.py:213` | Windows kernel32, via `ctypes` | Microsoft proprietary | OS API call |
 
@@ -504,11 +541,17 @@ the **University of Illinois/NCSA Open Source License**, so a reader
 checking a different branch will see a different answer. The MIT text on
 the current branch is the one that applies to a present-day ROCm install.
 
-**`sysctl` is marked unverified deliberately.** The `sysctl` binary invoked
-on macOS comes from Apple's base system; its upstream source
-(`system_cmds`) was not fetched and checked, so no license is asserted for
-it. It is a stock OS utility, invoked and never redistributed, exactly like
-`system_profiler`.
+**`sysctl` license determination.** The `sysctl` binary invoked on macOS
+comes from Apple's base system, built from the open-source
+`apple-oss-distributions/system_cmds` package. Its primary source,
+`https://raw.githubusercontent.com/apple-oss-distributions/system_cmds/main/sysctl/sysctl.c`
+(HTTP 200, 2026-07-30), carries the header
+`SPDX-License-Identifier: BSD-3-Clause` and `Copyright (c) 1993 The Regents
+of the University of California. All rights reserved.` — the classic
+3-clause BSD text. It is a stock OS utility, invoked and never
+redistributed, exactly like `system_profiler` — the difference is that this
+one particular binary's upstream is itself open source, which
+`system_profiler`'s is not.
 
 None of these are bundled, and every one is optional: if all detection
 fails, `detect_hardware()` returns a CPU-only `HardwareProfile` and the
@@ -598,24 +641,35 @@ FiTuna는 **런타임 의존성이 0개**이지만, 이는 "타 오픈소스SW�
 | 빌드 백엔드 | setuptools ≥ 68 | MIT | 빌드 시점 한정 | `pyproject.toml` |
 | CI | `actions/checkout@v4`, `actions/setup-python@v5` | 둘 다 MIT | 개발·CI 한정 | `.github/workflows/ci.yml` |
 | 테스트 | pytest | MIT | 개발 한정(`[dev]` 옵션) | `tests/`, `pyproject.toml` |
-| 검증 환경 | Jupyter 노트북 포맷, CMake, `huggingface_hub` | BSD-3-Clause, BSD-3-Clause, Apache-2.0 | 노트북 한정 | `notebooks/colab_nvidia_verification.ipynb` |
+| 검증 환경 | Jupyter 노트북 포맷, git, CMake, pip, `huggingface_hub` | BSD-3-Clause, GPL-2.0, BSD-3-Clause, MIT, Apache-2.0 | 노트북 한정 | `notebooks/colab_nvidia_verification.ipynb` |
 | GPU 감지 | `rocm-smi` (ROCm) | MIT (현행 기본 브랜치 `License.txt`) | 서브프로세스(선택) | `hardware.py:110` |
 
 **라이선스 확인 방법.** 위 라이선스는 모두 2026-07-30에 1차 출처에서 직접
 확인했다 — 각 프로젝트의 `LICENSE`/`License.txt` 원문, 또는 모델·데이터셋의
-경우 HuggingFace API의 `cardData.license` 값이다. 확인하지 못한 항목(macOS
-`sysctl`의 상류 라이선스)은 본문 §14에 **미확인**으로 명시했다.
+경우 HuggingFace API의 `cardData.license` 값이다. macOS `sysctl`도
+`apple-oss-distributions/system_cmds`의 `sysctl/sysctl.c` 헤더
+(`SPDX-License-Identifier: BSD-3-Clause`)로 직접 확인해 §14에 반영했다 —
+더 이상 미확인이 아니다. 끝내 확인하지 못했거나 의도적으로 특정하지 않은
+항목은 두 가지다: HuggingFace dataset-viewer **서비스 자체**의 이용약관
+(§7 — 서버 코드의 Apache-2.0 라이선스와는 별개이며, 검토하지 않았다)과
+Colab Run 4의 llama.cpp 정확한 빌드 버전(§13 — 태그를 고정하지 않고 클론해
+특정 버전을 주장하지 않는다).
 
 **오픈소스가 아닌 연동 대상.** `nvidia-smi`(NVIDIA 독점),
 `system_profiler`(Apple 독점), CUDA 툴킷(NVIDIA 독점), GitHub Actions·Google
 Colab(각 사 호스팅 서비스)도 호출·이용하지만, 모두 재배포하지 않으며 오픈소스로
 표기하지 않는다.
 
-**FiTuna가 지는 라이선스 의무.** 벤더링·링크가 없으므로 의무는 (1) llama.cpp
-MIT 고지 보존 — `THIRD_PARTY_NOTICES.md`에 전문 수록, (2) 코퍼스 CC BY-SA
-저작자표시·동일조건 — `fituna fetch-corpus` 실행 시마다 출처·라이선스 고지를
-표준출력에 인쇄하고 코퍼스 원문은 저장소에 넣지 않음, 이 두 가지로 끝난다.
-카피레프트 소프트웨어를 링크한 곳은 없다.
+**FiTuna가 지는 라이선스 의무.** 벤더링·링크가 없으므로 의무는 네 가지로
+정리된다: (1) llama.cpp MIT 고지 보존 — `THIRD_PARTY_NOTICES.md`에 전문
+수록, (2) 코퍼스 CC BY-SA 저작자표시·동일조건 — `fituna fetch-corpus` 실행
+시마다 출처·라이선스 고지를 표준출력에 인쇄하고 코퍼스 원문은 저장소에 넣지
+않음, (3) 사용자가 선택한 모델의 라이선스 준수 — 가중치를 재배포하지 않고
+`docs/AI_MODEL_USAGE.md`에 고지 템플릿을 제공하며 시연에 사용한 모델은 모두
+Apache-2.0, (4) FiTuna 자체 라이선스(MIT) 준수 — 사용자에게 아무 의무도
+부과하지 않는 permissive 라이선스. 링크된 카피레프트 소프트웨어는 없다 —
+§13의 `git`(GPL-2.0)은 검증 노트북 안에서만 호출되는 개발/노트북 한정
+도구이며 FiTuna 배포물에는 링크되지 않는다.
 
 **상류 기여 현황(과장 없이).** 현재까지 llama.cpp·ggml·MCP·데이터셋 저장소에
 **병합된 기여는 없다**. 대신 공개한 것은 실측 데이터
