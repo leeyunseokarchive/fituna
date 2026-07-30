@@ -289,7 +289,7 @@ Three facts remove the conflict:
 2. **FiTuna does not distribute it.** `fituna fetch-corpus` downloads to a
    path *the user chooses* (`--out`). The bytes travel from HuggingFace to
    the user; FiTuna is the transport, not the redistributor.
-3. **The notice is given at fetch time.** `fituna/cli.py:256`
+3. **The notice is given at fetch time.** `fituna/cli.py:276`
    (`_cmd_fetch_corpus`) prints the source URL and the license notice to
    stdout on every successful fetch, so a user who *does* go on to
    redistribute the text has been told the terms. When
@@ -301,20 +301,21 @@ Share-alike attaches to the corpus text. It does not reach FiTuna's source
 code, because FiTuna's source code is not a derivative or adaptation of the
 corpus — it is a program that passes a file path to another program.
 
-### 2.3 Model weights — Apache-2.0, never redistributed
+### 2.3 Model weights — Apache-2.0 / MIT, never redistributed
 
 `--model` is a path to a file the user already has. FiTuna does not bundle,
 train, fine-tune, distil or merge weights; `llama-quantize` changes numeric
 precision inside llama.cpp's own process. §1.4 confirms no `.gguf` is in
 either artifact, and `.gitignore` excludes `*.gguf` and `*.gguf.tmp`.
 
-The two models used for this project's own published measurements
-(`docs/RESULTS.md`) are SmolLM2-135M-Instruct and Qwen3-4B-Instruct-2507,
-both Apache-2.0, verified per `docs/OPEN_SOURCE_USAGE.md` §3–4. Apache-2.0
-is permissive and compatible with MIT in the direction that matters here
-(Apache-2.0 material combined into an MIT-licensed project); no combination
-occurs in any case. `docs/AI_MODEL_USAGE.md` carries the per-model
-disclosure template.
+The three models used for this project's own published measurements
+(`docs/RESULTS.md`) are SmolLM2-135M-Instruct and Qwen3-4B-Instruct-2507
+(both Apache-2.0) and Midm-2.0-Mini-Instruct (MIT), verified per
+`docs/OPEN_SOURCE_USAGE.md` §3–4. Both Apache-2.0 and MIT are permissive and
+compatible with MIT in the direction that matters here (that material
+combined into an MIT-licensed project); no combination occurs in any case.
+`docs/AI_MODEL_USAGE.md` carries the per-model disclosure template and the
+same three models.
 
 The model choice was itself made on license grounds: Qwen2.5-3B-Instruct was
 dropped from the results because its license is `qwen-research`, a
@@ -391,6 +392,7 @@ Every license FiTuna combines with, and the outcome:
 | CPython standard library | PSF-2.0 | **imported** | No — permissive, no copyleft |
 | llama.cpp, ggml/GGUF | MIT | subprocess / file format | No — same license; no linkage in any case |
 | Model weights (SmolLM2, Qwen3) | Apache-2.0 | user-supplied file | No — permissive; never redistributed |
+| Model weights (Midm-2.0-Mini) | MIT | user-supplied file | No — same license; never redistributed |
 | WikiText-2, Korean Wikipedia | CC BY-SA 3.0 / GFDL | fetched file | No — share-alike attaches to the text, which is neither in the repo nor in the distribution; notice printed at fetch |
 | HF dataset-viewer (server) | Apache-2.0 | HTTP client | No — no code of it is used |
 | Model Context Protocol | Apache-2.0 / MIT, in transition | protocol, own implementation | No — no SDK, no schema library, no spec-repo code |
@@ -573,7 +575,7 @@ $ /tmp/buildenv/bin/reuse lint
 * Used licenses: MIT
 * Read errors: 0
 * Invalid SPDX License Expressions: 2
-* Files with copyright information: 5 / 48
+* Files with copyright information: 6 / 48
 * Files with license information: 23 / 48
 
 Unfortunately, your project is not compliant with version 3.3 of the REUSE Specification :-(
@@ -606,6 +608,14 @@ one of them is a real finding:
   only place their exact spelling appears in this file, deliberately: naming
   the closing token anywhere in the prose would end the ignore block right
   there and re-expose everything below it.
+- **`Files with copyright information: 6 / 48`** — not a compliance signal.
+  `reuse` counts any file in which it finds a copyright notice, and the six
+  are the root `LICENSE`, `THIRD_PARTY_NOTICES.md` and the four documents
+  that *quote* someone else's notice while recording where a license was
+  read from (`README.md`, `docs/ARCHITECTURE.md`,
+  `docs/OPEN_SOURCE_USAGE.md`, `docs/RESULTS.md`). FiTuna's `.py` files carry
+  `SPDX-License-Identifier` but deliberately no `SPDX-FileCopyrightText`
+  line — see the `Missing licenses` bullet above and §6.
 - **`Files with license information: 23 / 48`** — all 23 `.py` files that
   carry the tag (§4) are counted. That includes `fituna/config.py`, which
   needs an explanation because `reuse` cannot read its own header: `reuse`
@@ -709,14 +719,25 @@ copyright and licensing information."
 **Regression check.** Adding a line to every file shifts every line number
 below it. Both consequences were checked and handled:
 
-- `python3.13 -m pytest -q` → **151 passed**, and all 16 module self-checks
+- `python3.13 -m pytest -q` → **152 passed**, and all 16 module self-checks
   listed in `.github/workflows/ci.yml` still exit 0.
-- `docs/OPEN_SOURCE_USAGE.md` cites source locations as `file.py:NNN` in 38
-  places. Each was verified — by comparing the cited line in the pre-change
-  file (`git show HEAD:<path>`) against line *N*+1 in the post-change file —
-  to be a clean one-line shift, 30 distinct `file:line` references, 0 mismatches, and
-  then bumped by one. No other file in the repository uses `file.py:NNN`
-  citations.
+- Four documents cite source locations as `file.py:NNN`, not one:
+  `docs/OPEN_SOURCE_USAGE.md` (38 occurrences, 30 distinct `file:line`
+  references), plus one each in `SECURITY.md`, `docs/DEVELOPMENT.md` and
+  this file (§2.2). The original sweep covered only
+  `docs/OPEN_SOURCE_USAGE.md` and wrongly asserted it was the only such
+  file. All four have since been swept together and every citation
+  re-verified by reading the cited line in the current source. Five stale
+  occurrences were found and corrected: the three pointing at the CC BY-SA
+  notice in `_cmd_fetch_corpus` (one here, two in
+  `docs/OPEN_SOURCE_USAGE.md` — all three still named the last line of
+  `_cmd_doctor`), and two mutually inconsistent anchors for one `bench.py` self-check,
+  which now both name its `def _self_check()` line. The scope of a citation
+  sweep is the whole repository, not one document:
+
+  ```
+  $ grep -rn --include="*.md" -E "[a-z_]+[.]py:[0-9]+" .
+  ```
 
 ---
 
@@ -765,7 +786,7 @@ for f in fituna/*.py tests/*.py; do head -1 "$f"; done | sort | uniq -c
 
 # --- 8. nothing broke (same two steps CI runs) --------------------------
 /tmp/runtimeenv/bin/python -m pip install pytest
-/tmp/runtimeenv/bin/python -m pytest -q            # expect: 151 passed
+/tmp/runtimeenv/bin/python -m pytest -q            # expect: 152 passed
 for m in __init__ errors config cache search model_info quantize quality \
          bench hardware binaries report; do /tmp/runtimeenv/bin/python -m fituna.$m || break; done
 for m in corpus doctor cli mcp_server; do /tmp/runtimeenv/bin/python -m fituna.$m --selfcheck || break; done

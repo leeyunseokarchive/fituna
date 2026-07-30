@@ -419,6 +419,13 @@ Five things follow, in order of how much they change the story:
   they are estimates over 32×512 tokens, not properties of the quant. Of the
   four, only Q4_K_M's degradation is big enough to clear its own error bar
   (Δppl 0.434 against ±0.17 at 128 chunks).
+  **So the verdict is a function of `--ppl-chunks` too, not just the numbers
+  it is derived from.** Against this run's `--max-quality-loss 5`, Q4_K_M's
+  Korean margin is 2.42 pp at 32 chunks and 0.92 pp at 128 — same file, same
+  corpus, same gate, four times the evidence, a quarter of the headroom. A
+  PASS reported at a low chunk count is a PASS at that chunk count; if a
+  candidate lands anywhere near your budget, re-run it with more chunks
+  before trusting the verdict.
 
 ### What a lookup table cannot know
 

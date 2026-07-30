@@ -50,12 +50,13 @@ library. That is what "zero runtime dependencies" actually means.
 | 2 | Model file format | GGUF (ggml) | MIT (spec repo) | file format | `model_info.py:201` `read_model_info()` |
 | 3 | Model weights | SmolLM2-135M-Instruct | Apache-2.0 | file format (user-supplied) | `docs/RESULTS.md` Run 1/4, `notebooks/` |
 | 4 | Model weights | Qwen3-4B-Instruct-2507 | Apache-2.0 | file format (user-supplied) | `docs/RESULTS.md` Run 2/3 |
+| 4b | Model weights | Midm-2.0-Mini-Instruct (KT Corporation) | MIT | file format (user-supplied) | `docs/RESULTS.md` Run 5 |
 | 5 | Evaluation corpus (EN) | `Salesforce/wikitext`, `wikitext-2-raw-v1` | CC BY-SA 3.0 / GFDL | file format (fetched) | `corpus.py` `PRESETS["en"]` |
 | 6 | Evaluation corpus (KO) | `wikimedia/wikipedia`, `20231101.ko` | CC BY-SA 3.0 / GFDL | file format (fetched) | `corpus.py` `PRESETS["ko"]` |
 | 7 | Data-access API | HuggingFace dataset-viewer | Apache-2.0 (server impl.) | network protocol (HTTP GET) | `corpus.py:52` `API_BASE` |
 | 8 | Agent protocol | Model Context Protocol, rev. `2024-11-05`, over JSON-RPC 2.0 | Apache-2.0 / MIT (in transition) | IPC protocol (stdio) | `mcp_server.py` |
 | 9 | Language runtime | CPython 3.11+ standard library | PSF License Agreement v2 | **imported** | whole package; `pyproject.toml` |
-| 10 | Build backend | setuptools ≥ 68 | MIT | build time only | `pyproject.toml` `[build-system]` |
+| 10 | Build backend | setuptools ≥ 77 | MIT | build time only | `pyproject.toml` `[build-system]` |
 | 11 | CI | `actions/checkout@v4`, `actions/setup-python@v5` | MIT | dev / CI only | `.github/workflows/ci.yml` |
 | 12 | Test framework | pytest | MIT | dev only (`[dev]` extra) | `tests/`, `pyproject.toml` |
 | 13 | Verification environment | Jupyter notebook format, git, CMake, pip, `huggingface_hub` | BSD-3-Clause, GPL-2.0, BSD-3-Clause, MIT, Apache-2.0 | dev / notebook only | `notebooks/colab_nvidia_verification.ipynb` |
@@ -189,7 +190,7 @@ downloaded.
 ## 3–4. Open-weight models
 
 FiTuna bundles no weights and pins no model. `--model` is whatever the user
-already has on disk. The two models below are the ones the project's own
+already has on disk. The three models below are the ones the project's own
 published measurements were taken with, so they are named here as *used
 open-source artifacts*, not as dependencies.
 
@@ -197,6 +198,7 @@ open-source artifacts*, not as dependencies.
 |---|---|---|---|
 | SmolLM2-135M-Instruct | `docs/RESULTS.md` Runs 1 and 4; `notebooks/colab_nvidia_verification.ipynb` cell 5; `docs/DEMO_SCRIPT.md` live demo | Apache-2.0 | `https://huggingface.co/api/models/HuggingFaceTB/SmolLM2-135M-Instruct` → `cardData.license: apache-2.0` (2026-07-30). The GGUF actually downloaded is `bartowski/SmolLM2-135M-Instruct-GGUF`, whose own card reports `apache-2.0` by the same query |
 | Qwen3-4B-Instruct-2507 | `docs/RESULTS.md` Runs 2 and 3 | Apache-2.0 | `https://huggingface.co/api/models/Qwen/Qwen3-4B-Instruct-2507` → `cardData.license: apache-2.0`; the GGUF used, `unsloth/Qwen3-4B-Instruct-2507-GGUF`, likewise reports `apache-2.0` |
+| Midm-2.0-Mini-Instruct (KT Corporation) | `docs/RESULTS.md` Run 5 | MIT | `https://huggingface.co/api/models/K-intelligence/Midm-2.0-Mini-Instruct` → `cardData.license: mit` (re-verified 2026-07-30); the GGUF actually downloaded is `mykor/Midm-2.0-Mini-Instruct-gguf`, which reports `cardData.license: mit` and `base_model: K-intelligence/Midm-2.0-Mini-Instruct` by the same query. Both repositories carry a verbatim MIT `LICENSE.txt` ("Copyright (c) 2025 KT Corporation") and neither is gated — see `docs/RESULTS.md` Run 5 |
 
 **Coupling.** File format, user-supplied. The weights are read by the
 llama.cpp subprocesses, never by FiTuna, and are never committed, packaged
@@ -204,11 +206,15 @@ or redistributed. FiTuna does not train, fine-tune, distil or merge
 anything; `llama-quantize` changes numeric precision inside llama.cpp's own
 process. `docs/AI_MODEL_USAGE.md` carries the per-model disclosure template.
 
-**Why these two.** They bracket the interesting range with the same
-command: 135M makes a full cold search finish in ~76 s (small enough to
+**Why these three.** The first two bracket the interesting range with the
+same command: 135M makes a full cold search finish in ~76 s (small enough to
 record live, per `docs/DEMO_SCRIPT.md`), and 4B is large enough that the
 answer stops being obvious — in Run 2 the measured quality order put Q6_K
-ahead of Q8_0, inverting the conventional ranking.
+ahead of Q8_0, inverting the conventional ranking. The third is Korean:
+Runs 1–4 all used models trained primarily on English, so Run 5 repeats the
+Run 3 English-vs-Korean corpus experiment on a Korean open-weight model. It
+was picked on license grounds too — MIT, ungated, and with an MIT GGUF
+redistributor, so the run reproduces without accepting any agreement.
 
 **Alternative rejected — and this one is a license decision.**
 Qwen2.5-3B-Instruct was the earlier candidate for the mid-size run and was
@@ -250,7 +256,7 @@ attribution text.
 to this repository; `.gitignore` keeps `*.txt` outputs out. Because the
 corpus is downloaded to a path of the user's choosing and never
 redistributed by FiTuna, CC BY-SA's share-alike condition is not triggered
-by FiTuna itself — but the user can trigger it, so `cli.py:256`
+by FiTuna itself — but the user can trigger it, so `cli.py:276`
 (`_cmd_fetch_corpus`) **prints the license notice and source URL to stdout
 on every successful fetch**. When `--dataset/--config/--split` override a
 preset, that same code path deliberately prints a *generic* "check this
@@ -312,7 +318,7 @@ optional: `fituna run` never touches the network.
 **What it is.** MCP is the open protocol for exposing tools to AI agents.
 Its stdio transport is newline-delimited JSON-RPC 2.0.
 
-**Where it is used.** `fituna/mcp_server.py` is a complete server in 304
+**Where it is used.** `fituna/mcp_server.py` is a complete server in 305
 lines of stdlib: `serve()` runs the newline-delimited JSON-RPC loop over
 stdin/stdout; `_handle()` implements `initialize`, `tools/list`,
 `tools/call` and `ping`, returns `-32601` for unknown methods and `-32700`
@@ -376,7 +382,7 @@ write-then-rename, spread across `corpus.py`, `quantize.py`, `binaries.py`,
 `convert_hf_to_gguf.py`; stdin/stdout in `mcp_server.py`), `time`
 (`search.py` elapsed-time tracking), `datetime` (`cache.py` result
 timestamps), `textwrap` (`doctor.py` output formatting), `unittest.mock`
-(patches `subprocess.run` in exactly one self-check, `bench.py:154`, for its
+(patches `subprocess.run` in exactly one self-check, `bench.py:147`, for its
 three failure-mode assertions; other self-checks that touch `subprocess`
 monkeypatch this module's own names directly instead — `search.py:428-430`'s
 own docstring says it does this "rather than pulling in
@@ -580,7 +586,7 @@ the obligation set is small and fully discharged in-repo:
 | Obligation | Source | Discharged by |
 |---|---|---|
 | Preserve the MIT notice | llama.cpp, ggml | `THIRD_PARTY_NOTICES.md` §1 reproduces the full MIT text |
-| Attribution + share-alike | CC BY-SA 3.0 corpora | `fituna fetch-corpus` prints the notice and source URL on every fetch (`cli.py:256`); no corpus text is committed |
+| Attribution + share-alike | CC BY-SA 3.0 corpora | `fituna fetch-corpus` prints the notice and source URL on every fetch (`cli.py:276`); no corpus text is committed |
 | Model license compliance | User's chosen weights | Weights are never redistributed; `docs/AI_MODEL_USAGE.md` carries the disclosure template, and every model in the published results is Apache-2.0 |
 | FiTuna's own terms | MIT (`LICENSE`) | Permissive; imposes nothing on users |
 
@@ -595,9 +601,9 @@ Stated as of 2026-07-30, without inflation:
 **What exists.**
 
 - **Published cross-platform measurements of the llama.cpp toolchain** that
-  are not otherwise available in one place: `docs/RESULTS.md` records four
-  runs, including a case where the *same* quantized file and the *same*
-  corpus produced 4.74 % quality loss under Metal and 5.22 % under CUDA —
+  are not otherwise available in one place: `docs/RESULTS.md` records five
+  runs, including a Korean open-weight model (Run 5) and a case where the
+  *same* quantized file and the *same* corpus produced 4.74 % quality loss under Metal and 5.22 % under CUDA —
   enough to flip a 5 % gate — and cases where a smaller quant benchmarks
   *slower* than a larger one on the same machine. Each number states the
   command, the hardware and the llama.cpp build where one was recorded.
@@ -649,12 +655,12 @@ FiTuna는 **런타임 의존성이 0개**이지만, 이는 "타 오픈소스SW�
 |---|---|---|---|---|
 | 추론·양자화 엔진 | llama.cpp (`llama-quantize`/`llama-bench`/`llama-perplexity`/`convert_hf_to_gguf.py`) | MIT | **서브프로세스** (링크·포함 없음) | `quantize.py`, `bench.py`, `quality.py`, `model_info.py`, `binaries.py`, `report.py` |
 | 모델 파일 포맷 | GGUF (ggml 사양) | MIT | **파일 포맷 준수** (`struct`로 직접 파싱) | `model_info.py:201` |
-| 모델 가중치 | SmolLM2-135M-Instruct, Qwen3-4B-Instruct-2507 | 둘 다 Apache-2.0 | **사용자 제공 파일** (재배포 없음) | `docs/RESULTS.md`, `notebooks/` |
+| 모델 가중치 | SmolLM2-135M-Instruct, Qwen3-4B-Instruct-2507, Midm-2.0-Mini-Instruct(KT) | 앞의 둘 Apache-2.0, Midm은 MIT | **사용자 제공 파일** (재배포 없음) | `docs/RESULTS.md`, `notebooks/` |
 | 평가 데이터셋 | `Salesforce/wikitext`(영), `wikimedia/wikipedia` `20231101.ko`(한) | CC BY-SA 3.0 / GFDL | **내려받아 파일로 사용** (저장소 미포함) | `corpus.py` `PRESETS` |
 | 데이터 조회 API | HuggingFace dataset-viewer | 서버 구현체 Apache-2.0 (FiTuna는 HTTP 호출만) | **네트워크 프로토콜** | `corpus.py:52` |
 | 에이전트 연동 프로토콜 | Model Context Protocol(`2024-11-05`) / JSON-RPC 2.0 | Apache-2.0·MIT 전환 중 | **프로토콜 자체 구현** (SDK 미사용) | `mcp_server.py` |
 | 언어·런타임 | CPython 3.11+ 표준 라이브러리 | PSF License Agreement v2 | **임포트** (유일한 링크 항목) | 패키지 전체, `pyproject.toml` |
-| 빌드 백엔드 | setuptools ≥ 68 | MIT | 빌드 시점 한정 | `pyproject.toml` |
+| 빌드 백엔드 | setuptools ≥ 77 | MIT | 빌드 시점 한정 | `pyproject.toml` |
 | CI | `actions/checkout@v4`, `actions/setup-python@v5` | 둘 다 MIT | 개발·CI 한정 | `.github/workflows/ci.yml` |
 | 테스트 | pytest | MIT | 개발 한정(`[dev]` 옵션) | `tests/`, `pyproject.toml` |
 | 검증 환경 | Jupyter 노트북 포맷, git, CMake, pip, `huggingface_hub` | BSD-3-Clause, GPL-2.0, BSD-3-Clause, MIT, Apache-2.0 | 노트북 한정 | `notebooks/colab_nvidia_verification.ipynb` |
