@@ -186,7 +186,7 @@ contract: [`fituna/config.py`](fituna/config.py)
 |---|---|---|---|
 | Qwen3-4B-Instruct (Apache 2.0) | 30 tok/s, ≤5% loss | Q8_0: 24.22 tok/s ❌ (and measured *worse* quality than Q6_K) | **Q4_K_M @ ngl=33 → 30.81 tok/s, 1.73% loss** ✅ |
 | SmolLM2-135M (Apache 2.0) | 240 tok/s, ≤5% loss | Q8_0: 205.91 tok/s ❌ | **Q6_K → 249.50 tok/s, 0.53% loss** ✅ (and Q4_K_M measured *slower* than Q6_K) |
-| Midm-2.0-Mini-Instruct, Korean (MIT) | 40 tok/s, ≤5% loss | Q8_0: 34.26 tok/s ❌ | **Q4_K_M @ ngl=48 → 44.62 tok/s, 2.58% loss** ✅ (the two corpora report different Q6_K/Q5_K_M mid-table orders, but reading the per-chunk trace the English order never changes sign in 125 points while the Korean one changes nine times — so a corpus-driven reorder is [not something we could establish](docs/RESULTS.md#how-big-is-a-perplexity-gap-the-error-bar-we-had-been-discarding)) |
+| Midm-2.0-Mini-Instruct, Korean (MIT) | 40 tok/s, ≤5% loss | Q8_0: 34.26 tok/s ❌ | **Q4_K_M @ ngl=48 → 44.62 tok/s, 2.58% loss** ✅ (the two corpora report different Q6_K/Q5_K_M mid-table orders, but reading the per-chunk trace — 125 nested, autocorrelated points, not independent trials — the English order never changes sign while the Korean one changes sign nine times after n=16 (ten times counting from n=4) — so a corpus-driven reorder is [not something we could establish](docs/RESULTS.md#how-big-is-a-perplexity-gap-the-error-bar-we-had-been-discarding)) |
 
 Environment: Apple M3 Pro, llama.cpp build 9960. Full logs, timings,
 run-to-run variance analysis (including a thermal-throttle outlier we caught
@@ -247,7 +247,11 @@ Silicon/Metal) and Linux (NVIDIA T4/CUDA); see
   recommendations instead of guessing from specs (`fituna-mcp`)
 - [x] **Korean calibration corpus option** — `--quality-corpus` gates on
   any language's text; measured EN-vs-KO comparison shows the corpus alone
-  can flip a feasibility verdict
+  can flip a feasibility verdict (the tool genuinely produced different
+  verdicts from the same two commands — though the underlying quality gap
+  driving it sits inside the estimator's own resolution, so read it as
+  "the corpus you gate on decides the verdict", not proof one language
+  degrades less)
   ([data](docs/RESULTS.md#run-3--english-vs-korean-quality-corpus-same-model-same-quants))
 - [x] NVIDIA/Linux measured run (Tesla T4 via the Colab notebook —
   [Run 4](docs/RESULTS.md#run-4--nvidia-tesla-t4-linux-google-colab):
@@ -265,7 +269,8 @@ Silicon/Metal) and Linux (NVIDIA T4/CUDA); see
   distribution; use `--gpu amd --vram-mb <N>`.
 - **Quality = perplexity on a corpus you choose** — a proxy, not a
   guarantee of domain quality. Gate on text resembling your workload
-  (`--quality-corpus`; measured EN-vs-KO comparison in
+  (`--quality-corpus`; measured EN-vs-KO comparison — real verdict flip,
+  underlying gap inside the estimator's resolution — in
   [docs/RESULTS.md](docs/RESULTS.md)).
 - **Benchmarks are thermally sensitive** — verdicts within a few tok/s of
   the target are marginal; see the

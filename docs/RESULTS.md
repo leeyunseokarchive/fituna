@@ -372,12 +372,14 @@ Five things follow, in order of how much they change the story:
   reading them is a free stability test. On English, the margin between the
   two contested quants turns positive at n=4 and stays positive for all 125
   remaining points: Q6_K ranks above Q5_K_M at **every** chunk count we can
-  read, zero sign changes. On Korean the same margin changes sign **nine
-  times** after n=16, alternating between the two orderings in ten runs:
+  read, zero sign changes. Korean starts from that same n=4 already reversed
+  — Q5_K_M ahead by 0.0867 pp — then changes sign **nine times** after n=16,
+  alternating between the two orderings in eleven runs (ten sign changes
+  counting from n=4):
 
-  | Korean, n = | 5–16 | 17–22 | 23–24 | 25–66 | 67 | 68–76 | 77–99 | 100–106 | 107–108 | 109–128 |
-  |---|---|---|---|---|---|---|---|---|---|---|
-  | ahead | Q6_K | Q5_K_M | Q6_K | Q5_K_M | Q6_K | Q5_K_M | **Q6_K** | Q5_K_M | Q6_K | **Q5_K_M** |
+  | Korean, n = | 4 | 5–16 | 17–22 | 23–24 | 25–66 | 67 | 68–76 | 77–99 | 100–106 | 107–108 | 109–128 |
+  |---|---|---|---|---|---|---|---|---|---|---|---|
+  | ahead | Q5_K_M | Q6_K | Q5_K_M | Q6_K | Q5_K_M | Q6_K | Q5_K_M | **Q6_K** | Q5_K_M | Q6_K | **Q5_K_M** |
 
   This is not a near-tie quietly settling down. Over n=77–99 — 23 consecutive
   points holding the *opposite* order to the one we publish — the mean absolute
@@ -446,10 +448,13 @@ Five things follow, in order of how much they change the story:
   holds up when read chunk by chunk: Korean Q8_0 is below its baseline at
   117 of the 125 points from n=4 to n=128 (one sign change, early), and
   English Q8_0 is above its baseline at all 125. A table that stores "Q8_0 ≈
-  lossless" hides which side of zero you land on. On a Δppl of 0.005–0.013
-  against a ±0.16 error bar we still will not call it a resolved result — but
-  it is a consistent observation, which is more than the ranking difference
-  managed.
+  lossless" hides which side of zero you land on. At the matching 32-chunk
+  count, Δppl is 0.0023 (Korean) to 0.0128 (English) against a ±0.26–0.29
+  error bar measured at that same chunk count — we directly measured the
+  missing English 32-chunk bars for this comparison rather than reusing the
+  128-chunk ±0.16 figure from a different-sized run. We still will not call
+  it a resolved result — but it is a consistent observation, which is more
+  than the ranking difference managed.
 - **Run 3's "Korean losses are smaller" pattern does not generalize.** In
   Run 3 the Korean figure was smaller than its English counterpart in three
   of four rows — Q6_K is already the exception there (−0.06 % Korean vs
