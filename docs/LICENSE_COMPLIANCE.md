@@ -51,15 +51,17 @@ $ /tmp/buildenv/bin/python -m build
 Successfully built fituna-0.1.0.tar.gz and fituna-0.1.0-py3-none-any.whl
 ```
 
-`build` 1.5.0 provisions `setuptools>=68` in its own isolated environment,
+`build` 1.5.0 provisions `setuptools>=77` in its own isolated environment,
 exactly as `pyproject.toml` `[build-system]` declares. Neither `build` nor
 `setuptools` appears in the installed package — §1.6 proves that by
 installing the wheel into an empty environment and listing what arrived.
 
-The elided `...` is setuptools' own build log plus two
-`SetuptoolsDeprecationWarning`s about `pyproject.toml`'s license
-declaration; they are not license findings, and they are recorded with
-their deadline in §6 rather than dropped.
+The elided `...` is setuptools' own build log. There is no
+`SetuptoolsDeprecationWarning` about a license declaration to elide any more:
+`pyproject.toml` now declares the PEP 639 `license = "MIT"` expression
+directly (raised from `setuptools>=68` for this), so the deprecated
+`license = { text = "MIT" }` form the warning used to fire on is gone. §6
+records the trade this made, not a pending warning.
 
 ### 1.2 Everything in the sdist
 
@@ -179,15 +181,21 @@ wheel: 18 byte-identical to tracked repo files, 6 build-generated metadata, 0 un
 
 ```
 $ unzip -p dist/fituna-0.1.0-py3-none-any.whl fituna-0.1.0.dist-info/METADATA \
-    | grep -E '^(Name|Version|Requires-Python|License|License-File|Provides-Extra|Requires-Dist):'
+    | grep -E '^(Name|Version|Requires-Python|License-Expression|License-File|Provides-Extra|Requires-Dist):'
 Name: fituna
 Version: 0.1.0
-License: MIT
+License-Expression: MIT
 Requires-Python: >=3.11
 License-File: LICENSE
 Provides-Extra: dev
 Requires-Dist: pytest; extra == "dev"
 ```
+
+The original `grep` pattern here matched `^License:`; under `setuptools>=77`
+and the PEP 639 `license = "MIT"` expression the wheel emits
+`License-Expression: MIT` (Metadata-Version 2.4) instead of a bare `License:`
+line, so the pattern above adds `License-Expression` to keep the block
+reproducible. §6 records what this change costs.
 
 The only `Requires-Dist` line is gated on the `dev` extra. There is no
 unconditional runtime requirement.
@@ -226,7 +234,7 @@ through use.** FiTuna does neither, for every counterparty except the Python
 standard library — and that one is PSF-2.0, which is permissive.
 
 FiTuna's own license is MIT (`LICENSE`, `pyproject.toml`
-`license = { text = "MIT" }`). MIT is permissive with a single operative
+`license = "MIT"`, a PEP 639 SPDX expression). MIT is permissive with a single operative
 condition — preserve the notice — and is compatible with every license named
 below.
 
@@ -429,7 +437,7 @@ Checked with `command -v` before anything was installed:
 
 **Why ScanCode was not run.** `scancode-toolkit` ships a license-text index
 of several hundred megabytes and would take longer to install and index than
-this repository has files. For a codebase of 47 tracked files, 17 of which
+this repository has files. For a codebase of 51 tracked files, 17 of which
 are the shipped source, that is disproportionate. What was run instead —
 `reuse` (SPDX tag extraction), `pip-licenses` (package metadata), `git grep`
 (license-string presence), an AST import scan, and the hash-based
@@ -456,11 +464,15 @@ $ /tmp/buildenv/bin/pip-licenses --python /tmp/runtimeenv/bin/python \
       --from=mixed --with-authors --with-urls --format=markdown
 ```
 
-| Name   | Version | License     | Author              | URL                                         |
-|--------|---------|-------------|---------------------|---------------------------------------------|
-| fituna | 0.1.0   | MIT License | FiTuna contributors | https://github.com/leeyunseokarchive/fituna |
+| Name   | Version | License | Author              | URL                                         |
+|--------|---------|---------|---------------------|---------------------------------------------|
+| fituna | 0.1.0   | MIT     | FiTuna contributors | https://github.com/leeyunseokarchive/fituna |
 
 **One row.** That is the complete license inventory of an installed FiTuna.
+It reads `MIT`, not `MIT License` — `pip-licenses` derives the name from the
+`License :: OSI Approved :: ...` classifier when one is present, and FiTuna's
+wheel carries none (§6 explains why); with only `License-Expression: MIT` to
+go on, `pip-licenses` reports the bare SPDX identifier instead.
 
 With the development extra installed (`fituna[dev]`), for completeness —
 none of this ships:
@@ -473,7 +485,7 @@ $ /tmp/buildenv/bin/pip-licenses --python /tmp/runtimeenv/bin/python --from=mixe
 | Name      | Version | License                    |
 |-----------|---------|----------------------------|
 | Pygments  | 2.20.0  | BSD-2-Clause               |
-| fituna    | 0.1.0   | MIT License                |
+| fituna    | 0.1.0   | MIT                        |
 | iniconfig | 2.3.0   | MIT                        |
 | packaging | 26.2    | Apache-2.0 OR BSD-2-Clause |
 | pluggy    | 1.6.0   | MIT License                |
@@ -561,8 +573,8 @@ $ /tmp/buildenv/bin/reuse lint
 * Used licenses: MIT
 * Read errors: 0
 * Invalid SPDX License Expressions: 2
-* Files with copyright information: 4 / 45
-* Files with license information: 23 / 45
+* Files with copyright information: 5 / 48
+* Files with license information: 23 / 48
 
 Unfortunately, your project is not compliant with version 3.3 of the REUSE Specification :-(
 ```
@@ -577,7 +589,7 @@ one of them is a real finding:
   files". It means the REUSE 3.3 specification wants a `LICENSES/MIT.txt`
   directory alongside the tags, and FiTuna keeps its license in the
   conventional root `LICENSE` file instead. Full REUSE compliance would also
-  require an `SPDX-FileCopyrightText` line in all 45 files including the
+  require an `SPDX-FileCopyrightText` line in all 48 files including the
   documentation. That is a stricter standard than the one being verified
   here, and the project deliberately does not adopt it; the `:-(` line is a
   statement about REUSE 3.3, not about license validity.
@@ -594,7 +606,7 @@ one of them is a real finding:
   only place their exact spelling appears in this file, deliberately: naming
   the closing token anywhere in the prose would end the ignore block right
   there and re-expose everything below it.
-- **`Files with license information: 23 / 45`** — all 23 `.py` files that
+- **`Files with license information: 23 / 48`** — all 23 `.py` files that
   carry the tag (§4) are counted. That includes `fituna/config.py`, which
   needs an explanation because `reuse` cannot read its own header: `reuse`
   sniffs the encoding of only the first 2048 bytes of a file
@@ -625,10 +637,10 @@ one of them is a real finding:
   depend on where in the file the annotation would otherwise sit: `reuse`
   reads `REUSE.toml` before it ever tries to sniff `config.py`'s encoding, so
   the 2048-byte heuristic never gets a chance to misfire. `reuse` also
-  excludes two further files from its 45: `LICENSE` itself (it is the
+  excludes two further files from its 48: `LICENSE` itself (it is the
   license) and the empty `fituna/py.typed` marker — plus `REUSE.toml` itself,
   which is its own configuration, not a file needing an annotation;
-  45 + 3 = 48 = `git ls-files | wc -l`. The upstream mitigation for the
+  48 + 3 = 51 = `git ls-files | wc -l`. The upstream mitigation for the
   underlying heuristic — installing `libmagic` so `reuse` uses `python-magic`
   instead of `charset-normalizer` for encoding detection — is a system
   package and was not installed here; `REUSE.toml` fixes the same symptom
@@ -724,7 +736,7 @@ rm -rf build dist fituna.egg-info
 tar -tzf dist/fituna-0.1.0.tar.gz | sort
 unzip -Z1 dist/fituna-0.1.0-py3-none-any.whl | sort
 unzip -p dist/fituna-0.1.0-py3-none-any.whl fituna-0.1.0.dist-info/METADATA \
-  | grep -E '^(Name|Version|Requires-Python|License|License-File|Provides-Extra|Requires-Dist):'
+  | grep -E '^(Name|Version|Requires-Python|License-Expression|License-File|Provides-Extra|Requires-Dist):'
 
 # --- 2. zero runtime dependencies, resolved by pip (§1.6) --------------
 python3 -m venv /tmp/runtimeenv
@@ -768,10 +780,10 @@ does.
 
 | Item | Status |
 |---|---|
-| Code-similarity / license-text matching (ScanCode, FOSSology) | **Not run** — disproportionate for 47 tracked files; see §3.1 for what stands in its place and what that leaves uncovered |
+| Code-similarity / license-text matching (ScanCode, FOSSology) | **Not run** — disproportionate for 51 tracked files; see §3.1 for what stands in its place and what that leaves uncovered |
 | `reuse` can't read `fituna/config.py`'s own header | **Tool limitation, diagnosed and worked around** (§3.5). `reuse`'s 2 KB encoding heuristic truncates a multi-byte character, so it never reads the in-file tag. Not fixed by reshaping the file's byte layout — that would be fragile in both directions and dependent on comment length staying clear of byte 2048. Fixed instead with a `REUSE.toml` file-level annotation, REUSE's own documented mechanism for this case, which does not depend on byte position |
 | REUSE 3.3 full compliance (`LICENSES/` directory, per-file copyright tags) | **Not adopted** — a stricter standard than this verification asks for; the root `LICENSE` plus per-file SPDX tags is the conventional position |
-| `pyproject.toml` uses `license = { text = "MIT" }` | **Deprecated by setuptools**, which warns during the build in §1.1 that PEP 639 `license = "MIT"` (an SPDX expression) is preferred, with a **2027-02-18** deadline. Not changed here: it would require raising the build-backend floor from `setuptools>=68` to `>=77`, which is a packaging decision, not a license one. The metadata already carries `License: MIT` and the OSI classifier, both machine-readable today |
+| `pyproject.toml` license declaration | **Changed**: `license = { text = "MIT" }` was replaced with the PEP 639 SPDX expression `license = "MIT"`, which required raising the build-backend floor from `setuptools>=68` to `>=77` (the version that supports the expression form). One cost came with it: the `License :: OSI Approved :: MIT License` classifier had to be removed, because `setuptools>=77` raises `InvalidConfigError` — "License classifiers have been superseded by license expressions" — if a license expression and an OSI classifier are both present (verified directly: re-adding the classifier alongside `license = "MIT"` fails the build with exactly that error). The wheel's metadata now carries `License-Expression: MIT` under Metadata-Version 2.4 instead of the old `License: MIT` field — still machine-readable, and it is what `pip-licenses` reads (§3.2). The narrow residual cost: any tool that reads `importlib.metadata`'s `License` key directly, or filters packages by the OSI classifier string, sees nothing for FiTuna now — it has to read `License-Expression` or parse the SPDX identifier instead |
 | HuggingFace dataset-viewer **service** terms of use | **Unverified**, as `docs/OPEN_SOURCE_USAGE.md` §7 already states. The server implementation's Apache-2.0 license was verified; the hosted service's terms were not reviewed |
 | llama.cpp build version used for `docs/RESULTS.md` Run 4 | **Not claimed** — the Colab notebook clones without a pinned tag, so no version is asserted (`docs/OPEN_SOURCE_USAGE.md` §13) |
 | `docs/SBOM.md` lists pytest's version as "latest" | **Left as is** — accurate for an unpinned `dev` extra. The version resolved at scan time was 9.1.1 (§3.2) |

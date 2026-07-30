@@ -194,7 +194,7 @@ re-exported from `errors.py`) to process exit codes:
 |---|---|
 | 0 | success — `search()` returned a `SearchResult` with `meets_target=True` |
 | 1 | generic error — any other `FiTunaError`, or `meets_target=False` (best-effort result, no config met the target) |
-| 2 | `BinaryNotFoundError` — a required llama.cpp binary is missing; message includes an install pointer |
+| 2 | `BinaryNotFoundError` — a required llama.cpp binary is missing; message includes an install pointer. **Also** argparse's own usage-error exit code — a missing required flag or an unrecognized flag exits 2 before `main()`'s `FiTunaError` mapping ever runs, since `parser.parse_args()` calls `sys.exit(2)` itself. Distinguish the two by stderr's first line: argparse's starts with `usage: ...`; `BinaryNotFoundError`'s is a `... ERROR fituna: ...` log line |
 | 3 | `NoFeasibleConfigError` — every quant candidate failed the quality gate or the full-offload speed check; `.closest` carries the nearest attempt for diagnostics |
 
 `ModelConversionError` (HF→GGUF conversion subprocess failure) and a

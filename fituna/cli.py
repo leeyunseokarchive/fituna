@@ -25,7 +25,10 @@ CLI <-> dataclass field mapping (see fituna/config.py for the dataclasses):
 Exit codes:
     0 = success (meets_target)
     1 = generic error
-    2 = BinaryNotFoundError
+    2 = BinaryNotFoundError, OR argparse's own usage-error exit (missing
+        required / unrecognized flag, via parser.parse_args() -> sys.exit(2)
+        before main()'s FiTunaError mapping runs) -- distinguish by whether
+        stderr's first line starts with "usage: "
     3 = NoFeasibleConfigError
 """
 

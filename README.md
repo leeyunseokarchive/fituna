@@ -283,7 +283,10 @@ Silicon/Metal) and Linux (NVIDIA T4/CUDA); see
 
 Contributions welcome — the codebase is small, dependency-free, and
 contract-first (start at [`fituna/config.py`](fituna/config.py)). See
-[CONTRIBUTING.md](CONTRIBUTING.md).
+[CONTRIBUTING.md](CONTRIBUTING.md), the development methodology in
+[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md), release history in
+[CHANGELOG.md](CHANGELOG.md), and vulnerability reporting in
+[SECURITY.md](SECURITY.md).
 
 ## License
 
