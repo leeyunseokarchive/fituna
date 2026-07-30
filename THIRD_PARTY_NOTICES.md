@@ -28,8 +28,16 @@ them, in line with the conditions of their respective licenses.
     (`fituna/bench.py`)
   - `llama-perplexity` — measure quality loss vs. a baseline
     (`fituna/quality.py`)
-  - `llama-imatrix` (optional) and the HF→GGUF `convert_hf_to_gguf.py`
-    script (optional) — model conversion (`fituna/model_info.py`)
+  - the HF→GGUF `convert_hf_to_gguf.py` script (optional) — convert an
+    HF-format model directory to a base F16 GGUF
+    (`fituna/model_info.py:ensure_base_gguf`)
+
+  Two further llama.cpp artifacts are **located but never executed** by
+  FiTuna: `llama-cli` is resolved by `fituna/report.py:_find_llama_cli`
+  only so the printed `run command:` names a real path, and is reported as
+  an optional check by `fituna doctor`; `llama-imatrix` is resolved by
+  `fituna/binaries.py:locate_binaries` and printed by
+  `fituna list-binaries`, and no code path invokes it today.
 
   FiTuna only starts these as separate OS processes and parses their
   stdout/stderr/exit code. **No llama.cpp source file or compiled binary is
@@ -83,6 +91,7 @@ absent:
 | `nvidia-smi` | Ships with the NVIDIA driver package | NVIDIA proprietary (not redistributed by FiTuna — invocation only) | Query NVIDIA GPU name / VRAM |
 | `rocm-smi` | ROCm (https://github.com/ROCm/rocm_smi_lib) | MIT | Query AMD GPU name / VRAM |
 | `system_profiler` | Ships with macOS | Apple proprietary (not redistributed by FiTuna — invocation only) | Query Apple Silicon unified memory |
+| `sysctl` | Ships with macOS / BSD base system | BSD-3-Clause (`apple-oss-distributions/system_cmds/sysctl/sysctl.c`; not redistributed by FiTuna — invocation only) | Query total RAM (`hw.memsize`) on macOS |
 
 ---
 
@@ -140,10 +149,12 @@ template.
 
 | # | Component | License | Bundled in this repo? | Invocation |
 |---|---|---|---|---|
-| 1 | llama.cpp (`llama-quantize`, `llama-bench`, `llama-perplexity`, `llama-imatrix`, convert script) | MIT | No | `subprocess` |
+| 1 | llama.cpp (`llama-quantize`, `llama-bench`, `llama-perplexity`, convert script) | MIT | No | `subprocess` |
+| 1 | llama.cpp (`llama-cli`, `llama-imatrix`) | MIT | No | located/reported only, never executed |
 | 2 | `nvidia-smi` | NVIDIA proprietary | No | `subprocess` (optional) |
 | 2 | `rocm-smi` | MIT | No | `subprocess` (optional) |
 | 2 | `system_profiler` | Apple proprietary | No | `subprocess` (optional) |
+| 2 | `sysctl` | BSD-3-Clause | No | `subprocess` (optional) |
 | 3 | WikiText-2 corpus | CC-BY-SA | No | read as file input |
 | 4 | User-selected LLM weights | Varies by model | No | read as file input |
 | 5 | pytest (dev-only) | MIT | No (optional-deps, dev only) | not invoked at runtime |

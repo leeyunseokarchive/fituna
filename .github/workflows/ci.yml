@@ -27,6 +27,8 @@ jobs:
         run: pytest -q
       - name: Module self-checks
         run: |
+          python -m fituna.__init__
+          python -m fituna.errors
           python -m fituna.config
           python -m fituna.cache
           python -m fituna.search
