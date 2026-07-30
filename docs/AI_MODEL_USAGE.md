@@ -2,14 +2,15 @@
 
 FiTuna 자체는 AI 모델을 내장·배포·파인튜닝·재학습하지 않는
 **오케스트레이션 도구**입니다. 사용자가 실행 시점에 `--model`로 지정하는
-기존 공개 모델(예: SmolLM2-135M-Instruct, Qwen3-4B-Instruct-2507 등)을
+기존 공개 모델(예: SmolLM2-135M-Instruct, Qwen3-4B-Instruct-2507,
+Midm-2.0-Mini-Instruct 등)을
 GGUF로 변환하고 양자화·벤치마크할 뿐, 특정 모델의 가중치를 저장소에
 포함하거나 코드에 고정하지 않습니다. 붙임2가 구분하는 세 가지 AI 활용
 유형(① 외부 모델 그대로 활용 ② 외부 모델 파인튜닝 ③ 자체 학습) 중 FiTuna
 자체에 해당하는 것은 없습니다 — 아래 "활용 유형"은 FiTuna가 아니라
 **FiTuna를 실행하는 사용자가 선택한 모델**의 활용 방식을 기준으로 작성되며,
 아래는 (A) 재사용 가능한 빈 템플릿과 (B) 본 프로젝트의 시연·검증에 실제
-사용한 모델 2개(둘 다 Apache-2.0)를 채운 예시로 구성됩니다.
+사용한 모델 3개(Apache-2.0 2개, MIT 1개)를 채운 예시로 구성됩니다.
 
 ## A. 활용 명세 템플릿 (모델 선택 시마다 채워서 사용)
 
@@ -23,10 +24,11 @@ GGUF로 변환하고 양자화·벤치마크할 뿐, 특정 모델의 가중치�
 | FiTuna의 모델 관여 범위 | 가중치를 수정하지 않음. `llama-quantize`로 정밀도만 낮추고(GGUF 양자화), `llama-bench`/`llama-perplexity`로 처리량과 품질손실(perplexity 증가율)을 측정. 학습·파인튜닝·증류·가중치 병합 없음 |
 | 상용 AI 보조 도구 활용 범위 | (본 프로젝트 개발 과정에서 사용한 상용 AI 코딩 보조 도구가 있다면 이름과 활용 범위를 구체적으로 기재. 아래 B절 참고) |
 
-## B. 시연·검증 모델 활용 명세 (작성 예시 — 실제 값, 2건)
+## B. 시연·검증 모델 활용 명세 (작성 예시 — 실제 값, 3건)
 
-본 프로젝트가 시연·검증에 실제로 사용한 모델은 아래 두 개이며, 둘 다
-Apache License 2.0(OSI 승인, 상업적 이용 제한 없음)입니다. 라이선스는
+본 프로젝트가 시연·검증에 실제로 사용한 모델은 아래 세 개이며, 모두 OSI
+승인 permissive 라이선스(Apache License 2.0 2건, MIT 1건)로 상업적 이용
+제한이 없습니다. 라이선스는
 HuggingFace API(`cardData.license`)로 2026-07-30에 직접 재확인했습니다
 (원본·GGUF 저장소 모두; `docs/OPEN_SOURCE_USAGE.md` §3–4 참고).
 
@@ -64,12 +66,33 @@ SmolLM2-135M-Instruct-f16.gguf --target-tps 240 --max-quality-loss 5
 | FiTuna의 모델 관여 범위 | 위와 동일한 절차(`llama-quantize`/`llama-bench`/`llama-perplexity`)를 4B급 모델에 적용 — 실측 품질·속도 모두에서 Q8_0이 Q6_K에 밀리는 역전 사례를 포함해 `docs/RESULTS.md` Run 2에 기록. 최종 채택 조합은 Q4_K_M, ngl=33(전체 오프로드가 아닌 최소 자원). 학습·파인튜닝·증류·가중치 병합 없음 |
 | 상용 AI 보조 도구 활용 범위 | B-1과 동일 (프로젝트 공통 개발 관행) |
 
+### B-3. K-intelligence/Midm-2.0-Mini-Instruct — 한국어 오픈웨이트 모델 실측
+
+`docs/RESULTS.md` Run 5에서 사용한 모델입니다. 한국어 코퍼스로 품질을
+평가하는 `--quality-corpus` 경로를 한국어 모델에 실제로 적용한 사례이며,
+저장소에 기록된 세 번째 실측 대상 모델입니다.
+
+| 항목 | 내용 |
+|------|------|
+| 활용 유형 | 1. 외부 모델 그대로 활용 |
+| 기반 모델명 | K-intelligence/Midm-2.0-Mini-Instruct (2.3B, KT Corporation. 실제 다운로드한 GGUF: `mykor/Midm-2.0-Mini-Instruct-gguf`) |
+| 기반 모델 라이선스 | MIT License — HuggingFace API `cardData.license: mit`으로 원본·GGUF 두 저장소 모두 확인, 원본 저장소의 `LICENSE.txt` 전문(“Copyright (c) 2025 KT Corporation”)도 직접 대조(2026-07-30). 두 저장소 모두 gated 아님 |
+| 가중치 출처 URL | https://huggingface.co/K-intelligence/Midm-2.0-Mini-Instruct (다운로드한 GGUF: https://huggingface.co/mykor/Midm-2.0-Mini-Instruct-gguf) |
+| FiTuna 소스 코드 라이선스 | MIT |
+| FiTuna의 모델 관여 범위 | B-1·B-2와 동일한 절차를 한국어·영어 두 코퍼스에 각각 적용. 목표 40 tok/s에서 통념상 최선인 Q8_0이 34.26 tok/s로 미달하고 Q4_K_M(ngl=48)이 44.62 tok/s로 목표를 충족한 결과를 `docs/RESULTS.md` Run 5에 기록. 학습·파인튜닝·증류·가중치 병합 없음 |
+| 상용 AI 보조 도구 활용 범위 | B-1과 동일 (프로젝트 공통 개발 관행) |
+
+> 참고: 한국어 오픈웨이트 모델 후보 조사에서 EXAONE 4.0 계열은 라이선스
+> 원문이 상업적 이용을 명시적으로 금지하고, Kanana 계열은 CC BY-NC 4.0
+> (비상업, OSI 미승인)이므로 제외했습니다. 대회 운영규정 제9조는 오픈웨이트를
+> 최소 요건으로 두지만, 재배포·상업 이용까지 제약이 없는 모델을 택했습니다.
+
 ## 작성 안내
 
 - 대회 제출 시 A절 템플릿을 실제로 사용/시연한 모델 기준으로 채운 표
   (B절과 같은 형태)가 최소 1개 이상 포함되어야 하며, 플레이스홀더
   상태(괄호 안내문)로만 제출하는 것은 금지됩니다. 본 문서는 B절에 그
-  예시 2건(B-1, B-2)을 이미 채워 두었습니다.
+  예시 3건(B-1, B-2, B-3)을 이미 채워 두었습니다.
 - 여러 모델로 시연했다면 B절 형태의 표를 모델별로 추가하십시오.
 - 모델별 라이선스는 시점에 따라 바뀔 수 있으므로, 실제 제출 직전
   해당 모델의 공식 라이선스 페이지를 재확인해 URL과 함께 최신 값으로
