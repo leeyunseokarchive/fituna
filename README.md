@@ -105,7 +105,28 @@ python3.13 -m venv .venv && source .venv/bin/activate
 pip install -e fituna
 ```
 
-**3. Get a quality corpus.** Quality loss is measured as perplexity increase
+**3. Let the wizard do the rest:**
+
+```bash
+fituna quickstart
+```
+
+Six steps — environment check, targets, license requirements, model
+(local scan / verified shortlist with download / HuggingFace search / your
+own path), quality corpus, then the search itself. It prints the fully
+assembled `fituna run ...` command **before** executing it, so the next run
+is a one-liner you already have. Needs a terminal; in CI or a pipe use
+`fituna run` directly — the wizard can do nothing `run` cannot.
+
+It never predicts throughput: memory fit is arithmetic (published file size
+vs detected VRAM/RAM, with the assumed margin stated), speed is measured
+rather than guessed, every candidate shows its license, and
+[`docs/RESULTS.md`](docs/RESULTS.md) numbers appear only as records of what
+was measured on named hardware.
+
+### The script path (what the wizard assembles for you)
+
+**A. Get a quality corpus.** Quality loss is measured as perplexity increase
 on a plain-text corpus — and it's only meaningful on text resembling your
 actual workload. Any UTF-8 text file works (`--quality-corpus`).
 
@@ -130,7 +151,7 @@ attribution/share-alike notice and source URL to stdout when it finishes.
 Have your own dataset in mind? `--dataset/--config/--split` override the
 preset (`fituna fetch-corpus --help`).
 
-**4. Run:**
+**B. Run:**
 
 ```bash
 fituna doctor                             # confirm the environment is ready
@@ -233,6 +254,7 @@ is newline-delimited JSON-RPC 2.0, no SDK required
 ```
 fituna/
 ├── cli.py         # argparse entry point, exit-code mapping (0/1/2/3)
+├── quickstart.py  # interactive wizard (fituna quickstart) over run's own flags
 ├── config.py      # frozen-dataclass interface contract (single source of truth)
 ├── hardware.py    # GPU/VRAM/CPU/RAM auto-detection + manual override
 ├── binaries.py    # llama.cpp binary discovery + capability introspection
@@ -249,7 +271,7 @@ fituna/
 └── report.py      # human/JSON result rendering + run-command builder
 ```
 
-178 unit tests (mocked subprocess/network layer) + per-module runnable
+241 unit tests (mocked subprocess/network layer) + per-module runnable
 self-checks + 3-OS × 2-Python CI matrix. Real-binary E2E validated on macOS (Apple
 Silicon/Metal) and Linux (NVIDIA T4/CUDA); see
 [Known limitations](#known-limitations).

@@ -23,7 +23,7 @@ grep이 아니라 실제 import 문만 집계한 결과입니다.
 | 13 | shutil (stdlib) | 3.11 내장 | PSF License | https://github.com/python/cpython | 바이너리 탐색(`shutil.which`) |
 | 14 | platform (stdlib) | 3.11 내장 | PSF License | https://github.com/python/cpython | CPU-only 폴백 HW 감지, OS 이름 판별 |
 | 15 | typing (stdlib) | 3.11 내장 | PSF License | https://github.com/python/cpython | Optional/Callable 등 타입 힌트 |
-| 16 | urllib (stdlib) | 3.11 내장 | PSF License | https://github.com/python/cpython | `fituna fetch-corpus`의 HuggingFace dataset-viewer API 호출 (`urllib.request`/`urllib.error`/`urllib.parse`) |
+| 16 | urllib (stdlib) | 3.11 내장 | PSF License | https://github.com/python/cpython | `fituna fetch-corpus`의 HuggingFace dataset-viewer API 호출, `fituna quickstart`의 HuggingFace 모델 검색(`/api/models`) 및 GGUF 다운로드 (`urllib.request`/`urllib.error`/`urllib.parse`) |
 | 17 | ctypes (stdlib) | 3.11 내장 | PSF License | https://github.com/python/cpython | Windows `GlobalMemoryStatusEx` 호출로 RAM 조회 (`hardware.py`) |
 | 18 | datetime (stdlib) | 3.11 내장 | PSF License | https://github.com/python/cpython | 캐시 결과 타임스탬프 기록 (`cache.py`) |
 | 19 | io (stdlib) | 3.11 내장 | PSF License | https://github.com/python/cpython | 인메모리 버퍼 처리 (`corpus.py` 원자적 쓰기, `mcp_server.py` stdio) |

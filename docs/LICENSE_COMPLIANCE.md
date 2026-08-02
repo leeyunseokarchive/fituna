@@ -289,7 +289,7 @@ Three facts remove the conflict:
 2. **FiTuna does not distribute it.** `fituna fetch-corpus` downloads to a
    path *the user chooses* (`--out`). The bytes travel from HuggingFace to
    the user; FiTuna is the transport, not the redistributor.
-3. **The notice is given at fetch time.** `fituna/cli.py:307`
+3. **The notice is given at fetch time.** `fituna/cli.py:320`
    (`_cmd_fetch_corpus`) prints the source URL and the license notice to
    stdout on every successful fetch, so a user who *does* go on to
    redistribute the text has been told the terms. When

@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`fituna quickstart`** — an interactive six-step wizard (environment
+  check → targets → license requirements → model → quality corpus → confirm
+  and run). It is a shell over `fituna run`'s own flags and nothing more: it
+  prints the fully assembled `fituna run ...` command, then parses that same
+  argv back through the CLI parser and executes it in-process, so what is
+  shown and what runs cannot diverge. Requires a TTY (exit 1 otherwise,
+  pointing at `fituna run`).
+  It refuses to predict throughput and says so on screen. Memory fit is
+  arithmetic only — published file size vs detected VRAM/RAM, with the
+  assumed 20 % margin stated as an assumption. The three project-verified
+  models carry a "license text verified" badge; every HuggingFace search
+  result is labelled uploader-supplied metadata with the uploader's link,
+  and gated repositories are marked unusable. Past `docs/RESULTS.md`
+  measurements appear only as records of what was measured on named
+  hardware. The HuggingFace `/api/models` response shape was verified
+  against the live API before the parser was written.
+
 - **Artifact-centric result exits.** The quantized `.gguf` the search
   already produced is now the headline of the result (path + size), followed
   by the three ways to use it, in order: a `llama-server` command (the

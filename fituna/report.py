@@ -167,7 +167,7 @@ def to_json(result: SearchResult) -> str:
     return json.dumps(_to_jsonable(result), indent=2, ensure_ascii=False)
 
 
-def _human_size(num_bytes: float) -> str:
+def human_size(num_bytes: float) -> str:
     """Decimal (SI) file size, matching how model files are usually quoted."""
     for unit in ("B", "KB", "MB", "GB"):
         if num_bytes < 1000:
@@ -183,7 +183,7 @@ def _artifact_line(gguf_path: Path) -> str:
     line is still printed without it rather than blowing up a report.
     """
     try:
-        size = f"{_human_size(gguf_path.stat().st_size)} -- "
+        size = f"{human_size(gguf_path.stat().st_size)} -- "
     except OSError:
         size = ""
     return f"  artifact: {gguf_path}  ({size}already produced during the search)"
@@ -403,9 +403,9 @@ def _self_check() -> None:
     assert human_bad.index("artifact:") < human_bad.index("1) local API server")
     assert json.loads(to_json(result_bad))["meets_target"] is False
 
-    # 6. _human_size: decimal units, matching how model files are quoted.
-    assert _human_size(999) == "999 B"
-    assert _human_size(2_300_000_000) == "2.3 GB"
+    # 6. human_size: decimal units, matching how model files are quoted.
+    assert human_size(999) == "999 B"
+    assert human_size(2_300_000_000) == "2.3 GB"
 
 
 if __name__ == "__main__":

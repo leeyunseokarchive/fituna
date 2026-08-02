@@ -15,8 +15,9 @@ search, and caching. It has zero runtime Python dependencies (stdlib only).
 ```
                               ┌───────────┐
                               │  cli.py   │  argparse entry point (run /
-                              └─────┬─────┘  detect-hw / list-binaries /
-                                    │ doctor / fetch-corpus / help);
+                              └─────┬─────┘  quickstart / detect-hw /
+                                    │ list-binaries / doctor /
+                                    │ fetch-corpus / help);
                                     │ builds TargetSpec, dispatches
         ┌───────────────┬──────────┼───────────┬──────────────────┐
         ▼                ▼          ▼           ▼                  ▼
@@ -59,6 +60,21 @@ Arrows show call direction, not import direction: `search.py` *calls*
 call back into `search.py`. `cli.py` is the only module that imports and
 calls all the others — every other module only depends on `config.py`
 (and, where noted, on `binaries.py`'s `BinaryPaths`).
+
+`fituna/quickstart.py` sits *above* `cli.py` rather than beside it: the
+`fituna quickstart` wizard is an `input()`-based shell that collects answers,
+assembles a `fituna run ...` argv, prints it, then parses that same argv back
+through `cli._build_parser()` and calls `cli._cmd_run()` in-process. It
+orchestrates existing modules only — `doctor.run_checks()` for step 1,
+`hardware.detect_hardware()` for the memory-fit arithmetic,
+`corpus.fetch_corpus()` for step 5, `report.human_size()` for every file size
+— and duplicates none of their logic. Every capability it offers maps to a
+public `run` flag by construction; a wizard-only feature would fail its own
+self-check (`python -m fituna.quickstart`). It downloads models with stdlib
+`urllib` using the same temp-file + `os.replace` atomic pattern as
+`corpus.py`, and reads the HuggingFace `/api/models` search endpoint whose
+response shape is documented (and was verified live) in that module's
+docstring.
 
 `fituna/mcp_server.py` is a second, thinner entry point alongside `cli.py`:
 a stdlib-only MCP stdio server (newline-delimited JSON-RPC 2.0, no SDK
