@@ -30,12 +30,24 @@ fituna run --model SmolLM2-135M-Instruct-f16.gguf \
   --wikitext wikitext-2-raw-test.txt --out ./out --resume
 ```
 
-| Candidate | File size | Measured gen tok/s (full offload, ctx 4096) | Measured quality loss vs F16 | Verdict at target 240 |
+| Candidate | File size (MiB) | Measured gen tok/s (full offload, ctx 4096) | Measured quality loss vs F16 | Verdict at target 240 |
 |---|---|---|---|---|
-| Q8_0 | 138 MB | 205.91 | 0.29 % | **miss** — early-exit B |
-| **Q6_K** | 132 MB | **249.50** | **0.53 %** | **PASS (ngl=30)** |
-| Q5_K_M | 107 MB | 233.26 | 3.32 % | never reached (early exit) |
-| Q4_K_M | 101 MB | 244.34 | 4.74 % | never reached (early exit) |
+| Q8_0 | 138 MiB | 205.91 | 0.29 % | **miss** — early-exit B |
+| **Q6_K** | 132 MiB | **249.50** | **0.53 %** | **PASS (ngl=30)** |
+| Q5_K_M | 107 MiB | 233.26 | 3.32 % | never reached (early exit) |
+| Q4_K_M | 101 MiB | 244.34 | 4.74 % | never reached (early exit) |
+
+*(unit correction: this column was previously labelled "MB" but the figures
+were always binary MiB — re-measured with `ls -l` on the regenerated files,
+Q8_0 144,811,072 B, Q6_K 138,382,912 B, Q5_K_M 112,103,488 B, Q4_K_M
+105,454,144 B. FiTuna's own `artifact:` line quotes decimal SI MB instead
+(`report.human_size`), so this same Q6_K file prints as `138.4 MB` there —
+the same bytes in a different unit, not a discrepancy. The `110.0 MB` /
+`111.0 MB` figures in the reconstructed report transcripts of
+`REVIEWERS.md` §5-2 and `docs/DEMO_SCRIPT.md` §4 are the size of the
+stand-in file those reconstructions pointed `artifact:` at, not of this
+Q6_K; only the tok/s and perplexity numbers in those blocks are the Run 1
+measurements.)*
 
 *(the Q5_K_M/Q4_K_M tok/s columns come from the target-300 run below, where
 every candidate was probed; at target 240 the search stops at Q6_K and never

@@ -47,6 +47,9 @@ FiTuna result: MEETS TARGET
        llama-cli -m out/Qwen3-...-Q4_K_M.gguf -ngl 33 -c 4096
 ```
 
+*(Output formatting above is reconstructed against the current version; the
+numbers are the Run 2 measurements.)*
+
 That's a real run (Apple M3 Pro — [full logs](docs/RESULTS.md)). Note what
 happened: the "obviously best" Q8_0 **failed** the speed target, Q5_K_M missed
 it by **0.41 tok/s**, and the answer wasn't just a quant — it was a quant
@@ -132,7 +135,9 @@ disk.
 
 It never predicts throughput: memory fit is arithmetic (published file size
 vs detected VRAM/RAM, with the assumed margin stated), speed is measured
-rather than guessed, every candidate shows its license, and
+rather than guessed, every curated and HuggingFace-search candidate shows its
+license (the local-scan and manual-path options cannot — a `.gguf` file
+carries no license metadata to show), and
 [`docs/RESULTS.md`](docs/RESULTS.md) numbers appear only as records of what
 was measured on named hardware.
 
@@ -316,7 +321,7 @@ fituna/
 └── report.py      # human/JSON result rendering + run-command builder
 ```
 
-241 unit tests (mocked subprocess/network layer) + per-module runnable
+246 unit tests (mocked subprocess/network layer) + per-module runnable
 self-checks + 3-OS × 2-Python CI matrix. Real-binary E2E validated on macOS (Apple
 Silicon/Metal) and Linux (NVIDIA T4/CUDA); see
 [Known limitations](#known-limitations).

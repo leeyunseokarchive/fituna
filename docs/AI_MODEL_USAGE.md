@@ -44,7 +44,7 @@ SmolLM2-135M-Instruct-f16.gguf --target-tps 240 --max-quality-loss 5
 |------|------|
 | 활용 유형 | 1. 외부 모델 그대로 활용 |
 | 기반 모델명 | HuggingFaceTB/SmolLM2-135M-Instruct (실제 다운로드한 GGUF: `bartowski/SmolLM2-135M-Instruct-GGUF`) |
-| 기반 모델 라이선스 | Apache License 2.0 — HuggingFace API `cardData.license: apache-2.0`으로 원본·GGUF 두 저장소 모두 확인(2026-07-30). 특허·표시 조건은 있으나 상업적 이용·수정·배포 제한이 없는 OSI 승인 permissive 라이선스 |
+| 기반 모델 라이선스 | Apache License 2.0 — HuggingFace API `cardData.license: apache-2.0`으로 원본·GGUF 두 저장소 모두 확인(2026-07-30). 특허·표시 조건은 있으나 상업적 이용·수정·배포 제한이 없는 OSI 승인 permissive 라이선스. **원문 파일 대조는 불가**: 2026-08-02에 두 저장소의 `siblings` 목록을 다시 조회한 결과 `LICENSE`/`LICENSE.txt`/`LICENSE.md` 어느 것도 존재하지 않아, 이 모델의 근거는 모델 카드 메타데이터뿐입니다(B-2·B-3와 달리 전문 대조 없음). `fituna quickstart`도 이 모델에만 “라이선스 메타데이터만 확인 — 원문 파일 없음” 배지를 붙입니다 |
 | 가중치 출처 URL | https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct (다운로드한 GGUF: https://huggingface.co/bartowski/SmolLM2-135M-Instruct-GGUF) |
 | FiTuna 소스 코드 라이선스 | MIT (본 저장소 `LICENSE` 참고, OSI 인증, 비상업적 이용 제한 없음) |
 | FiTuna의 모델 관여 범위 | 가중치를 수정하지 않음. `llama-quantize`로 Q8_0/Q6_K/Q5_K_M/Q4_K_M을 생성하고 `llama-bench`(tok/s)·`llama-perplexity`(wikitext-2 기준 품질손실 %)로 측정해 목표를 만족하는 최소 자원 조합(quant/ngl/ctx)만 탐색·보고 (실측값: `docs/RESULTS.md` Run 1·4). 학습·파인튜닝·증류·가중치 병합 없음 |
@@ -60,7 +60,7 @@ SmolLM2-135M-Instruct-f16.gguf --target-tps 240 --max-quality-loss 5
 |------|------|
 | 활용 유형 | 1. 외부 모델 그대로 활용 |
 | 기반 모델명 | Qwen/Qwen3-4B-Instruct-2507 (실제 다운로드한 GGUF: `unsloth/Qwen3-4B-Instruct-2507-GGUF`) |
-| 기반 모델 라이선스 | Apache License 2.0 — HuggingFace API `cardData.license: apache-2.0`으로 원본·GGUF 두 저장소 모두 확인(2026-07-30) |
+| 기반 모델 라이선스 | Apache License 2.0 — HuggingFace API `cardData.license: apache-2.0`으로 원본·GGUF 두 저장소 모두 확인(2026-07-30). 원본 저장소(`Qwen/Qwen3-4B-Instruct-2507`)의 `LICENSE` 전문(“Apache License / Version 2.0, January 2004”, 부록 저작권 표시 “Copyright 2024 Alibaba Cloud”)도 직접 대조(2026-08-02) — 표준 Apache-2.0 본문과 일치. GGUF 저장소(`unsloth/...`)에는 라이선스 파일이 없고 메타데이터와 `license_link`만 있습니다 |
 | 가중치 출처 URL | https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507 (다운로드한 GGUF: https://huggingface.co/unsloth/Qwen3-4B-Instruct-2507-GGUF) |
 | FiTuna 소스 코드 라이선스 | MIT |
 | FiTuna의 모델 관여 범위 | 위와 동일한 절차(`llama-quantize`/`llama-bench`/`llama-perplexity`)를 4B급 모델에 적용 — 실측 품질·속도 모두에서 Q8_0이 Q6_K에 밀리는 역전 사례를 포함해 `docs/RESULTS.md` Run 2에 기록. 최종 채택 조합은 Q4_K_M, ngl=33(전체 오프로드가 아닌 최소 자원). 학습·파인튜닝·증류·가중치 병합 없음 |
@@ -76,7 +76,7 @@ SmolLM2-135M-Instruct-f16.gguf --target-tps 240 --max-quality-loss 5
 |------|------|
 | 활용 유형 | 1. 외부 모델 그대로 활용 |
 | 기반 모델명 | K-intelligence/Midm-2.0-Mini-Instruct (2.3B, KT Corporation. 실제 다운로드한 GGUF: `mykor/Midm-2.0-Mini-Instruct-gguf`) |
-| 기반 모델 라이선스 | MIT License — HuggingFace API `cardData.license: mit`으로 원본·GGUF 두 저장소 모두 확인, 원본 저장소의 `LICENSE.txt` 전문(“Copyright (c) 2025 KT Corporation”)도 직접 대조(2026-07-30). 두 저장소 모두 gated 아님 |
+| 기반 모델 라이선스 | MIT License — HuggingFace API `cardData.license: mit`으로 원본·GGUF 두 저장소 모두 확인, 원본 저장소의 `LICENSE.txt` 전문(“MIT License / Copyright (c) 2025 KT Corporation”)도 직접 대조(2026-07-30, 2026-08-02 재확인) — 표준 MIT 본문과 일치. 두 저장소 모두 gated 아님 |
 | 가중치 출처 URL | https://huggingface.co/K-intelligence/Midm-2.0-Mini-Instruct (다운로드한 GGUF: https://huggingface.co/mykor/Midm-2.0-Mini-Instruct-gguf) |
 | FiTuna 소스 코드 라이선스 | MIT |
 | FiTuna의 모델 관여 범위 | B-1·B-2와 동일한 절차를 한국어·영어 두 코퍼스에 각각 적용. 목표 40 tok/s에서 통념상 최선인 Q8_0이 34.26 tok/s로 미달하고 Q4_K_M(ngl=48)이 44.62 tok/s로 목표를 충족한 결과를 `docs/RESULTS.md` Run 5에 기록. 학습·파인튜닝·증류·가중치 병합 없음 |

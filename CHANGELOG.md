@@ -20,13 +20,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   diverge. Requires a TTY (exit 1 otherwise, pointing at `fituna run`).
   It refuses to predict throughput and says so on screen. Memory fit is
   arithmetic only — published file size vs detected VRAM/RAM, with the
-  assumed 20 % margin stated as an assumption. The three project-verified
-  models carry a "license text verified" badge; every HuggingFace search
+  assumed 20 % margin stated as an assumption. A curated model whose F16
+  file exceeds that budget stays listed and selectable, flagged rather than
+  hidden — the file that actually runs is the quantized one. Each curated
+  model carries the license badge it earned: "license text verified" where a
+  real `LICENSE` file was fetched and compared (Qwen3, Mi:dm), "metadata
+  only" where the upstream repository ships none (SmolLM2); every
+  HuggingFace search
   result is labelled uploader-supplied metadata with the uploader's link,
   and gated repositories are marked unusable. Past `docs/RESULTS.md`
   measurements appear only as records of what was measured on named
   hardware. The HuggingFace `/api/models` response shape was verified
   against the live API before the parser was written.
+
+- **`fituna help [topic]`** — a subcommand that prints the same help
+  argparse would print for a given command name (`fituna help run`), and the
+  top-level help with no topic. An unknown topic exits 2 with the list of
+  valid names, matching argparse's own exit code for a bad command.
 
 - **Artifact-centric result exits.** The quantized `.gguf` the search
   already produced is now the headline of the result (path + size), followed

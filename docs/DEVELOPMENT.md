@@ -31,8 +31,9 @@ consumer in the same pull request.
 
 ## 2. Per-module self-checks
 
-All sixteen modules in `fituna/` (everything but the three-line `__main__.py`
-shim) are runnable on their own and assert their own core invariants:
+All seventeen modules in `fituna/` (18 `.py` files, everything but the
+three-line `__main__.py` shim) are runnable on their own and assert their own
+core invariants:
 
 ```bash
 python -m fituna.config          # frozen-dataclass contract
@@ -52,12 +53,12 @@ single module can be verified in isolation, including on a machine that has not
 installed pytest.
 
 They are not optional or informational: [CI](../.github/workflows/ci.yml) runs
-all sixteen of them as a required step, on every OS and Python version in the
+all seventeen of them as a required step, on every OS and Python version in the
 matrix, alongside the test suite. A self-check that fails fails the build.
 
 ## 3. Mocked-subprocess unit tests
 
-The suite is 175 tests across `tests/`, and it is designed to pass on a machine
+The suite is 246 tests across `tests/`, and it is designed to pass on a machine
 with **no llama.cpp installed and no network access**. Every external effect is
 monkeypatched at its boundary:
 
@@ -92,9 +93,9 @@ hardware-probe output parsing (`test_hardware.py`, against recorded
 `nvidia-smi`/`rocm-smi`/`system_profiler` text), hardware-detection
 fallbacks, error mapping and exit codes, and cross-platform path handling.
 It does *not* cover parsing `llama-bench`, `llama-perplexity` or
-`llama-quantize` output: `tests/` has eight files
+`llama-quantize` output: `tests/` has nine files
 (`test_cache`, `test_cli`, `test_config`, `test_corpus`, `test_doctor`,
-`test_hardware`, `test_report`, `test_search`) and none of them exercise
+`test_hardware`, `test_quickstart`, `test_report`, `test_search`) and none of them exercise
 `bench.py`, `quality.py`, `quantize.py` or `binaries.py` directly. `report.py`
 is covered by `test_report.py`, but only its pure parts (command building,
 Modelfile export, rendering) — it spawns no subprocess to begin with.
@@ -123,8 +124,8 @@ request and every push to `main`:
 Six jobs, `fail-fast: false` so one platform's failure does not hide another's.
 Each job installs the package with `pip install -e .` plus pytest — that install
 is itself the zero-runtime-dependency check, since anything FiTuna imported and
-did not declare would fail there — then runs `pytest -q` and all sixteen module
-self-checks.
+did not declare would fail there — then runs `pytest -q` and all seventeen
+module self-checks.
 
 3.11 is the floor declared in `pyproject.toml`; 3.13 is the current release.
 Windows is in the matrix because FiTuna manipulates paths and parses tool

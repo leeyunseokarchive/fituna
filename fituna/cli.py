@@ -48,6 +48,8 @@ Exit codes:
 from __future__ import annotations
 
 import argparse
+import contextlib
+import io
 import logging
 import sys
 from dataclasses import asdict, fields, replace
@@ -184,8 +186,17 @@ def _build_parser() -> argparse.ArgumentParser:
         "quickstart",
         help="interactive wizard: environment check -> targets -> license -> "
         "model -> corpus -> the assembled `fituna run` command, executed for you",
+        description="Interactive six-step wizard that asks what you want, picks "
+        "a model, fetches a corpus, then assembles and runs the equivalent "
+        "`fituna run` command in-process -- it adds no capability `run` lacks "
+        "and prints the exact command it runs. Requires an interactive "
+        "terminal (a non-TTY stdin exits 1).",
     )
-    qs.add_argument("--llama-bin-dir", default=None, dest="llama_bin_dir")
+    qs.add_argument(
+        "--llama-bin-dir", default=None, dest="llama_bin_dir",
+        help="directory holding the llama.cpp binaries, passed straight through "
+        "to the assembled `fituna run` (default: search PATH)",
+    )
     qs.add_argument("--out", default="./out", help="working/output directory")
 
     hp = sub.add_parser(
@@ -640,7 +651,11 @@ def _selfcheck() -> None:
     for subparser in subparsers_action.choices.values():
         subparser.format_help()  # must not raise for any registered name
 
-    assert _cmd_help(argparse.Namespace(topic="not-a-real-command")) == 2
+    # _cmd_help prints its "unknown command" diagnostic to stderr -- correct
+    # for a real invocation, but here it is the asserted behaviour, not a
+    # problem. Swallow it so `--selfcheck` emits only its OK line.
+    with contextlib.redirect_stderr(io.StringIO()):
+        assert _cmd_help(argparse.Namespace(topic="not-a-real-command")) == 2
 
     try:
         _parse_ctx_candidates("")
