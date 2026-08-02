@@ -17,6 +17,7 @@ The HF search parser is checked against `tests/fixtures/hf_models_search.json`
 from __future__ import annotations
 
 import json
+import shlex
 from pathlib import Path
 
 import pytest
@@ -644,7 +645,10 @@ def test_the_command_is_printed_before_it_runs(wizard, tmp_path, capsys):
     (tmp_path / "c.txt").write_text("hi", encoding="utf-8")
     _code, recorded = wizard(_answers())
     out = capsys.readouterr().out
-    assert "fituna " + " ".join(recorded["argv"]) in out
+    # The wizard prints shlex.join(argv), which equals " ".join on clean
+    # POSIX paths but not on Windows, where backslashes in tmp_path trigger
+    # quoting -- asserting the plain join broke both windows-latest CI legs.
+    assert "fituna " + shlex.join(recorded["argv"]) in out
     assert "다음부터는 이 명령을 직접 쓰시면 됩니다" in out
 
 
