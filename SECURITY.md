@@ -44,11 +44,14 @@ an attacker-writable `convert_hf_to_gguf.py` is enough to get it executed.
 Treat that fallback as part of the boundary: `--llama-bin-dir` and everything
 up to two parents above it are inputs you control.
 
-FiTuna never executes `llama-cli`: `fituna doctor`/`report.py` only locate it
-on `PATH`/`--llama-bin-dir` to report whether it's available, and
-`fituna run`'s `--json`/human output emits a `llama-cli ...` command string
-(`report.py`'s `build_run_command`) for *you* to run afterwards — it is not
-run by FiTuna itself.
+FiTuna never executes `llama-cli` or `llama-server`: `fituna doctor`/
+`report.py` only locate them on `PATH`/`--llama-bin-dir` to report whether
+they are available, and `fituna run`'s `--json`/human output emits
+`llama-cli ...` / `llama-server ...` command strings (`report.py`'s
+`build_run_command` / `build_server_command`) for *you* to run afterwards —
+they are not run by FiTuna itself. `--export-ollama` likewise only *writes*
+a `Modelfile` next to the produced `.gguf` (`report.py`'s
+`export_ollama_modelfile`); FiTuna never invokes `ollama`.
 
 Bugs *inside* this boundary — FiTuna mishandling an untrusted path, model
 file, script, or downloaded corpus in a way that grants more than the above —

@@ -21,14 +21,22 @@ FiTuna는 로컬 LLM(llama.cpp)을 돌릴 때 **어떤 양자화 레벨(quant)�
 |---|---|
 | **입력** | F16 GGUF 모델 파일, 목표 생성속도(tok/s), 허용 품질저하(%), 컨텍스트 길이, 품질 측정용 텍스트 코퍼스 |
 | **처리** | llama.cpp 바이너리(`llama-quantize` → `llama-perplexity` → `llama-bench`)를 직접 호출해 후보를 **실제로 양자화하고, 실제로 perplexity를 재고, 실제로 벤치마크**한다 |
-| **출력** | 목표를 만족하는 가장 작은 구성(quant × `-ngl` × ctx) + 실측 tok/s + 실측 품질손실 + **그대로 복사해 실행 가능한 `llama-cli` 커맨드** |
+| **출력** | 목표를 만족하는 가장 작은 구성(quant × `-ngl` × ctx) + 실측 tok/s + 실측 품질손실 + **이미 만들어진 gguf 산출물(artifact)** 과 그걸 바로 쓰는 세 가지 방법 — 로컬 API 서버(`llama-server`) / Ollama(`--export-ollama`) / 대화형 확인용 `llama-cli` 커맨드 |
 
 **무엇을 확인하면 "정상 동작"인가.** `fituna doctor`가 9개 점검 항목을 출력하고
 실패 0건이면 환경 준비가 끝난 것이고, `fituna run`이 단계별 진행 로그(양자화 →
-품질 평가 → 벤치)를 흘린 뒤 마지막에 `FiTuna result:` 블록과 `run command:` 줄을
-출력하면 정상 동작이다. **종료 코드 0(목표 달성)과 종료 코드 3(목표 미달 + 최선
-구성 보고)은 둘 다 정상 동작이며, 3은 버그가 아니다.** 이 구분은 5장에서 자세히
-설명한다 — 검증 전에 5장을 먼저 읽어도 좋다.
+품질 평가 → 벤치)를 흘린 뒤 마지막에 `FiTuna result:` 블록과 산출물(artifact)
+블록 — 생성된 gguf 경로·크기, 그리고 그걸 바로 쓰는 세 가지 방법(로컬 API 서버 /
+Ollama / 대화형 `llama-cli`) — 을 출력하면 정상 동작이다. **종료 코드 0(목표
+달성)과 종료 코드 3(목표 미달 + 최선 구성 보고)은 둘 다 정상 동작이며, 3은
+버그가 아니다.** 이 구분은 5장에서 자세히 설명한다 — 검증 전에 5장을 먼저
+읽어도 좋다.
+
+> **버전 참고.** 이 문서의 4-6·5-2에 있는 2026-07-30 실행 기록(타임스탬프가 찍힌
+> 전체 출력)은 결과 블록이 `run command:` 한 줄로 끝나던 0.2 이전 형식을 그대로
+> 보존한 **실측 기록**이며, 재현 여부 판정을 위해 손대지 않는다. 현재 버전은 그
+> 자리를 산출물(artifact) 블록 + 세 가지 사용법으로 대체했다 — 각 절 아래에 현재
+> 버전으로 재현한 실제 출력을 별도 박스로 덧붙였다.
 
 ---
 
@@ -84,8 +92,14 @@ FiTuna는 로컬 LLM(llama.cpp)을 돌릴 때 **어떤 양자화 레벨(quant)�
 > FiTuna result: BEST EFFORT (target not met)
 >   quant : Q6_K   ngl : ...   ctx : 4096
 >   gen tok/s (tg): 205.50      quality loss : 0.83%
->   run command:
->     ...llama-cli -m ... -ngl ... -c 4096
+>
+>   artifact: .../SmolLM2-...-Q6_K.gguf  (... already produced during the search)
+>
+>   1) local API server (OpenAI-compatible):
+>        ...llama-server -m ... -ngl ... -c 4096 --port 8080
+>   2) import into Ollama: re-run with --export-ollama to write a Modelfile ...
+>   3) terminal chat (interactive check):
+>        ...llama-cli -m ... -ngl ... -c 4096
 > ```
 >
 > 이것은 **오류가 아니라 이 도구의 핵심 기능**이다. "목표를 달성했다"고
@@ -268,11 +282,46 @@ FiTuna result: MEETS TARGET
   품질이 좋은 순서로 벤치하고, 목표를 만족하면 **즉시 멈춘다**(조기종료). 이때
   `-ngl`은 전량 오프로드(30)가 아니라 **목표를 만족하는 최소값(28)**을 이진
   탐색으로 찾은 결과다.
-- 마지막 `run command:` 줄은 그대로 복사해 실행할 수 있다. 이 줄에는 프롬프트
-  플래그가 없어 `llama-cli`가 대화형 입력을 기다린다 — 스크립트로 비대화형
-  실행할 때는 `-p "..." -n 64 -no-cnv` 같은 플래그를 덧붙여야 stdin에서
-  멈추지 않는다.
+- 위 기록에서 마지막 `run command:` 줄은 그대로 복사해 실행할 수 있었다(0.2
+  이전 형식). **현재 버전은 이 자리를 산출물(artifact) 블록 + 세 가지 사용법으로
+  대체했다** — 아래 참고 박스가 같은 측정값을 현재 버전으로 재현한 실제 출력이다.
+  `llama-cli` 커맨드는 여전히 나오지만 옵션 3) "대화형 확인용"으로 격하되었고,
+  프롬프트 플래그가 없어 대화형 입력을 기다리므로 스크립트로 비대화형 실행할
+  때는 `-p "..." -n 64 -no-cnv` 같은 플래그를 덧붙여야 stdin에서 멈추지 않는다.
 - 작업 디렉토리 `./out`에 양자화된 GGUF 4개가 생성된다(직접 측정: 합계 478 MB).
+
+> **현재 버전(0.2+) 출력 형태 — 위와 같은 측정값을, 현재 코드의 `to_human()`을
+> 직접 호출해(고정된 `SearchResult`를 넘겨) 재현한 실제 출력.** `fituna run`을
+> 새로 돌리지 않고 이미 확보된 실측값(quant/tok/s/perplexity)을 그대로 현재
+> 렌더러에 통과시킨 것이므로, 벤치마크 숫자 자체는 위 4-6 기록과 동일하고
+> **블록의 형태만** 현재 버전 것이다:
+>
+> ```
+> FiTuna result: MEETS TARGET
+>
+>   quant           : Q8_0
+>   ngl             : 28
+>   ctx             : 4096
+>
+>   prompt tok/s (pp): 1669.37
+>   gen tok/s    (tg): 257.62
+>
+>   perplexity      : 18.2931 (baseline 18.2407)
+>   quality loss    : 0.29%
+>
+>   artifact: out/SmolLM2-135M-Instruct-83beb8b331ac-Q8_0.gguf  (145.0 MB -- already produced during the search)
+>
+>   1) local API server (OpenAI-compatible):
+>        /opt/homebrew/bin/llama-server -m out/SmolLM2-135M-Instruct-83beb8b331ac-Q8_0.gguf -ngl 28 -c 4096 --port 8080
+>   2) import into Ollama: re-run with --export-ollama to write a Modelfile beside the artifact
+>   3) terminal chat (interactive check):
+>        /opt/homebrew/bin/llama-cli -m out/SmolLM2-135M-Instruct-83beb8b331ac-Q8_0.gguf -ngl 28 -c 4096
+> ```
+>
+> `--export-ollama`를 추가하면 2)가 `ollama create <name> -f out/Modelfile`로
+> 바뀌고, `out/Modelfile`이 실제로 쓰인다(내용: `FROM ./<gguf 파일명>` +
+> `PARAMETER num_gpu <ngl>` + `PARAMETER num_ctx <ctx>` 세 줄 — 직접 실행해 확인,
+> `docs/DEMO_SCRIPT.md` 참고).
 
 > **주의 — 승자 quant와 절대 수치는 기기·세션마다 다르다.** 위 실행에서는
 > Q8_0이 257.62 tok/s로 목표를 통과했지만, 같은 기기에서 이전에 측정된 기록
@@ -392,12 +441,48 @@ FiTuna result: BEST EFFORT (target not met)
 결과**로 기재되어 있다. 경로 A(Colab)를 따라가면 셀 6에서 이 상황을 그대로 보게
 된다.
 
+> **현재 버전(0.2+) 출력 형태 — 목표 미달(종료 코드 3) + `--export-ollama` 동시
+> 사용.** 위 4-6 참고 박스와 같은 방식으로, 실측값을 고정한 `SearchResult`를
+> `NoFeasibleConfigError.closest`로 발생시켜 현재 코드의 `main()`을 그대로
+> 통과시킨 실제 출력이다(exit code 3):
+>
+> ```
+> ERROR fituna: no quant/ngl/ctx combination met target_tokens_per_sec within max_quality_loss_pct
+> INFO fituna: closest best-effort attempt:
+> FiTuna result: BEST EFFORT (target not met)
+>
+>   quant           : Q6_K
+>   ngl             : 30
+>   ctx             : 4096
+>
+>   prompt tok/s (pp): 1580.20
+>   gen tok/s    (tg): 205.50
+>
+>   perplexity      : 18.4438 (baseline 18.2407)
+>   quality loss    : 0.83%
+>
+>   artifact: out/SmolLM2-135M-Instruct-83beb8b331ac-Q6_K.gguf  (110.0 MB -- already produced during the search)
+>
+>   1) local API server (OpenAI-compatible):
+>        /opt/homebrew/bin/llama-server -m out/SmolLM2-135M-Instruct-83beb8b331ac-Q6_K.gguf -ngl 30 -c 4096 --port 8080
+>   2) import into Ollama:
+>        ollama create <name> -f out/Modelfile
+>   3) terminal chat (interactive check):
+>        /opt/homebrew/bin/llama-cli -m out/SmolLM2-135M-Instruct-83beb8b331ac-Q6_K.gguf -ngl 30 -c 4096
+> ```
+>
+> 주목할 점: `2)`가 "재실행하라"는 안내가 아니라 실제 `ollama create` 명령이다.
+> `--export-ollama`를 준 사용자는 목표를 달성하지 못한 경우에도(종료 코드 3)
+> `out/Modelfile`을 실제로 받는다 — 이전 버전은 이 경로에서 Modelfile을 쓰지
+> 않고 "`--export-ollama`로 재실행하라"는, 이미 준 플래그를 다시 주라는 안내를
+> 출력했었다(수정됨).
+
 ### 5-3. 오작동·크래시와 구분하는 방법
 
 | | 정상 동작 (코드 0 또는 3) | 실제 오작동 |
 |---|---|---|
 | 결과 블록 | `FiTuna result:` 블록이 완결된 형태로 출력됨 | 출력되지 않음 |
-| `run command:` | 항상 출력됨 | 없음 |
+| 산출물(artifact) 블록 | `artifact:` 줄 + 세 가지 사용법(서버/Ollama/`llama-cli`)이 항상 출력됨 | 없음 |
 | Python traceback | **없음** | `Traceback (most recent call last):` 가 그대로 노출됨 |
 | 종료 코드 | 0 또는 3 | 1 (예상치 못한 예외는 `unexpected error`로 로깅) |
 
@@ -612,7 +697,7 @@ ERROR fituna: could not reach the HuggingFace dataset-viewer API: The read opera
 5. `full-offload ... < target ..., skipping (early-exit B)` 또는
    `found ngl=N meeting target -- done`
 6. `FiTuna result: MEETS TARGET` **또는** `FiTuna result: BEST EFFORT (target not met)`
-   + `run command:` 줄
+   + 산출물(artifact) 블록(gguf 경로·크기 + 서버/Ollama/`llama-cli` 세 가지 사용법)
 
 이 6단계가 순서대로 나타나면, 숫자가 무엇이든 정상 동작이다.
 

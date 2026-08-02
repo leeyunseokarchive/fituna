@@ -289,7 +289,7 @@ Three facts remove the conflict:
 2. **FiTuna does not distribute it.** `fituna fetch-corpus` downloads to a
    path *the user chooses* (`--out`). The bytes travel from HuggingFace to
    the user; FiTuna is the transport, not the redistributor.
-3. **The notice is given at fetch time.** `fituna/cli.py:276`
+3. **The notice is given at fetch time.** `fituna/cli.py:293`
    (`_cmd_fetch_corpus`) prints the source URL and the license notice to
    stdout on every successful fetch, so a user who *does* go on to
    redistribute the text has been told the terms. When
@@ -786,7 +786,7 @@ for f in fituna/*.py tests/*.py; do head -1 "$f"; done | sort | uniq -c
 
 # --- 8. nothing broke (same two steps CI runs) --------------------------
 /tmp/runtimeenv/bin/python -m pip install pytest
-/tmp/runtimeenv/bin/python -m pytest -q            # expect: 152 passed
+/tmp/runtimeenv/bin/python -m pytest -q            # expect: 0 failed (175 passed at the time of writing)
 for m in __init__ errors config cache search model_info quantize quality \
          bench hardware binaries report; do /tmp/runtimeenv/bin/python -m fituna.$m || break; done
 for m in corpus doctor cli mcp_server; do /tmp/runtimeenv/bin/python -m fituna.$m --selfcheck || break; done

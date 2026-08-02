@@ -22,7 +22,9 @@ FiTuna가 "모델 지정 → 하드웨어/품질 제약 조건 → 최적 양자
 1. 사람이 quant × ngl × ctx 조합을 수동으로 벤치마크할 필요가 없다.
 2. 품질(perplexity) 우선 필터 덕분에 "품질 저하가 허용 범위 안에서 가장 좋은"
    조합을 찾으며, 목표를 만족하는 순간 즉시 멈춘다(조기종료).
-3. 결과물은 추상적인 점수가 아니라 **그대로 복사해서 실행 가능한 커맨드**다.
+3. 결과물은 추상적인 점수나 명령 한 줄이 아니라 **이미 만들어진 산출물(gguf
+   파일)** 이고, 그걸 바로 쓰는 세 가지 방법(로컬 API 서버 / Ollama / 대화형
+   확인용 `llama-cli`)이 함께 나온다.
 
 ## 사전 준비 (녹화 최소 하루 전에 끝낼 것)
 
@@ -122,7 +124,12 @@ INFO fituna: [Q6_K] found ngl=30 meeting target -- done
 
 ### 4. 2:20–2:50 — 결과 확인
 
-탐색이 끝나면 사람이 읽는 최종 리포트가 출력된다 (M3 Pro 실측):
+탐색이 끝나면 사람이 읽는 최종 리포트가 출력된다. 아래는 같은 측정값(M3 Pro
+실측, Q6_K/ngl=30/249.50 tok/s/품질손실 0.53%)을 현재 버전의 `to_human()`으로
+재현한 실제 출력이다 — `fituna run --model ... --out ./out`처럼 상대 경로로
+찍으면 `artifact:` 줄도 `out/...`으로 나온다 (`llama-server`/`llama-cli`
+경로는 이 환경의 실제 Homebrew 설치 경로 `/opt/homebrew/bin/...`; 녹화
+환경에서는 그 기기의 실제 PATH가 그대로 찍힌다):
 
 ```
 FiTuna result: MEETS TARGET
@@ -130,7 +137,6 @@ FiTuna result: MEETS TARGET
   quant           : Q6_K
   ngl             : 30
   ctx             : 4096
-  gguf            : out/SmolLM2-135M-Instruct-d4777063db8a-Q6_K.gguf
 
   prompt tok/s (pp): 2939.98
   gen tok/s    (tg): 249.50
@@ -138,15 +144,29 @@ FiTuna result: MEETS TARGET
   perplexity      : 18.3377 (baseline 18.2407)
   quality loss    : 0.53%
 
-  run command:
-    llama-cli -m out/SmolLM2-135M-Instruct-d4777063db8a-Q6_K.gguf -ngl 30 -c 4096
+  artifact: out/SmolLM2-135M-Instruct-d4777063db8a-Q6_K.gguf  (111.0 MB -- already produced during the search)
+
+  1) local API server (OpenAI-compatible):
+       /opt/homebrew/bin/llama-server -m out/SmolLM2-135M-Instruct-d4777063db8a-Q6_K.gguf -ngl 30 -c 4096 --port 8080
+  2) import into Ollama: re-run with --export-ollama to write a Modelfile beside the artifact
+  3) terminal chat (interactive check):
+       /opt/homebrew/bin/llama-cli -m out/SmolLM2-135M-Instruct-d4777063db8a-Q6_K.gguf -ngl 30 -c 4096
 ```
 
 - **내레이션**:
-  > "결과는 선택된 quant, ngl, ctx, 실측 tok/s, 품질 손실률, 그리고 그대로
-  > 복사해서 실행 가능한 `llama-cli` 커맨드까지 한 번에 나옵니다."
-- 화면에서 `llama-cli ...` 줄을 마우스로 드래그해 복사하는 동작을 보여주면
-  "그대로 실행 가능"이라는 메시지가 시각적으로 강화된다.
+  > "결과 화면의 주인공은 명령 한 줄이 아니라, 탐색 도중 이미 만들어진 gguf
+  > 파일 그 자체입니다. 그 아래로 이 파일을 바로 쓰는 세 가지 방법이 나옵니다 —
+  > 1) OpenAI 호환 로컬 API 서버로 띄우거나, 2) Ollama로 가져오거나, 3)
+  > `llama-cli`로 대화형 확인을 해 볼 수 있습니다. quant, ngl, ctx, 실측
+  > tok/s, 품질 손실률도 함께 나옵니다."
+- 화면에서 `artifact:` 줄과 세 가지 방법 블록을 순서대로 하이라이트하면
+  "결과 = 산출물 + 사용법"이라는 메시지가 시각적으로 강화된다.
+- **(선택) `--export-ollama` 한 컷 추가**: 같은 명령에 `--export-ollama`를
+  붙이면 2)가 `ollama create <name> -f out/Modelfile`로 바뀌고, `out/Modelfile`
+  이 실제로 생성된다(`FROM ./<gguf 파일명>` + `PARAMETER num_gpu <ngl>` +
+  `PARAMETER num_ctx <ctx>` 세 줄 — 직접 실행해 확인). 시간이 남으면 `cat
+  out/Modelfile`을 짧게 비춰 "산출물이 곧바로 다른 도구의 입력이 된다"는
+  포인트를 보강한다.
 - **캐시 재사용 보여주기**: 같은 커맨드를 한 번 더 실행한다(--resume 포함).
   이번에는 quantize/bench/perplexity를 다시 돌리지 않고 `.fituna_cache.sqlite3`
   에서 즉시 읽어와 **1초 미만**(실측 0.75초)에 동일한 결과가 출력된다.
@@ -199,6 +219,6 @@ FiTuna result: MEETS TARGET
 - [ ] 각 컷의 내레이션과 화면 타이밍이 맞는지 확인.
 - [ ] 로그에서 조기종료 A(품질 게이트 탈락)/B(속도 미달로 quant 스킵)/C(ngl=0
   으로 즉시 채택)가 실제로 발생한 줄에 자막 하이라이트를 넣었는지 확인.
-- [ ] 최종 리포트의 `run_command` 줄이 화면에 최소 2초 이상 고정되어 시청자가
-  읽을 수 있는지 확인.
+- [ ] 최종 리포트의 `artifact:` 줄과 세 가지 사용법(서버/Ollama/`llama-cli`)
+  블록이 화면에 최소 2초 이상 고정되어 시청자가 읽을 수 있는지 확인.
 - [ ] 전체 영상 길이가 3분(±10초) 이내인지 확인.

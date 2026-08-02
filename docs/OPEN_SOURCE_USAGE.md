@@ -46,7 +46,7 @@ library. That is what "zero runtime dependencies" actually means.
 
 | # | Area | Open-source software | License (verified) | Coupling | Where in this repo |
 |---|---|---|---|---|---|
-| 1 | Inference / quantization engine | llama.cpp (`llama-quantize`, `llama-bench`, `llama-perplexity`, `convert_hf_to_gguf.py`) | MIT | subprocess (`llama-cli`: emitted in the result command, never run) | `quantize.py`, `bench.py`, `quality.py`, `model_info.py`, `binaries.py`, `report.py` |
+| 1 | Inference / quantization engine | llama.cpp (`llama-quantize`, `llama-bench`, `llama-perplexity`, `convert_hf_to_gguf.py`) | MIT | subprocess (`llama-cli`/`llama-server`: emitted in the result commands, never run) | `quantize.py`, `bench.py`, `quality.py`, `model_info.py`, `binaries.py`, `report.py` |
 | 2 | Model file format | GGUF (ggml) | MIT (spec repo) | file format | `model_info.py:201` `read_model_info()` |
 | 3 | Model weights | SmolLM2-135M-Instruct | Apache-2.0 | file format (user-supplied) | `docs/RESULTS.md` Run 1/4, `notebooks/` |
 | 4 | Model weights | Qwen3-4B-Instruct-2507 | Apache-2.0 | file format (user-supplied) | `docs/RESULTS.md` Run 2/3 |
@@ -88,12 +88,14 @@ run through `sys.executable`):
 | `llama-perplexity` | `fituna/quality.py:56` (`compute_perplexity()`) | Measure perplexity for the quality-loss gate |
 | `convert_hf_to_gguf.py` | `fituna/model_info.py:166` (`ensure_base_gguf()`) | Convert an HF-format directory to a base F16 GGUF |
 
-Two more are *located but never executed*: `llama-cli` is resolved by
-`fituna/report.py:25` (`_find_llama_cli()`) purely so the printed
-`run command:` line names a real path, and is checked by `fituna doctor`
-(`doctor.py:300`) as an optional check; `llama-imatrix` is resolved by
+Three more are *located but never executed*: `llama-cli` and `llama-server`
+are resolved by `fituna/report.py:32` (`_find_beside_binaries()`, via
+`_find_llama_cli()` / `_find_llama_server()`) purely so the result's
+`3) terminal chat` and `1) local API server` lines name a real path, and
+`llama-cli` is checked by `fituna doctor` (`doctor.py:312`) as an optional
+check; `llama-imatrix` is resolved by
 `fituna/binaries.py:99` and printed by `fituna list-binaries`
-(`cli.py:220`), and no code path invokes it today. Stating this precisely
+(`cli.py:240`), and no code path invokes it today. Stating this precisely
 matters — claiming FiTuna "uses llama-imatrix" would overstate the
 relationship.
 
@@ -134,7 +136,7 @@ Deliberate design consequences of the subprocess boundary:
   wording changed across llama.cpp releases; `bench.py:43` distinguishes
   llama-bench's prompt/generation records by `n_prompt`/`n_gen` rather than
   by the `"pp512"`-style label, because that label format has changed.
-  `report.py:22` accepts `main` as well as `llama-cli`, upstream's older
+  `report.py:28` accepts `main` as well as `llama-cli`, upstream's older
   binary name.
 
 **Alternative considered.** Binding to `libllama` (ctypes or a compiled
@@ -256,7 +258,7 @@ attribution text.
 to this repository; `.gitignore` keeps `*.txt` outputs out. Because the
 corpus is downloaded to a path of the user's choosing and never
 redistributed by FiTuna, CC BY-SA's share-alike condition is not triggered
-by FiTuna itself — but the user can trigger it, so `cli.py:276`
+by FiTuna itself — but the user can trigger it, so `cli.py:293`
 (`_cmd_fetch_corpus`) **prints the license notice and source URL to stdout
 on every successful fetch**. When `--dataset/--config/--split` override a
 preset, that same code path deliberately prints a *generic* "check this
@@ -384,7 +386,7 @@ write-then-rename, spread across `corpus.py`, `quantize.py`, `binaries.py`,
 timestamps), `textwrap` (`doctor.py` output formatting), `unittest.mock`
 (patches `subprocess.run` in exactly one self-check, `bench.py:147`, for its
 three failure-mode assertions; other self-checks that touch `subprocess`
-monkeypatch this module's own names directly instead — `search.py:428-430`'s
+monkeypatch this module's own names directly instead — `search.py:434-436`'s
 own docstring says it does this "rather than pulling in
 unittest.mock/pytest" — and six of the sixteen self-check modules,
 `__init__`/`errors`/`config`/`corpus`/`doctor`/`mcp_server`, never reference
@@ -586,7 +588,7 @@ the obligation set is small and fully discharged in-repo:
 | Obligation | Source | Discharged by |
 |---|---|---|
 | Preserve the MIT notice | llama.cpp, ggml | `THIRD_PARTY_NOTICES.md` §1 reproduces the full MIT text |
-| Attribution + share-alike | CC BY-SA 3.0 corpora | `fituna fetch-corpus` prints the notice and source URL on every fetch (`cli.py:276`); no corpus text is committed |
+| Attribution + share-alike | CC BY-SA 3.0 corpora | `fituna fetch-corpus` prints the notice and source URL on every fetch (`cli.py:293`); no corpus text is committed |
 | Model license compliance | User's chosen weights | Weights are never redistributed; `docs/AI_MODEL_USAGE.md` carries the disclosure template, and every model in the published results is Apache-2.0 |
 | FiTuna's own terms | MIT (`LICENSE`) | Permissive; imposes nothing on users |
 

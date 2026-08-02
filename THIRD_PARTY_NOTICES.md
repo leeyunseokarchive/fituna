@@ -32,9 +32,10 @@ them, in line with the conditions of their respective licenses.
     HF-format model directory to a base F16 GGUF
     (`fituna/model_info.py:ensure_base_gguf`)
 
-  Two further llama.cpp artifacts are **located but never executed** by
-  FiTuna: `llama-cli` is resolved by `fituna/report.py:_find_llama_cli`
-  only so the printed `run command:` names a real path, and is reported as
+  Three further llama.cpp artifacts are **located but never executed** by
+  FiTuna: `llama-cli` and `llama-server` are resolved by
+  `fituna/report.py:_find_llama_cli` / `_find_llama_server` only so the
+  printed result commands name a real path, and `llama-cli` is reported as
   an optional check by `fituna doctor`; `llama-imatrix` is resolved by
   `fituna/binaries.py:locate_binaries` and printed by
   `fituna list-binaries`, and no code path invokes it today.
@@ -150,7 +151,7 @@ template.
 | # | Component | License | Bundled in this repo? | Invocation |
 |---|---|---|---|---|
 | 1 | llama.cpp (`llama-quantize`, `llama-bench`, `llama-perplexity`, convert script) | MIT | No | `subprocess` |
-| 1 | llama.cpp (`llama-cli`, `llama-imatrix`) | MIT | No | located/reported only, never executed |
+| 1 | llama.cpp (`llama-cli`, `llama-server`, `llama-imatrix`) | MIT | No | located/reported only, never executed |
 | 2 | `nvidia-smi` | NVIDIA proprietary | No | `subprocess` (optional) |
 | 2 | `rocm-smi` | MIT | No | `subprocess` (optional) |
 | 2 | `system_profiler` | Apple proprietary | No | `subprocess` (optional) |

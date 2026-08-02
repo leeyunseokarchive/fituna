@@ -5,6 +5,27 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Artifact-centric result exits.** The quantized `.gguf` the search
+  already produced is now the headline of the result (path + size), followed
+  by the three ways to use it, in order: a `llama-server` command (the
+  OpenAI-compatible local API), Ollama, and `llama-cli` — demoted to what it
+  actually is, an interactive check. `report.build_server_command()` resolves
+  `llama-server` exactly the way `llama-cli` is resolved: **located, never
+  executed**, falling back to the bare name (and saying so) when it isn't
+  installed.
+- **`fituna run --export-ollama`** writes an Ollama `Modelfile`
+  (`FROM ./<gguf>` + the measured `num_gpu`/`num_ctx`) next to the `.gguf`,
+  atomically. The `FROM` path is relative so the `--out` directory stays
+  relocatable. PARAMETER names verified against Ollama's documentation on
+  2026-08-02, not written from memory.
+- **`run --json` gains `llama_server_command` and `modelfile_path`**
+  (the latter `null` unless `--export-ollama` was passed). Additive only —
+  every existing field keeps its name and shape.
+
 ## [0.1.0] — 2026-07-30
 
 Initial public release: everything below is the work recorded in this
