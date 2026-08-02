@@ -388,7 +388,7 @@ timestamps), `textwrap` (`doctor.py` output formatting), `unittest.mock`
 three failure-mode assertions; other self-checks that touch `subprocess`
 monkeypatch this module's own names directly instead — `search.py:434-436`'s
 own docstring says it does this "rather than pulling in
-unittest.mock/pytest" — and six of the sixteen self-check modules,
+unittest.mock/pytest" — and six of the seventeen self-check modules,
 `__init__`/`errors`/`config`/`corpus`/`doctor`/`mcp_server`, never reference
 `subprocess` at all), and `tomllib` (`fituna/__init__.py:11`'s version-drift
 self-check, parsing `pyproject.toml`) — the one genuinely 3.11-only module in
@@ -401,7 +401,7 @@ path imports `tomllib`, so it does not force the 3.11 floor for an
 installer; `requires-python` is simply a declared constraint (see the
 Python-floor note two paragraphs down for how it is verified in CI). An AST
 scan of every top-level import across `fituna/*.py` finds
-exactly 26 such modules (27 if `__future__` is counted, but that is a
+exactly 29 such modules (30 if `__future__` is counted, but that is a
 compiler directive processed at parse time, not a runtime import).
 **`csv` is not one of them, despite an earlier version of this document
 claiming it was**: the string `"csv"` appears only as the literal
@@ -454,13 +454,14 @@ console scripts and needs nothing a modern setuptools does not already do.
 `main` and every pull request, over a 3 OS × 2 Python matrix
 (ubuntu/macos/windows-latest × 3.11/3.13) with `fail-fast: false`. Two
 steps: `pytest -q`, then every module that ships a standalone self-check.
-All 17 files under `fituna/` have an `if __name__ == "__main__":` block, but
-only 16 of them run an assert-based check there; CI invokes exactly those
-16 (`python -m fituna.config`, `.cache`, `.search`, `.model_info`,
+All 18 files under `fituna/` have an `if __name__ == "__main__":` block, but
+only 17 of them run an assert-based check there; CI invokes exactly those
+17 (`python -m fituna.config`, `.cache`, `.search`, `.model_info`,
 `.quantize`, `.quality`, `.bench`, `.hardware`, `.binaries`, `.report`,
-`.corpus`, `.doctor`, `.cli`, `.mcp_server`, `.__init__`, `.errors`) — so the
+`.corpus`, `.doctor`, `.quickstart`, `.cli`, `.mcp_server`, `.__init__`,
+`.errors`) — so the
 assert-based checks embedded in each module are real CI gates, not
-decoration. The 17th file, `fituna/__main__.py`, is the `python -m fituna`
+decoration. The 18th file, `fituna/__main__.py`, is the `python -m fituna`
 entry point (it just calls `cli.main()`); it has no self-check of its own,
 so excluding it from this list is correct, not an oversight.
 

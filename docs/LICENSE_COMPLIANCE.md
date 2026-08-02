@@ -95,16 +95,20 @@ fituna-0.1.0/fituna/model_info.py
 fituna-0.1.0/fituna/py.typed
 fituna-0.1.0/fituna/quality.py
 fituna-0.1.0/fituna/quantize.py
+fituna-0.1.0/fituna/quickstart.py
 fituna-0.1.0/fituna/report.py
 fituna-0.1.0/fituna/search.py
 fituna-0.1.0/pyproject.toml
 fituna-0.1.0/setup.cfg
 fituna-0.1.0/tests/
 fituna-0.1.0/tests/test_cache.py
+fituna-0.1.0/tests/test_cli.py
 fituna-0.1.0/tests/test_config.py
 fituna-0.1.0/tests/test_corpus.py
 fituna-0.1.0/tests/test_doctor.py
 fituna-0.1.0/tests/test_hardware.py
+fituna-0.1.0/tests/test_quickstart.py
+fituna-0.1.0/tests/test_report.py
 fituna-0.1.0/tests/test_search.py
 ```
 
@@ -134,11 +138,12 @@ fituna/model_info.py
 fituna/py.typed
 fituna/quality.py
 fituna/quantize.py
+fituna/quickstart.py
 fituna/report.py
 fituna/search.py
 ```
 
-**24 files. 17 of them are FiTuna `.py` source, one is the empty PEP 561
+**25 files. 18 of them are FiTuna `.py` source, one is the empty PEP 561
 `py.typed` marker, and six are build-generated metadata (one of which is
 FiTuna's own MIT `LICENSE`, which the wheel format places under
 `.dist-info/licenses/`).** No vendored directory, no bundled binary, no
@@ -439,7 +444,7 @@ Checked with `command -v` before anything was installed:
 
 **Why ScanCode was not run.** `scancode-toolkit` ships a license-text index
 of several hundred megabytes and would take longer to install and index than
-this repository has files. For a codebase of 51 tracked files, 17 of which
+this repository has files. For a codebase of 57 tracked files, 18 of which
 are the shipped source, that is disproportionate. What was run instead —
 `reuse` (SPDX tag extraction), `pip-licenses` (package metadata), `git grep`
 (license-string presence), an AST import scan, and the hash-based
@@ -554,9 +559,9 @@ first-party : ['fituna']
 THIRD-PARTY : NONE
 ```
 
-`THIRD-PARTY : NONE`. The 26 stdlib modules (27 counting `__future__`,
+`THIRD-PARTY : NONE`. The 29 stdlib modules (30 counting `__future__`,
 which is a compiler directive rather than a runtime import) are exactly rows
-2–27 of `docs/SBOM.md`, checked name by name — the SBOM and this scan agree.
+2–30 of `docs/SBOM.md`, checked name by name — the SBOM and this scan agree.
 
 ### 3.5 SPDX conformance scan — `reuse` 6.2.0
 
@@ -575,8 +580,8 @@ $ /tmp/buildenv/bin/reuse lint
 * Used licenses: MIT
 * Read errors: 0
 * Invalid SPDX License Expressions: 2
-* Files with copyright information: 6 / 48
-* Files with license information: 23 / 48
+* Files with copyright information: 6 / 54
+* Files with license information: 27 / 54
 
 Unfortunately, your project is not compliant with version 3.3 of the REUSE Specification :-(
 ```
@@ -591,7 +596,7 @@ one of them is a real finding:
   files". It means the REUSE 3.3 specification wants a `LICENSES/MIT.txt`
   directory alongside the tags, and FiTuna keeps its license in the
   conventional root `LICENSE` file instead. Full REUSE compliance would also
-  require an `SPDX-FileCopyrightText` line in all 48 files including the
+  require an `SPDX-FileCopyrightText` line in all 54 files including the
   documentation. That is a stricter standard than the one being verified
   here, and the project deliberately does not adopt it; the `:-(` line is a
   statement about REUSE 3.3, not about license validity.
@@ -608,7 +613,7 @@ one of them is a real finding:
   only place their exact spelling appears in this file, deliberately: naming
   the closing token anywhere in the prose would end the ignore block right
   there and re-expose everything below it.
-- **`Files with copyright information: 6 / 48`** — not a compliance signal.
+- **`Files with copyright information: 6 / 54`** — not a compliance signal.
   `reuse` counts any file in which it finds a copyright notice, and the six
   are the root `LICENSE`, `THIRD_PARTY_NOTICES.md` and the four documents
   that *quote* someone else's notice while recording where a license was
@@ -616,7 +621,7 @@ one of them is a real finding:
   `docs/OPEN_SOURCE_USAGE.md`, `docs/RESULTS.md`). FiTuna's `.py` files carry
   `SPDX-License-Identifier` but deliberately no `SPDX-FileCopyrightText`
   line — see the `Missing licenses` bullet above and §6.
-- **`Files with license information: 23 / 48`** — all 23 `.py` files that
+- **`Files with license information: 27 / 54`** — all 27 `.py` files that
   carry the tag (§4) are counted. That includes `fituna/config.py`, which
   needs an explanation because `reuse` cannot read its own header: `reuse`
   sniffs the encoding of only the first 2048 bytes of a file
@@ -640,17 +645,17 @@ one of them is a real finding:
   ```
 
   The tag *is* present in the file — `head -1 fituna/config.py` prints
-  `# SPDX-License-Identifier: MIT`, and §4's independent check confirms 23 of
-  23 — but since `reuse` cannot see it directly, `REUSE.toml` supplies the
+  `# SPDX-License-Identifier: MIT`, and §4's independent check confirms 27 of
+  27 — but since `reuse` cannot see it directly, `REUSE.toml` supplies the
   same `MIT` identifier as a file-level annotation instead. This is REUSE's
   own documented mechanism for exactly this situation, and it does not
   depend on where in the file the annotation would otherwise sit: `reuse`
   reads `REUSE.toml` before it ever tries to sniff `config.py`'s encoding, so
   the 2048-byte heuristic never gets a chance to misfire. `reuse` also
-  excludes two further files from its 48: `LICENSE` itself (it is the
+  excludes two further files from its 54: `LICENSE` itself (it is the
   license) and the empty `fituna/py.typed` marker — plus `REUSE.toml` itself,
   which is its own configuration, not a file needing an annotation;
-  48 + 3 = 51 = `git ls-files | wc -l`. The upstream mitigation for the
+  54 + 3 = 57 = `git ls-files | wc -l`. The upstream mitigation for the
   underlying heuristic — installing `libmagic` so `reuse` uses `python-magic`
   instead of `charset-normalizer` for encoding detection — is a system
   package and was not installed here; `REUSE.toml` fixes the same symptom
@@ -672,7 +677,7 @@ described in §2.4.
 Verified by `grep -rn "SPDX" fituna/ tests/` returning nothing.
 
 **Action taken: `# SPDX-License-Identifier: MIT` was added as line 1 of all
-23 Python files** — 17 in the `fituna/` package and 6 in `tests/`. No file
+27 Python files** — 18 in the `fituna/` package and 9 in `tests/`. No file
 in this repository has a shebang, so line 1 is correct everywhere; the tag
 sits above the module docstring, which leaves `__doc__` untouched (a comment
 is not a string literal). Verified:
@@ -681,7 +686,7 @@ is not a string literal). Verified:
 $ ok=0; for f in fituna/*.py tests/*.py; do
     [ "$(head -1 "$f")" = "# SPDX-License-Identifier: MIT" ] && ok=$((ok+1)) || echo "MISSING: $f"
   done; echo "line-1 SPDX tag present: $ok/$(ls fituna/*.py tests/*.py | wc -l | tr -d ' ')"
-line-1 SPDX tag present: 23/23
+line-1 SPDX tag present: 27/27
 ```
 
 And in the built wheel, so the tag reaches whoever installs the package:
@@ -704,6 +709,7 @@ fituna/mcp_server.py     # SPDX-License-Identifier: MIT
 fituna/model_info.py     # SPDX-License-Identifier: MIT
 fituna/quality.py        # SPDX-License-Identifier: MIT
 fituna/quantize.py       # SPDX-License-Identifier: MIT
+fituna/quickstart.py     # SPDX-License-Identifier: MIT
 fituna/report.py         # SPDX-License-Identifier: MIT
 fituna/search.py         # SPDX-License-Identifier: MIT
 ```
@@ -711,7 +717,7 @@ fituna/search.py         # SPDX-License-Identifier: MIT
 Why it matters: without the tag, a scanner classifies each file as *unknown
 license* and reports it as an unresolved item even though the repository has
 a perfectly good root `LICENSE`. With it, every source file self-identifies —
-22 directly via this header, and `fituna/config.py` via the `REUSE.toml`
+26 directly via this header, and `fituna/config.py` via the `REUSE.toml`
 annotation described in §3.5, because `reuse` cannot read its own header —
 and this project's own SCA scan (§3.5) has nothing left to flag under "no
 copyright and licensing information."
@@ -719,7 +725,7 @@ copyright and licensing information."
 **Regression check.** Adding a line to every file shifts every line number
 below it. Both consequences were checked and handled:
 
-- `python3.13 -m pytest -q` → **245 passed**, and all 16 module self-checks
+- `python3.13 -m pytest -q` → **246 passed**, and all 17 module self-checks
   listed in `.github/workflows/ci.yml` still exit 0.
 - Four documents cite source locations as `file.py:NNN`, not one:
   `docs/OPEN_SOURCE_USAGE.md` (38 occurrences, 30 distinct `file:line`
@@ -786,10 +792,10 @@ for f in fituna/*.py tests/*.py; do head -1 "$f"; done | sort | uniq -c
 
 # --- 8. nothing broke (same two steps CI runs) --------------------------
 /tmp/runtimeenv/bin/python -m pip install pytest
-/tmp/runtimeenv/bin/python -m pytest -q            # expect: 0 failed (245 passed at the time of writing)
+/tmp/runtimeenv/bin/python -m pytest -q            # expect: 0 failed (246 passed at the time of writing)
 for m in __init__ errors config cache search model_info quantize quality \
          bench hardware binaries report; do /tmp/runtimeenv/bin/python -m fituna.$m || break; done
-for m in corpus doctor cli mcp_server; do /tmp/runtimeenv/bin/python -m fituna.$m --selfcheck || break; done
+for m in corpus doctor quickstart cli mcp_server; do /tmp/runtimeenv/bin/python -m fituna.$m --selfcheck || break; done
 ```
 
 ---
@@ -801,7 +807,7 @@ does.
 
 | Item | Status |
 |---|---|
-| Code-similarity / license-text matching (ScanCode, FOSSology) | **Not run** — disproportionate for 51 tracked files; see §3.1 for what stands in its place and what that leaves uncovered |
+| Code-similarity / license-text matching (ScanCode, FOSSology) | **Not run** — disproportionate for 57 tracked files; see §3.1 for what stands in its place and what that leaves uncovered |
 | `reuse` can't read `fituna/config.py`'s own header | **Tool limitation, diagnosed and worked around** (§3.5). `reuse`'s 2 KB encoding heuristic truncates a multi-byte character, so it never reads the in-file tag. Not fixed by reshaping the file's byte layout — that would be fragile in both directions and dependent on comment length staying clear of byte 2048. Fixed instead with a `REUSE.toml` file-level annotation, REUSE's own documented mechanism for this case, which does not depend on byte position |
 | REUSE 3.3 full compliance (`LICENSES/` directory, per-file copyright tags) | **Not adopted** — a stricter standard than this verification asks for; the root `LICENSE` plus per-file SPDX tags is the conventional position |
 | `pyproject.toml` license declaration | **Changed**: `license = { text = "MIT" }` was replaced with the PEP 639 SPDX expression `license = "MIT"`, which required raising the build-backend floor from `setuptools>=68` to `>=77` (the version that supports the expression form). One cost came with it: the `License :: OSI Approved :: MIT License` classifier had to be removed, because `setuptools>=77` raises `InvalidConfigError` — "License classifiers have been superseded by license expressions" — if a license expression and an OSI classifier are both present (verified directly: re-adding the classifier alongside `license = "MIT"` fails the build with exactly that error). The wheel's metadata now carries `License-Expression: MIT` under Metadata-Version 2.4 instead of the old `License: MIT` field — still machine-readable, and it is what `pip-licenses` reads (§3.2). The narrow residual cost: any tool that reads `importlib.metadata`'s `License` key directly, or filters packages by the OSI classifier string, sees nothing for FiTuna now — it has to read `License-Expression` or parse the SPDX identifier instead |

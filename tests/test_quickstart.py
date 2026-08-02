@@ -261,7 +261,10 @@ def test_unknown_need_is_a_programming_error():
 def test_curated_shortlist_survives_the_strictest_filter_with_its_badge(wizard, tmp_path, capsys):
     # All three curated models are MIT/Apache-2.0, so all three survive even
     # the redistribution filter -- what matters is that each carries the
-    # "license text verified by this project" badge and its measured anchor.
+    # license-evidence badge it actually earned and its measured anchor. The
+    # badge is split on purpose: Qwen3 and Midm ship a real LICENSE file that
+    # was fetched and compared, SmolLM2 ships none, so only two may claim
+    # "원문 확인됨" (see quickstart._LICENSE_TEXT_VERIFIED).
     elsewhere = tmp_path / "models"
     elsewhere.mkdir()
     (elsewhere / "m.gguf").write_bytes(b"x")
@@ -270,49 +273,65 @@ def test_curated_shortlist_survives_the_strictest_filter_with_its_badge(wizard, 
     code, _ = wizard(_answers(license_="3", model="5", extra=(str(elsewhere / "m.gguf"),)))
     assert code == 0
     out = capsys.readouterr().out
-    assert out.count("라이선스 원문 확인됨") == len(quickstart.CURATED)
+    text_verified = [m for m in quickstart.CURATED if m.license_evidence == quickstart._LICENSE_TEXT_VERIFIED]
+    metadata_only = [m for m in quickstart.CURATED if m.license_evidence == quickstart._LICENSE_METADATA_ONLY]
+    assert text_verified and metadata_only  # the split is real, not vacuous
+    assert out.count("라이선스 원문 확인됨") == len(text_verified)
+    assert out.count("라이선스 메타데이터만 확인 — 원문 파일 없음") == len(metadata_only)
     assert "기록이지 이 컴퓨터의 예측이 아닙니다" in out
     assert "docs/RESULTS.md Run 5" in out  # measured anchor, labelled as a record
 
 
-def test_curated_model_over_detected_memory_is_not_offered(wizard, monkeypatch, tmp_path, capsys):
+def test_curated_model_over_detected_memory_stays_selectable_and_is_flagged(
+    wizard, monkeypatch, tmp_path, capsys
+):
     # ~1 GiB of RAM: the 135M SmolLM (~258 MiB) fits, the 4B Qwen3 (~7.5 GiB)
-    # and the 2.3B Midm (~4.3 GiB) do not -- they must not appear as
-    # selectable options at all, not just be flagged "부족합니다".
+    # and the 2.3B Midm (~4.3 GiB) do not. They are still listed and still
+    # selectable: the F16 size is what is being compared, but the file that
+    # actually runs is the quantized one, and search.py raises ngl from 0, so
+    # "F16 doesn't fit" is not "FiTuna can't do this". Hiding them hid this
+    # project's own Run-2 flagship on an 8 GB machine.
     tiny = HardwareProfile(GPUVendor.NONE, None, None, 4, 1024, "linux")
     monkeypatch.setattr(quickstart.hardware, "detect_hardware", lambda: tiny)
     monkeypatch.setattr(quickstart, "_download", lambda url, dest: dest)
     (tmp_path / "c.txt").write_text("hi", encoding="utf-8")
-    # no local *.gguf -> menu is 1) SmolLM (only curated model that fits),
-    # 2) search, 3) manual
-    code, recorded = wizard(_answers(model="1", extra=("y",)))
+    # no local *.gguf -> menu is 1..3 curated, 4 search, 5 manual. Pick the
+    # 4B Qwen3 (option 2) -- the one the old memory filter used to hide.
+    code, recorded = wizard(_answers(model="2", extra=("y",)))
     assert code == 0
     out = capsys.readouterr().out
-    assert "SmolLM2-135M" in out
-    assert "Qwen3-4B" not in out
-    assert "Midm-2.0" not in out
-    assert "감지된 메모리보다 커서 2개는 목록에서 제외했습니다" in out
+    assert "SmolLM2-135M" in out and "Qwen3-4B" in out and "Midm-2.0" in out
+    assert "부족합니다" in out  # the verdict line still flags them
+    assert "감지된 메모리보다 큰 모델 2개도 그대로 고를 수 있습니다" in out
+    # selecting one prints what the F16 stage actually costs, accurately
+    assert "디스크·다운로드 비용은 F16 원본 크기 그대로입니다" in out
+    assert "양자화 단계는 F16을 읽으므로" in out
+    assert "ngl을 0부터" in out
     argv = recorded["argv"]
-    assert argv[argv.index("--model") + 1] == str(tmp_path / "SmolLM2-135M-Instruct-f16.gguf")
+    assert argv[argv.index("--model") + 1] == str(tmp_path / "Qwen3-4B-Instruct-2507-F16.gguf")
 
 
-def test_all_curated_models_filtered_by_memory_says_so_instead_of_an_empty_section(
+def test_no_curated_model_fits_detected_memory_all_still_listed(
     wizard, monkeypatch, tmp_path, capsys
 ):
-    # ~1 MiB of RAM: nothing in the curated shortlist fits.
+    # ~1 MiB of RAM: nothing in the curated shortlist fits the arithmetic.
+    # The section is not emptied -- all three stay, each flagged 부족합니다.
     starved = HardwareProfile(GPUVendor.NONE, None, None, 4, 1, "linux")
     monkeypatch.setattr(quickstart.hardware, "detect_hardware", lambda: starved)
     elsewhere = tmp_path / "models"
     elsewhere.mkdir()
     (elsewhere / "m.gguf").write_bytes(b"x")
     (tmp_path / "c.txt").write_text("hi", encoding="utf-8")
-    # no curated model fits and no local *.gguf -> menu is 1) search, 2) manual
-    code, recorded = wizard(_answers(model="2", extra=(str(elsewhere / "m.gguf"),)))
+    # menu is 1..3 curated, 4) search, 5) manual
+    code, recorded = wizard(_answers(model="5", extra=(str(elsewhere / "m.gguf"),)))
     assert code == 0
     out = capsys.readouterr().out
-    assert "감지된 메모리에 맞는 모델이 없어 전부 제외했습니다" in out
-    assert "감지된 메모리보다 커서 3개는 목록에서 제외했습니다" in out
-    assert "SmolLM2" not in out and "Qwen3-4B" not in out and "Midm-2.0" not in out
+    assert "SmolLM2" in out and "Qwen3-4B" in out and "Midm-2.0" in out
+    assert out.count("부족합니다") == len(quickstart.CURATED)
+    assert f"감지된 메모리보다 큰 모델 {len(quickstart.CURATED)}개도 그대로 고를 수 있습니다" in out
+    assert "제외했습니다" not in out
+    argv = recorded["argv"]
+    assert argv[argv.index("--model") + 1] == str(elsewhere / "m.gguf")
 
 
 # ---------------------------------------------------------------------------
@@ -486,6 +505,29 @@ def test_hf_search_flow_skips_gated_and_fileless_repos(monkeypatch, tmp_path, ca
     assert "gated 저장소" in out
     assert "단일 .gguf 파일이 없습니다" in out
     assert "업로더가 모델 카드에 적어 넣은 메타데이터" in out
+
+
+def test_hf_search_flow_reports_license_excluded_candidates(monkeypatch, tmp_path, capsys):
+    # License-filtered hits used to be dropped before the 제외 loop, so a
+    # search whose results were all license-ineligible printed nothing about
+    # licenses -- the exclusion happened but was never reported.
+    monkeypatch.setattr("builtins.input", lambda prompt="": next(answers))
+    answers = iter(["qwen", "1", "1"])
+    monkeypatch.setattr(
+        quickstart,
+        "_hf_search",
+        lambda q: [
+            quickstart.HFCandidate("nc/repo", "cc-by-nc-4.0", None, False, 10, ("a-f16.gguf",)),
+            quickstart.HFCandidate("ok/repo", "mit", "http://x", False, 99, ("b-f16.gguf",)),
+        ],
+    )
+    monkeypatch.setattr(quickstart, "_download", lambda url, dest: dest)
+
+    got = quickstart._hf_search_flow("commercial", tmp_path)
+    assert str(got) == str(tmp_path / "b-f16.gguf")
+    out = capsys.readouterr().out
+    assert "(제외) nc/repo — 선택하신 라이선스 조건에 맞지 않습니다" in out
+    assert "cc-by-nc-4.0" in out
 
 
 def test_curated_shortlist_matches_ai_model_usage_doc():

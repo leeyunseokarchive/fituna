@@ -72,7 +72,7 @@ Ollama / 대화형 `llama-cli`) — 을 출력하면 정상 동작이다. **종�
 |---|---|---|---|
 | 1 | `nvidia-smi` | `Tesla T4` / `15360MiB` 표. 노트북 파일에 실제 실행 출력이 저장돼 있어 미리 확인 가능 | 수 초 |
 | 2 | llama.cpp를 CUDA로 빌드 | 마지막 줄에 `llama.cpp ready` | **10~20분** (가장 긴 셀) |
-| 3 | FiTuna 설치 + `fituna --help` | `usage: fituna [-h] [-v] {run,detect-hw,list-binaries,doctor,fetch-corpus,help} ...` | 수십 초 |
+| 3 | FiTuna 설치 + `fituna --help` | 두 줄로 감기는 `usage: fituna [-h] [-v]` / `{run,detect-hw,list-binaries,doctor,fetch-corpus,quickstart,help} ...` | 수십 초 |
 | 4 | `fituna detect-hw` | `gpu_vendor: nvidia` / `gpu_name: Tesla T4` / `vram_mb: 15360` / `os_name: linux` | 수 초 |
 | 5 | 데모 모델(SmolLM2-135M F16, Apache 2.0) + 코퍼스 준비 | `model + corpus ready` | 1~2분 |
 | 6 | **측정 탐색 본체** (`fituna run`) | 아래 설명 참고 — T4에서는 `BEST EFFORT` | 약 61초 |
@@ -356,6 +356,12 @@ FiTuna result: MEETS TARGET
 | **2** | 인자 오류(argparse) **또는** llama.cpp 바이너리를 찾지 못함 — 원인 두 가지, 아래에서 구분 | 메시지로 원인 구분 (6장) |
 | **3** | 목표를 만족하는 구성이 없음 + **가장 근접한 구성 보고** | ✅ **정상** |
 
+`fituna quickstart`는 여기에 한 줄이 더 붙는다.
+
+| 코드 | 의미 | 정상인가 |
+|---|---|---|
+| **1** | stdin이 TTY가 아님 — 파이프·리다이렉트·CI에서 실행됨 | ✅ **정상**(설계된 거부. 아래 6장 참고) |
+
 **종료 코드 2는 원인이 두 가지다.** 필수 플래그 누락이나 오타난 플래그는
 argparse가 처리하며 stderr 첫 줄이 항상 `usage: ...`로 시작한다. 반면 llama.cpp
 바이너리를 찾지 못한 경우(`BinaryNotFoundError`)는 FiTuna 자체 로거가 남기는
@@ -521,20 +527,24 @@ cd fituna
 python3.13 -m pytest -q
 ```
 
-직접 실행 결과: `152 passed in 1.55s` (이 문서 작성 시점 `main` 기준. 테스트가
+직접 실행 결과: `246 passed in 2.95s` (이 문서 작성 시점 `main` 기준. 테스트가
 추가되면 개수는 늘어난다 — 중요한 것은 **실패 0건**이다).
 
 > **`python3`가 아니라 `python3.13`인 이유.** macOS 기본 `python3`는 3.9.6이고,
 > FiTuna는 3.11 이상을 요구한다. 가상환경을 활성화했다면 `python3`도 3.13을
 >가리키지만, 새 셸을 열었거나 `source`를 빠뜨리면 시스템 3.9.6이 잡혀
-> 테스트 1건이 실패한다(직접 재현: `python3 -m pytest -q` →
-> `1 failed, 150 passed`). 인터프리터를 명시하면 이 함정 자체가 사라진다.
+> 테스트 1건이 실패한다(직접 재현: `/usr/bin/python3 -m pytest -q` →
+> `1 failed, 245 passed in 2.50s`). 인터프리터를 명시하면 이 함정 자체가
+> 사라진다.
 
-모듈별 자체 점검도 개별 실행할 수 있다 (직접 실행, 모두 종료 코드 0):
+모듈별 자체 점검도 개별 실행할 수 있다 (직접 실행, 모두 종료 코드 0, 각각
+`OK` 한 줄만 출력):
 
 ```bash
-python3.13 -m fituna.cli --selfcheck     # -> fituna.cli self-check OK
-python3.13 -m fituna.doctor              # -> fituna.doctor self-check OK
+python3.13 -m fituna.cli --selfcheck        # -> fituna.cli self-check OK
+python3.13 -m fituna.doctor                 # -> fituna.doctor self-check OK
+python3.13 -m fituna.report                 # -> fituna.report self-check OK
+python3.13 -m fituna.quickstart --selfcheck # -> fituna.quickstart self-check OK
 ```
 
 ---
@@ -552,6 +562,22 @@ python3.13 -m fituna.doctor              # -> fituna.doctor self-check OK
   그 상태의 `python3`는 macOS 기본 3.9.6이라 FiTuna가 아예 실행되지 않는다.
 - 조치 2: `python3.13 -m pip show -f fituna`가 알려주는 스크립트 경로를 `PATH`에
   추가한다.
+
+### `fituna quickstart`가 아무것도 묻지 않고 끝난다
+
+`quickstart`는 대화형 마법사이므로 stdin이 TTY일 때만 동작한다. 파이프·리다이렉트
+(`fituna quickstart < /dev/null`)나 CI에서는 묻지 않고 안내 두 줄을 출력한 뒤
+**종료 코드 1**로 끝난다(직접 재현: `fituna quickstart는 대화형 터미널(TTY)이
+필요합니다.`). 오작동이 아니라 설계된 거부다 — 답을 받을 수 없는 질문을 던지느니
+`fituna run`을 직접 쓰라고 안내한다.
+
+마법사 안에서도 막다른 길은 종료가 아니라 **메뉴로 되돌아간다**: 라이선스 조건에
+맞는 후보가 하나도 남지 않았을 때, HuggingFace 검색 결과가 비었을 때, 다운로드가
+실패했을 때 — 세 경우 모두 다시 고를 수 있게 모델 선택 메뉴로 돌아온다.
+
+`quickstart`는 `run`이 못 하는 일을 하지 않는다. 조립한 `fituna run` 명령을 그대로
+출력한 뒤 같은 코드를 호출할 뿐이므로, 이 문서의 검증 경로는 계속 **경로 B
+(`fituna run` 직접 실행)** 이다.
 
 ### `error: externally-managed-environment`
 
@@ -577,13 +603,19 @@ usage: fituna run [-h] --model MODEL --target-tps TARGET_TPS
                   [--quant QUANT] [--gpu {none,nvidia,amd,apple}]
                   [--vram-mb VRAM_MB] [--llama-bin-dir LLAMA_BIN_DIR]
                   --quality-corpus WIKITEXT [--ppl-chunks PPL_CHUNKS]
-                  [--out OUT] [--json] [--resume]
+                  [--out OUT] [--json] [--resume] [--export-ollama]
 fituna run: error: the following arguments are required: --model, --target-tps, --max-quality-loss, --quality-corpus/--wikitext
 ```
 
 오타난 플래그(`fituna run ... --bogus-flag foo`)도 같은 종료 코드 2, 같은
-`usage:` 형태다(직접 재현): `usage: fituna [-h] [-v] {run,detect-hw,...} ...`
-다음 줄에 `fituna: error: unrecognized arguments: --bogus-flag foo`.
+`usage:` 형태다(직접 재현). 다만 이때는 최상위 파서의 usage가 나오고, 이것이
+두 줄로 감기기 때문에 `fituna: error:` 줄은 **세 번째** 줄이다:
+
+```
+usage: fituna [-h] [-v]
+              {run,detect-hw,list-binaries,doctor,fetch-corpus,quickstart,help} ...
+fituna: error: unrecognized arguments: --bogus-flag foo
+```
 
 - 조치: `usage:` 줄이 보여주는 필수 인자를 채우거나 오타난 플래그명을 고친다.
 

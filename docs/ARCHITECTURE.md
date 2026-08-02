@@ -57,9 +57,12 @@ search, and caching. It has zero runtime Python dependencies (stdlib only).
 
 Arrows show call direction, not import direction: `search.py` *calls*
 `quantize.py` / `bench.py` / `quality.py` / `cache.py`; those modules never
-call back into `search.py`. `cli.py` is the only module that imports and
-calls all the others — every other module only depends on `config.py`
-(and, where noted, on `binaries.py`'s `BinaryPaths`).
+call back into `search.py`. `cli.py` is the module that imports and calls the
+widest set of the others; below it, a module depends only on `config.py`
+(and, where noted, on `binaries.py`'s `BinaryPaths`). The two entry points
+*above* `cli.py` — `quickstart.py` and `mcp_server.py` — also reach across
+several modules each, but they reach through `cli.py` for anything that runs
+a search, so there is still exactly one implementation of the search path.
 
 `fituna/quickstart.py` sits *above* `cli.py` rather than beside it: the
 `fituna quickstart` wizard is an `input()`-based shell that collects answers,
@@ -68,9 +71,13 @@ through `cli._build_parser()` and calls `cli._cmd_run()` in-process. It
 orchestrates existing modules only — `doctor.run_checks()` for step 1,
 `hardware.detect_hardware()` for the memory-fit arithmetic,
 `corpus.fetch_corpus()` for step 5, `report.human_size()` for every file size
-— and duplicates none of their logic. Every capability it offers maps to a
-public `run` flag by construction; a wizard-only feature would fail its own
-self-check (`python -m fituna.quickstart`). It downloads models with stdlib
+— and duplicates none of their logic. Every *search parameter* it assembles
+maps to a public `run` flag: the self-check
+(`python -m fituna.quickstart --selfcheck`) asserts on the assembled argv, so
+a wizard-only search knob would fail it. That check covers the run-argv
+surface only — the wizard's own conveniences (curated-model download,
+HuggingFace search, corpus fetch) have no `run` equivalent and are outside
+what it asserts. It downloads models with stdlib
 `urllib` using the same temp-file + `os.replace` atomic pattern as
 `corpus.py`, and reads the HuggingFace `/api/models` search endpoint whose
 response shape is documented (and was verified live) in that module's
@@ -245,9 +252,13 @@ no doctor equivalent of exit code 3 — `NoFeasibleConfigError` is a
   cross-module value is a `frozen` dataclass or `Enum` defined once, so
   parallel implementation of modules can't drift on the interface.
 - **Pure functions, explicit side effects**: only `quantize.py` (writes a
-  `.gguf`), `model_info.py` (writes a converted base `.gguf`), and
-  `cache.py` (writes to sqlite3) touch the filesystem; everything else
-  returns values.
+  `.gguf`), `model_info.py` (writes a converted base `.gguf`),
+  `cache.py` (writes to sqlite3), `corpus.py` (writes the downloaded
+  corpus), `report.py` (writes the Ollama `Modelfile` for `--export-ollama`)
+  and `quickstart.py` (writes downloaded `.gguf` files) touch the
+  filesystem; everything else returns values. The three that download do it
+  through the same temp-file + `os.replace` pattern, so an interrupted run
+  leaves no partial file.
 - **subprocess isolation**: every llama.cpp interaction goes through exactly
   one wrapper function per binary (`quantize()`, `run_bench()`,
   `compute_perplexity()`), so parsing logic for that binary's output lives

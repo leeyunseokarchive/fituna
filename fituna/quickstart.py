@@ -87,7 +87,6 @@ import os
 import shlex
 import sys
 import tempfile
-import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
@@ -119,7 +118,12 @@ PRESETS: tuple[tuple[str, float, float, int], ...] = (
 # [3/6] license needs -> filter predicate (see license_allows).
 LICENSE_NEEDS: tuple[tuple[str, str], ...] = (
     ("personal", "개인/연구용 (필터 없음)"),
-    ("commercial", "상업적 이용 (비상업·연구전용 라이선스 제외)"),
+    # "알려진" is load-bearing: the filter is a deny-list of known
+    # non-commercial markers, so a model with no license metadata at all --
+    # or one whose license string this list has never seen -- stays in the
+    # list. Promising "비상업 라이선스 제외" would claim an exclusion the
+    # deny-list cannot make for unlabelled models.
+    ("commercial", "상업적 이용 (알려진 비상업 라이선스 제외)"),
     ("redistribution", "재배포/파생물 배포 (MIT/Apache-2.0/BSD 계열만)"),
 )
 
@@ -150,10 +154,35 @@ _METADATA_CAVEAT = (
     "라이선스 원문을 직접 확인하세요."
 )
 
+# Per-model license evidence. These are two *different* claims and the menu
+# must not blur them -- "원문 확인됨" is exactly the evidence class
+# _METADATA_CAVEAT disclaims the absence of, so it may only be printed where
+# a real LICENSE file was fetched and compared. Checked 2026-08-02 against
+# https://huggingface.co/api/models/<repo> siblings + the raw file:
+# Qwen/Qwen3-4B-Instruct-2507 ships LICENSE (Apache-2.0 text) and
+# K-intelligence/Midm-2.0-Mini-Instruct ships LICENSE.txt (MIT text), but
+# HuggingFaceTB/SmolLM2-135M-Instruct ships no license file at all -- for it
+# only the model-card metadata exists. See docs/AI_MODEL_USAGE.md B-1/B-2/B-3.
+_LICENSE_TEXT_VERIFIED = "[라이선스 원문 확인됨(가중치 원본 저장소) — docs/AI_MODEL_USAGE.md]"
+_LICENSE_METADATA_ONLY = "[라이선스 메타데이터만 확인 — 원문 파일 없음, docs/AI_MODEL_USAGE.md]"
+
 _MEMORY_CAVEAT = (
     "메모리 판정은 '공개된 파일 크기 vs 감지된 메모리' 산술입니다. 여유 20 %는\n"
     "  KV 캐시·런타임 몫으로 잡은 가정이지 실측이 아니며, 기준 파일은 F16/BF16\n"
     "  원본이라 실제로 돌릴 양자화 파일은 이보다 작습니다."
+)
+
+# Printed when a selected curated model's F16 file is larger than the memory
+# budget. The verdict line already said so; this says what it actually costs,
+# because the naive reading ("too big, won't work") is wrong: the artifact you
+# end up running is the quantized file.
+_F16_STAGE_WARNING = (
+    "  ⚠ 이 모델의 F16 원본은 감지된 메모리 예산보다 큽니다. 그래도 진행할 수\n"
+    "    있습니다 — 다만 정확히 무엇이 걸리는지 알고 고르십시오:\n"
+    "      · 디스크·다운로드 비용은 F16 원본 크기 그대로입니다.\n"
+    "      · 양자화 단계는 F16을 읽으므로 그 동안 메모리 압박이 실제로 있습니다.\n"
+    "      · 반면 최종 산출물(예: Q4_K_M)은 훨씬 작고, 탐색은 ngl을 0부터\n"
+    "        올려가며 맞추므로 통째로 올라가지 않아도 측정은 진행됩니다."
 )
 
 _NO_SPEED_PREDICTION = (
@@ -180,8 +209,12 @@ class CuratedModel:
     base_model: str  # upstream weights (AI_MODEL_USAGE.md "기반 모델명")
     gguf_repo: str  # repo the bytes actually come from
     filename: str
-    size_bytes: int
+    # Published size of `filename` in `gguf_repo` as of the snapshot date
+    # below -- a recorded figure, not a live HEAD request. Every line that
+    # prints it says "게시 시점 크기" for that reason.
+    size_bytes: int  # HuggingFace API siblings[].size, snapshot 2026-08-02
     license: str
+    license_evidence: str  # one of the _LICENSE_* badges above
     anchor: str
 
 
@@ -193,6 +226,7 @@ CURATED: tuple[CuratedModel, ...] = (
         filename="SmolLM2-135M-Instruct-f16.gguf",
         size_bytes=270_885_952,
         license="apache-2.0",
+        license_evidence=_LICENSE_METADATA_ONLY,
         anchor="Apple M3 Pro 실측 249.50 tok/s @Q6_K, ngl=30 (docs/RESULTS.md Run 1)",
     ),
     CuratedModel(
@@ -202,6 +236,7 @@ CURATED: tuple[CuratedModel, ...] = (
         filename="Qwen3-4B-Instruct-2507-F16.gguf",
         size_bytes=8_051_285_344,
         license="apache-2.0",
+        license_evidence=_LICENSE_TEXT_VERIFIED,
         anchor="Apple M3 Pro 실측 30.81 tok/s @Q4_K_M, ngl=33 (docs/RESULTS.md Run 2)",
     ),
     CuratedModel(
@@ -211,6 +246,7 @@ CURATED: tuple[CuratedModel, ...] = (
         filename="Midm-2.0-Mini-Instruct-BF16.gguf",
         size_bytes=4_617_053_184,
         license="mit",
+        license_evidence=_LICENSE_TEXT_VERIFIED,
         anchor="Apple M3 Pro 실측 44.62 tok/s @Q4_K_M, ngl=48 (docs/RESULTS.md Run 5)",
     ),
 )
@@ -625,7 +661,7 @@ def _local_ggufs(out_dir: Path) -> list[Path]:
 
 def _curated_menu_lines(model: CuratedModel, hw: HardwareProfile) -> list[str]:
     return [
-        f"     라이선스: {model.license}  [라이선스 원문 확인됨 — docs/AI_MODEL_USAGE.md]",
+        f"     라이선스: {model.license}  {model.license_evidence}",
         f"     가중치: {model.base_model} / GGUF: {model.gguf_repo}",
         f"     {_memory_fit_line(model.size_bytes, hw)}",
         f"     실측 기록: {model.anchor} — 기록이지 이 컴퓨터의 예측이 아닙니다",
@@ -638,12 +674,16 @@ def _step_model(need: str, out_dir: Path, hw: HardwareProfile) -> Path:
     while True:
         local = _local_ggufs(out_dir)
         license_ok = [m for m in CURATED if license_allows(m.license, need)]
-        # A model that does not fit the detected memory is filtered out, not
-        # just flagged: offering a "부족합니다" option that stays selectable
-        # is a trap, not a choice. `memory_fit` returning None (no detected
-        # memory to compare against) must not exclude anything -- "unknown"
-        # is not "doesn't fit".
-        curated = [m for m in license_ok if memory_fit(m.size_bytes, hw) is not False]
+        # A model whose *F16* file exceeds the memory budget is shown and
+        # stays selectable, flagged by its own "부족합니다" verdict line.
+        # Excluding it would be wrong: the file that actually gets run is the
+        # quantized one (Q4_K_M of Qwen3-4B is 2.3 GB, not 8.1 GB), and
+        # search.py binary-searches ngl up from 0, so a model that does not
+        # fit whole still runs partly offloaded. Hiding it hid this project's
+        # own flagship Run-2 model on an 8 GB machine. The real constraint is
+        # narrower -- see _F16_STAGE_WARNING, printed on selection.
+        curated = license_ok
+        tight = [m for m in curated if memory_fit(m.size_bytes, hw) is False]
 
         print()
         options: list[tuple[str, object]] = []
@@ -665,18 +705,14 @@ def _step_model(need: str, out_dir: Path, hw: HardwareProfile) -> Path:
                 print(f"  {len(options)}) {model.label}")
                 for line in _curated_menu_lines(model, hw):
                     print(line)
-        elif license_ok:
-            # Every license-eligible curated model was filtered by memory --
-            # say so instead of silently showing nothing where a section used
-            # to be.
-            print("  이 프로젝트가 직접 검증한 모델: 감지된 메모리에 맞는 모델이 없어 전부 제외했습니다.")
-            print(f"  ({_MEMORY_CAVEAT})")
         license_excluded = len(CURATED) - len(license_ok)
-        memory_excluded = len(license_ok) - len(curated)
         if license_excluded:
             print(f"  (라이선스 조건에 맞지 않아 {license_excluded}개는 목록에서 제외했습니다)")
-        if memory_excluded:
-            print(f"  (감지된 메모리보다 커서 {memory_excluded}개는 목록에서 제외했습니다)")
+        if tight:
+            print(
+                f"  (감지된 메모리보다 큰 모델 {len(tight)}개도 그대로 고를 수 있습니다 — "
+                "제외하지 않습니다)"
+            )
         options.append(("search", None))
         print(f"  {len(options)}) HuggingFace에서 검색")
         options.append(("manual", None))
@@ -700,6 +736,9 @@ def _step_model(need: str, out_dir: Path, hw: HardwareProfile) -> Path:
         try:
             if kind == "curated":
                 assert isinstance(payload, CuratedModel)
+                if memory_fit(payload.size_bytes, hw) is False:
+                    print()
+                    print(_F16_STAGE_WARNING)
                 chosen = _download_curated(payload, out_dir)
             else:
                 chosen = _hf_search_flow(need, out_dir)
@@ -717,7 +756,7 @@ def _download_curated(model: CuratedModel, out_dir: Path) -> Optional[Path]:
         return dest
     url = HF_RESOLVE.format(repo=model.gguf_repo, filename=model.filename)
     print(f"  받을 파일: {url}")
-    print(f"  크기: {report.human_size(model.size_bytes)} → {dest}")
+    print(f"  게시 시점 크기: {report.human_size(model.size_bytes)} → {dest}")
     print(f"  라이선스: {model.license} (가중치 제공: {model.base_model})")
     print("  이 파일의 라이선스는 FiTuna가 아니라 위 가중치 제공자의 것입니다.")
     if not _ask_yes_no("  내려받을까요?", True):
@@ -745,14 +784,24 @@ def _resolved_license_link(candidate: HFCandidate) -> str:
 
 def _hf_search_flow(need: str, out_dir: Path) -> Optional[Path]:
     query = _ask("  검색어 (예: qwen3 4b)")
+    # License-filtered candidates used to be dropped before this loop, so the
+    # 제외 report silently under-counted: a search where every hit failed the
+    # license filter printed nothing about licenses at all. Filter after
+    # fetching and report all three exclusion reasons from the same list.
+    found = _hf_search(query)
     candidates = [
         c
-        for c in _hf_search(query)
+        for c in found
         if license_allows(c.license, need, model_id=c.model_id, base_model=c.base_model)
     ]
     usable = [c for c in candidates if not c.gated and c.gguf_files]
-    for c in candidates:
-        if c.gated:
+    for c in found:
+        if c not in candidates:
+            print(
+                f"  (제외) {c.model_id} — 선택하신 라이선스 조건에 맞지 않습니다"
+                f" (업로더 기재: {c.license or '표기 없음'})"
+            )
+        elif c.gated:
             print(f"  (제외) {c.model_id} — gated 저장소라 인증 없이 받을 수 없습니다")
         elif not c.gguf_files:
             print(f"  (제외) {c.model_id} — 단일 .gguf 파일이 없습니다")
