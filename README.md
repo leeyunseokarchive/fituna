@@ -1,5 +1,7 @@
 <div align="center">
 
+**English** | [한국어](README.ko.md)
+
 # 🎯 FiTuna
 
 **Stop guessing your llama.cpp config. Measure it.**
@@ -280,6 +282,29 @@ along with the smaller items — pytest coverage for the llama.cpp output
 parsers ([#10](https://github.com/leeyunseokarchive/fituna/issues/10), good
 first issue) and documenting how `--ppl-chunks` moves the quality figure
 ([#13](https://github.com/leeyunseokarchive/fituna/issues/13)).
+
+## Scope
+
+FiTuna recommends; it doesn't execute or serve. The output is a `llama-cli`
+command you copy and run — FiTuna never launches it, and it doesn't
+integrate with Ollama, LM Studio, or any inference server.
+
+That's a boundary, not an oversight. Actually serving inference is
+llama.cpp's job (and Ollama's, and LM Studio's), and duplicating it would
+compete with the exact tools this README contrasts itself against, for no
+differentiated value — FiTuna's only claim is that the *search* is measured,
+not guessed. A server process also sits awkwardly next to a
+zero-runtime-dependency design.
+
+Two extensions that stay inside this boundary rather than crossing it are
+tracked in [#19](https://github.com/leeyunseokarchive/fituna/issues/19):
+running the winning command directly (`--launch`), and exporting it to an
+Ollama Modelfile or LM Studio preset — since both apply a fixed per-model
+preset today ([the exact gap cited above](https://github.com/ollama/ollama/issues/14674))
+and FiTuna already computes the measured answer neither of them does. The
+MCP server already covers the agent-facing version of "what happens after
+the recommendation": an agent reads `fituna_recommend`'s answer and decides
+what to do with it, no human copying a command required.
 
 ## Known limitations
 
