@@ -230,11 +230,24 @@ def to_human(result: SearchResult) -> str:
         f"       {' '.join(server_cmd)}",
     ]
     if server_cmd[0] == _LLAMA_SERVER_NAMES[0]:
-        # bare name, i.e. not found next to the other binaries nor on PATH
-        lines.append(
-            "       (llama-server was not found on this machine -- the command "
-            "shows the bare name)"
-        )
+        # Bare name -- but *why* differs by which branch produced server_cmd,
+        # and only one of them actually looked:
+        if result.llama_server_command is not None:
+            # search() called build_server_command() with real BinaryPaths,
+            # i.e. it checked beside the known binaries and on PATH and came
+            # up empty. "not found" is a checked fact here.
+            lines.append(
+                "       (llama-server was not found on this machine -- the "
+                "command shows the bare name)"
+            )
+        else:
+            # This is to_human()'s own fallback (no BinaryPaths available to
+            # search with), which never looked anywhere -- claiming "not
+            # found" would assert a check that never happened.
+            lines.append(
+                "       (no binary-location info available for this report "
+                "-- the command shows the bare name, unchecked)"
+            )
     if result.modelfile_path is not None:
         lines += [
             "  2) import into Ollama:",

@@ -151,7 +151,7 @@ template.
 | # | Component | License | Bundled in this repo? | Invocation |
 |---|---|---|---|---|
 | 1 | llama.cpp (`llama-quantize`, `llama-bench`, `llama-perplexity`, convert script) | MIT | No | `subprocess` |
-| 1 | llama.cpp (`llama-cli`, `llama-imatrix`) | MIT | No | located/reported only, never executed |
+| 1 | llama.cpp (`llama-cli`, `llama-server`, `llama-imatrix`) | MIT | No | located/reported only, never executed |
 | 2 | `nvidia-smi` | NVIDIA proprietary | No | `subprocess` (optional) |
 | 2 | `rocm-smi` | MIT | No | `subprocess` (optional) |
 | 2 | `system_profiler` | Apple proprietary | No | `subprocess` (optional) |

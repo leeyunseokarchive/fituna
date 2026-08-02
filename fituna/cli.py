@@ -22,7 +22,12 @@ CLI <-> dataclass field mapping (see fituna/config.py for the dataclasses):
     --json                -> report.to_json(...) instead of to_human(...)
     --resume              -> activates a ResultCache at <out>/.fituna_cache.sqlite3
     --export-ollama       -> report.export_ollama_modelfile(...) -> SearchResult
-                             .modelfile_path (JSON "modelfile_path")
+                             .modelfile_path (JSON "modelfile_path"). Attempted
+                             on the exit-3 (NoFeasibleConfigError) best-effort
+                             path too, using e.closest -- not just on success --
+                             and a failed export never eats the report: it's
+                             caught, logged as a warning, and the exit code
+                             stays whatever the search itself earned.
 
 Exit codes:
     0 = success (meets_target)
@@ -350,13 +355,25 @@ def _cmd_run(args: argparse.Namespace) -> int:
         progress_cb=logger.info,
     )
 
+    export_error: Optional[FiTunaError] = None
     if args.export_ollama:
         # Export lives in report.py (not inline here) so other front ends --
         # the MCP server, a library caller -- reach the same code path.
-        modelfile = report.export_ollama_modelfile(result.gguf_path, result.config)
-        result = replace(result, modelfile_path=modelfile)
+        # Guarded: a multi-minute search result must still get reported even
+        # if the Modelfile write fails (e.g. --out became read-only in the
+        # meantime) -- letting this raise would propagate to main()'s
+        # generic FiTunaError handler, which exits 1 *without ever printing
+        # the report*, discarding the whole measurement over an unrelated
+        # export failure.
+        try:
+            modelfile = report.export_ollama_modelfile(result.gguf_path, result.config)
+            result = replace(result, modelfile_path=modelfile)
+        except FiTunaError as exc:
+            export_error = exc
 
     print(report.to_json(result) if args.json else report.to_human(result))
+    if export_error is not None:
+        logger.warning("could not write Ollama Modelfile: %s", export_error)
     return 0 if result.meets_target else 1
 
 
@@ -394,9 +411,25 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     except NoFeasibleConfigError as e:
         logger.error(str(e))
         if e.closest is not None:
+            closest = e.closest
+            # --export-ollama must still export here: e.closest is a real
+            # SearchResult with a real gguf_path (the best-effort config the
+            # search found), and the best-effort report below already
+            # renders the artifact block. Without this, the rendered hint
+            # ("re-run with --export-ollama...") would tell the user to redo
+            # something they already asked for -- re-running just loops back
+            # into the same NoFeasibleConfigError.
+            if getattr(args, "export_ollama", False):
+                try:
+                    modelfile = report.export_ollama_modelfile(
+                        closest.gguf_path, closest.config
+                    )
+                    closest = replace(closest, modelfile_path=modelfile)
+                except FiTunaError as exc:
+                    logger.warning("could not write Ollama Modelfile: %s", exc)
             try:
                 logger.info(
-                    "closest best-effort attempt:\n%s", report.to_human(e.closest)
+                    "closest best-effort attempt:\n%s", report.to_human(closest)
                 )
             except Exception:  # pragma: no cover - reporting must not mask exit code
                 pass

@@ -250,7 +250,7 @@ fituna/
 └── report.py      # 사람/JSON 결과 렌더링 + 실행 명령어 생성
 ```
 
-유닛 테스트 169개(서브프로세스/네트워크 계층 모킹) + 모듈별 실행 가능한
+유닛 테스트 175개(서브프로세스/네트워크 계층 모킹) + 모듈별 실행 가능한
 self-check + 3-OS × 2-Python CI 매트릭스. 실기 E2E 검증은 macOS(Apple
 Silicon/Metal)와 Linux(NVIDIA T4/CUDA)에서 수행됨; [알려진 한계](#알려진-한계)
 참고.

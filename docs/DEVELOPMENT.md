@@ -57,7 +57,7 @@ matrix, alongside the test suite. A self-check that fails fails the build.
 
 ## 3. Mocked-subprocess unit tests
 
-The suite is 169 tests across `tests/`, and it is designed to pass on a machine
+The suite is 175 tests across `tests/`, and it is designed to pass on a machine
 with **no llama.cpp installed and no network access**. Every external effect is
 monkeypatched at its boundary:
 
@@ -92,13 +92,17 @@ hardware-probe output parsing (`test_hardware.py`, against recorded
 `nvidia-smi`/`rocm-smi`/`system_profiler` text), hardware-detection
 fallbacks, error mapping and exit codes, and cross-platform path handling.
 It does *not* cover parsing `llama-bench`, `llama-perplexity` or
-`llama-quantize` output: `tests/` has seven files
-(`test_cache`, `test_config`, `test_corpus`, `test_doctor`, `test_hardware`,
-`test_report`, `test_search`) and none of them exercise `bench.py`,
-`quality.py`, `quantize.py` or `binaries.py` directly. `report.py` is
-covered by `test_report.py`, but only its pure parts (command building,
+`llama-quantize` output: `tests/` has eight files
+(`test_cache`, `test_cli`, `test_config`, `test_corpus`, `test_doctor`,
+`test_hardware`, `test_report`, `test_search`) and none of them exercise
+`bench.py`, `quality.py`, `quantize.py` or `binaries.py` directly. `report.py`
+is covered by `test_report.py`, but only its pure parts (command building,
 Modelfile export, rendering) — it spawns no subprocess to begin with.
-`model_info.py` is the
+`cli.py` is covered by `test_cli.py`, which drives `cli.main()` end to end
+with `search.search()`/`binaries.locate_binaries()` faked out — this is what
+catches wiring bugs pure argparse tests can't, e.g. `--export-ollama` never
+actually being connected to `report.export_ollama_modelfile()`. `model_info.py`
+is the
 one exception among the subprocess wrappers: `test_config.py` covers its
 `is_already_quantized` guard, though not its GGUF header parsing. Those
 modules' parsing logic is otherwise covered only by their own per-module

@@ -230,12 +230,26 @@ def test_human_survives_a_missing_artifact_file(tmp_path):
     assert "already produced during the search" in human
 
 
-def test_human_notes_when_llama_server_could_not_be_located(tmp_path, monkeypatch):
+def test_human_says_not_found_only_when_a_lookup_actually_happened(tmp_path):
+    """search() stores llama_server_command after really looking (beside
+    known binaries, then PATH); a bare name there means the lookup came up
+    empty, so "not found" is a checked fact."""
+    gguf = tmp_path / "m.gguf"
+    gguf.touch()
+    human = to_human(_result(gguf, llama_server_command=["llama-server"]))
+    assert "llama-server was not found on this machine" in human
+
+
+def test_human_does_not_claim_not_found_when_nothing_was_checked(tmp_path, monkeypatch):
+    """When llama_server_command is None, to_human()'s own fallback builds
+    the command with no BinaryPaths, so it never looks anywhere -- the note
+    must not claim "not found" for a lookup that never happened."""
     monkeypatch.setenv("PATH", "")
     gguf = tmp_path / "m.gguf"
     gguf.touch()
     human = to_human(_result(gguf))
-    assert "llama-server was not found" in human
+    assert "llama-server was not found" not in human
+    assert "no binary-location info available" in human
 
 
 def test_human_hints_at_export_ollama_until_a_modelfile_exists(tmp_path):

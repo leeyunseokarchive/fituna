@@ -36,7 +36,7 @@ grep이 아니라 실제 import 문만 집계한 결과입니다.
 | 26 | tomllib (stdlib, self-check 전용) | 3.11 내장 | PSF License | https://github.com/python/cpython | `__init__.py` 버전-드리프트 self-check(`python -m fituna.__init__`에서만 실행)가 `pyproject.toml` 파싱 — 3.11+ 전용 모듈이지만 설치된 패키지의 런타임 경로에는 없어 하한선을 강제하는 근거는 아님 |
 | 27 | unittest.mock (stdlib, self-check 전용) | 3.11 내장 | PSF License | https://github.com/python/cpython | `bench.py`의 assert 기반 self-check(`_self_check()`)가 `subprocess.run`을 모킹 — unittest.mock을 쓰는 유일한 모듈 |
 | 28 | pytest (dev-only) | latest | MIT | https://github.com/pytest-dev/pytest | 테스트(설치 산출물에는 미포함) |
-| 29 | llama.cpp (외부 실행 도구, 서브프로세스) | 사용자 빌드 버전 | MIT | https://github.com/ggml-org/llama.cpp | `llama-quantize`/`llama-bench`/`llama-perplexity`/(선택)`convert_hf_to_gguf.py` 실행 — 실제 양자화·벤치마크·perplexity 연산 수행. `llama-cli`·`llama-imatrix`는 경로 탐색·보고만 하고 실행하지 않음(아래 비고) |
+| 29 | llama.cpp (외부 실행 도구, 서브프로세스) | 사용자 빌드 버전 | MIT | https://github.com/ggml-org/llama.cpp | `llama-quantize`/`llama-bench`/`llama-perplexity`/(선택)`convert_hf_to_gguf.py` 실행 — 실제 양자화·벤치마크·perplexity 연산 수행. `llama-cli`·`llama-server`·`llama-imatrix`는 경로 탐색·보고만 하고 실행하지 않음(아래 비고) |
 | 30 | nvidia-smi (선택, OS 드라이버 유틸) | 드라이버 종속 | NVIDIA 독점 (연동만, 재배포 없음) | https://developer.nvidia.com | NVIDIA GPU/VRAM 감지 |
 | 31 | rocm-smi (선택, OS 드라이버 유틸) | ROCm 종속 | MIT | https://github.com/ROCm/rocm_smi_lib | AMD GPU/VRAM 감지 |
 | 32 | system_profiler (선택, macOS 내장) | macOS 종속 | Apple 독점 (연동만, 재배포 없음) | https://www.apple.com | Apple Silicon 통합메모리(VRAM) 감지 |
@@ -59,12 +59,15 @@ grep이 아니라 실제 import 문만 집계한 결과입니다.
 - 29번 llama.cpp는 단일 저장소이며 빌드 산출물인 여러 바이너리
   (`llama-quantize`, `llama-bench`, `llama-perplexity`, 선택적으로 HF→GGUF
   변환 스크립트)를 하나의 SBOM 항목으로 묶어 표기했습니다 — 모두 동일
-  저장소·동일 라이선스(MIT)에서 비롯됩니다. `llama-cli`와 `llama-imatrix`도
-  같은 저장소 산출물이지만 **FiTuna가 실행하지는 않습니다**: `llama-cli`는
-  최종 결과의 `run command:` 줄에 실제 경로를 넣기 위해
-  `fituna/report.py`가 경로만 찾고(그리고 `fituna doctor`가 선택 점검
-  항목으로 보고), `llama-imatrix`는 `fituna/binaries.py`가 경로를 찾아
-  `fituna list-binaries`가 출력할 뿐 호출하는 코드 경로가 현재 없습니다.
+  저장소·동일 라이선스(MIT)에서 비롯됩니다. **세 가지**(`llama-cli`,
+  `llama-server`, `llama-imatrix`)는 같은 저장소 산출물이지만 **FiTuna가
+  실행하지는 않습니다**: `llama-cli`와 `llama-server`는 최종 결과 블록의
+  산출물(artifact) 사용법 — `3) terminal chat`(`llama-cli`)과 `1) local API
+  server`(`llama-server`) — 에 실제 경로를 넣기 위해 `fituna/report.py`가
+  경로만 찾고(`llama-cli`는 `fituna doctor`가 선택 점검 항목으로도 보고),
+  `llama-imatrix`는 `fituna/binaries.py`가 경로를 찾아 `fituna list-binaries`가
+  출력할 뿐 호출하는 코드 경로가 현재 없습니다. (`THIRD_PARTY_NOTICES.md`,
+  `docs/OPEN_SOURCE_USAGE.md`와 동일한 세 항목.)
 - 30번(nvidia-smi)과 32번(system_profiler)은 각각 NVIDIA 드라이버 패키지,
   macOS 운영체제에 기본 포함된 독점 유틸리티입니다. 33번(sysctl)은 macOS/BSD
   기본 유틸리티이지만, 상류 소스(`apple-oss-distributions/system_cmds`
