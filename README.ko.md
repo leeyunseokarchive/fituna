@@ -36,8 +36,14 @@ $ fituna run --model Qwen3-4B-Instruct-2507-F16.gguf \
 FiTuna result: MEETS TARGET
   quant : Q4_K_M   ngl : 33   ctx : 4096
   gen tok/s : 30.81      quality loss : 1.73%
-  run command:
-    llama-cli -m out/Qwen3-4B-Instruct-2507-...-Q4_K_M.gguf -ngl 33 -c 4096
+
+  artifact: out/Qwen3-4B-Instruct-2507-...-Q4_K_M.gguf  (2.3 GB -- already produced during the search)
+
+  1) local API server (OpenAI-compatible):
+       llama-server -m out/Qwen3-...-Q4_K_M.gguf -ngl 33 -c 4096 --port 8080
+  2) import into Ollama: re-run with --export-ollama to write a Modelfile beside the artifact
+  3) terminal chat (interactive check):
+       llama-cli -m out/Qwen3-...-Q4_K_M.gguf -ngl 33 -c 4096
 ```
 
 실제로 Apple M3 Pro에서 돌린 결과입니다([전체 로그](docs/RESULTS.md)). 무엇이
@@ -244,7 +250,7 @@ fituna/
 └── report.py      # 사람/JSON 결과 렌더링 + 실행 명령어 생성
 ```
 
-유닛 테스트 152개(서브프로세스/네트워크 계층 모킹) + 모듈별 실행 가능한
+유닛 테스트 169개(서브프로세스/네트워크 계층 모킹) + 모듈별 실행 가능한
 self-check + 3-OS × 2-Python CI 매트릭스. 실기 E2E 검증은 macOS(Apple
 Silicon/Metal)와 Linux(NVIDIA T4/CUDA)에서 수행됨; [알려진 한계](#알려진-한계)
 참고.
@@ -286,9 +292,11 @@ good first issue)와 `--ppl-chunks`가 품질 수치를 어떻게 움직이는�
 
 ## 범위
 
-FiTuna는 추천만 합니다 — 실행하거나 서빙하지 않습니다. 출력은 복사해서
-직접 돌리는 `llama-cli` 명령어입니다. FiTuna는 그걸 실행하지 않고,
-Ollama·LM Studio·어떤 추론 서버와도 통합하지 않습니다.
+FiTuna는 추천만 합니다 — 실행하거나 서빙하지 않습니다. 출력은 양자화된
+`.gguf` 산출물과, 복사해서 직접 돌리는 `llama-server`·`llama-cli`
+명령어입니다(`--export-ollama`를 쓰면 그 옆에 Ollama `Modelfile`도
+생성합니다). FiTuna는 그중 어느 것도 실행하지 않고, 자체 추론 서버도
+띄우지 않습니다.
 
 이건 빠뜨린 게 아니라 **의도적인 경계선**입니다. 실제로 추론을 서빙하는
 건 llama.cpp의 일이고(Ollama의 일이고, LM Studio의 일입니다), 그걸
@@ -297,12 +305,14 @@ Ollama·LM Studio·어떤 추론 서버와도 통합하지 않습니다.
 실측"이라는 것뿐입니다. 서버 프로세스를 추가하면 런타임 의존성 0개라는
 설계와도 어울리지 않습니다.
 
-이 경계선 안에 머무르면서도 확장할 수 있는 두 가지는
-[#19](https://github.com/leeyunseokarchive/fituna/issues/19)에서 추적
-중입니다: 찾아낸 명령을 직접 실행하는 것(`--launch`), 그리고 Ollama
-Modelfile이나 LM Studio 프리셋으로 내보내는 것 — 두 도구 모두 지금은
-모델별 고정 프리셋을 적용하고 있고([위에서 인용한 바로 그 공백](https://github.com/ollama/ollama/issues/14674)),
-FiTuna는 이미 그 둘이 하지 않는 실측 답을 계산해두고 있기 때문입니다. MCP
+이 중 Ollama 쪽은 이제 구현되었습니다(`--export-ollama`가 실측한
+`num_gpu`/`num_ctx`를 Modelfile에 써 줍니다 — 두 도구 모두 그러지 않으면
+모델별 고정 프리셋을 적용합니다,
+[위에서 인용한 바로 그 공백](https://github.com/ollama/ollama/issues/14674)).
+이 경계선 안에 머무르면서도 확장할 수 있는 나머지 두 가지는
+[#19](https://github.com/leeyunseokarchive/fituna/issues/19)에서 계속 추적
+중입니다: 찾아낸 명령을 직접 실행하는 것(`--launch`), 그리고 LM Studio
+프리셋으로 내보내는 것. MCP
 서버는 이미 "추천 이후에 무슨 일이 일어나는가"의 에이전트 버전을 다루고
 있습니다 — 에이전트가 `fituna_recommend`의 답을 읽고 스스로 판단합니다.
 사람이 명령을 복사할 필요가 없습니다.

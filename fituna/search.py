@@ -68,7 +68,7 @@ from fituna.config import (
 from fituna.model_info import model_fingerprint
 from fituna.quality import compute_perplexity, evaluate_quality
 from fituna.quantize import quantize
-from fituna.report import build_run_command
+from fituna.report import build_run_command, build_server_command
 
 # Sentinel quant key used to cache the base-GGUF baseline perplexity inside
 # quality_cache (which is keyed by (model_fp, quant)). cache.py's
@@ -298,6 +298,9 @@ def search(
                     quality=quality_res,
                     gguf_path=cand_gguf,
                     run_command=build_run_command(cand_gguf, bench.candidate, binaries),
+                    llama_server_command=build_server_command(
+                        cand_gguf, bench.candidate, binaries
+                    ),
                     meets_target=False,
                 )
 
@@ -308,6 +311,9 @@ def search(
                 quality=quality_res,
                 gguf_path=cand_gguf,
                 run_command=build_run_command(cand_gguf, bench.candidate, binaries),
+                llama_server_command=build_server_command(
+                    cand_gguf, bench.candidate, binaries
+                ),
                 meets_target=True,
             )
 

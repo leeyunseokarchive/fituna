@@ -127,6 +127,10 @@ class SearchResult:
     gguf_path: Path
     run_command: list[str]  # 사용자가 그대로 실행 가능한 llama-cli 커맨드
     meets_target: bool  # False면 best-effort(목표 미달) 결과
+    # 아래 두 필드는 나중에 추가된 것이라 기본값 None을 갖는다(기존 생성자
+    # 호출 호환). 산출물(gguf)을 실제로 쓰는 두 경로:
+    llama_server_command: Optional[list[str]] = None  # OpenAI 호환 로컬 API 서버 커맨드
+    modelfile_path: Optional[Path] = None  # --export-ollama로 쓴 Modelfile, 미생성 시 None
 
 
 @dataclass(frozen=True)

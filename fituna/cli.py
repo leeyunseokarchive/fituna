@@ -21,6 +21,8 @@ CLI <-> dataclass field mapping (see fituna/config.py for the dataclasses):
     --out                -> work_dir
     --json                -> report.to_json(...) instead of to_human(...)
     --resume              -> activates a ResultCache at <out>/.fituna_cache.sqlite3
+    --export-ollama       -> report.export_ollama_modelfile(...) -> SearchResult
+                             .modelfile_path (JSON "modelfile_path")
 
 Exit codes:
     0 = success (meets_target)
@@ -37,7 +39,7 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
-from dataclasses import asdict, fields
+from dataclasses import asdict, fields, replace
 from pathlib import Path
 from typing import Optional, Sequence
 
@@ -117,6 +119,16 @@ def _build_parser() -> argparse.ArgumentParser:
     run.add_argument("--json", action="store_true", help="emit JSON report to stdout")
     run.add_argument(
         "--resume", action="store_true", help="reuse cached bench/quality results"
+    )
+    run.add_argument(
+        "--export-ollama",
+        action="store_true",
+        dest="export_ollama",
+        help=(
+            "write an Ollama Modelfile (FROM + num_gpu/num_ctx of the winning "
+            "config) next to the produced .gguf in --out, ready for "
+            "`ollama create <name> -f <out>/Modelfile`"
+        ),
     )
 
     sub.add_parser("detect-hw", help="print auto-detected hardware profile")
@@ -337,6 +349,12 @@ def _cmd_run(args: argparse.Namespace) -> int:
         cache=cache,
         progress_cb=logger.info,
     )
+
+    if args.export_ollama:
+        # Export lives in report.py (not inline here) so other front ends --
+        # the MCP server, a library caller -- reach the same code path.
+        modelfile = report.export_ollama_modelfile(result.gguf_path, result.config)
+        result = replace(result, modelfile_path=modelfile)
 
     print(report.to_json(result) if args.json else report.to_human(result))
     return 0 if result.meets_target else 1

@@ -57,7 +57,7 @@ matrix, alongside the test suite. A self-check that fails fails the build.
 
 ## 3. Mocked-subprocess unit tests
 
-The suite is 152 tests across `tests/`, and it is designed to pass on a machine
+The suite is 169 tests across `tests/`, and it is designed to pass on a machine
 with **no llama.cpp installed and no network access**. Every external effect is
 monkeypatched at its boundary:
 
@@ -92,10 +92,13 @@ hardware-probe output parsing (`test_hardware.py`, against recorded
 `nvidia-smi`/`rocm-smi`/`system_profiler` text), hardware-detection
 fallbacks, error mapping and exit codes, and cross-platform path handling.
 It does *not* cover parsing `llama-bench`, `llama-perplexity` or
-`llama-quantize` output: `tests/` has six files
+`llama-quantize` output: `tests/` has seven files
 (`test_cache`, `test_config`, `test_corpus`, `test_doctor`, `test_hardware`,
-`test_search`) and none of them exercise `bench.py`, `quality.py`,
-`quantize.py`, `report.py` or `binaries.py` directly. `model_info.py` is the
+`test_report`, `test_search`) and none of them exercise `bench.py`,
+`quality.py`, `quantize.py` or `binaries.py` directly. `report.py` is
+covered by `test_report.py`, but only its pure parts (command building,
+Modelfile export, rendering) — it spawns no subprocess to begin with.
+`model_info.py` is the
 one exception among the subprocess wrappers: `test_config.py` covers its
 `is_already_quantized` guard, though not its GGUF header parsing. Those
 modules' parsing logic is otherwise covered only by their own per-module

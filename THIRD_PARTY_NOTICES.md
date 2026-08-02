@@ -32,9 +32,10 @@ them, in line with the conditions of their respective licenses.
     HF-format model directory to a base F16 GGUF
     (`fituna/model_info.py:ensure_base_gguf`)
 
-  Two further llama.cpp artifacts are **located but never executed** by
-  FiTuna: `llama-cli` is resolved by `fituna/report.py:_find_llama_cli`
-  only so the printed `run command:` names a real path, and is reported as
+  Three further llama.cpp artifacts are **located but never executed** by
+  FiTuna: `llama-cli` and `llama-server` are resolved by
+  `fituna/report.py:_find_llama_cli` / `_find_llama_server` only so the
+  printed result commands name a real path, and `llama-cli` is reported as
   an optional check by `fituna doctor`; `llama-imatrix` is resolved by
   `fituna/binaries.py:locate_binaries` and printed by
   `fituna list-binaries`, and no code path invokes it today.

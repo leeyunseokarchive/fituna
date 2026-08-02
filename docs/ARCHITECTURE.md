@@ -99,9 +99,17 @@ model/hardware answers in about a second.
    through `cache.ResultCache` when `--resume` is passed. It returns a
    `SearchResult` — either a real solution (`meets_target=True`) or a
    best-effort one, or raises `NoFeasibleConfigError` if nothing came close.
-6. `report.py` turns the `SearchResult` into `build_run_command()` (a ready
-   to paste `llama-cli` invocation) plus `to_json()` / `to_human()` output,
-   which `cli.py` prints to stdout per `--json`.
+6. `report.py` turns the `SearchResult` into the three ways to consume the
+   GGUF the search already produced: `build_server_command()` (a
+   `llama-server` invocation, the OpenAI-compatible local API),
+   `export_ollama_modelfile()` (an Ollama `Modelfile` written atomically
+   next to the `.gguf` when `--export-ollama` is passed) and
+   `build_run_command()` (the `llama-cli` invocation, kept as the
+   interactive check). `to_human()` leads with the artifact path and size,
+   then lists those three in that order; `to_json()` adds
+   `llama_server_command` / `modelfile_path` beside the existing fields.
+   `cli.py` prints one or the other to stdout per `--json`. Both
+   `llama-cli` and `llama-server` are *located, never executed*.
 
 ## Search algorithm flow (inside `search.search()`)
 
@@ -171,6 +179,7 @@ binaries themselves; every other function is a pure transform over
 <work_dir>/
 ├── base-f16.gguf            # model_info.ensure_base_gguf() — only if input was an HF dir
 ├── <model>-<fp12>-<quant>.gguf  # quantize.quantize() — one per quant tried, idempotent (reused if present)
+├── Modelfile                # report.export_ollama_modelfile() — only with --export-ollama; atomic (Modelfile.tmp + os.replace)
 └── .fituna_cache.sqlite3    # cache.ResultCache — bench_cache / quality_cache tables, only with --resume
 ```
 

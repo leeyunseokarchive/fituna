@@ -34,8 +34,14 @@ $ fituna run --model Qwen3-4B-Instruct-2507-F16.gguf \
 FiTuna result: MEETS TARGET
   quant : Q4_K_M   ngl : 33   ctx : 4096
   gen tok/s : 30.81      quality loss : 1.73%
-  run command:
-    llama-cli -m out/Qwen3-4B-Instruct-2507-...-Q4_K_M.gguf -ngl 33 -c 4096
+
+  artifact: out/Qwen3-4B-Instruct-2507-...-Q4_K_M.gguf  (2.3 GB -- already produced during the search)
+
+  1) local API server (OpenAI-compatible):
+       llama-server -m out/Qwen3-...-Q4_K_M.gguf -ngl 33 -c 4096 --port 8080
+  2) import into Ollama: re-run with --export-ollama to write a Modelfile beside the artifact
+  3) terminal chat (interactive check):
+       llama-cli -m out/Qwen3-...-Q4_K_M.gguf -ngl 33 -c 4096
 ```
 
 That's a real run (Apple M3 Pro — [full logs](docs/RESULTS.md)). Note what
@@ -243,7 +249,7 @@ fituna/
 └── report.py      # human/JSON result rendering + run-command builder
 ```
 
-152 unit tests (mocked subprocess/network layer) + per-module runnable
+169 unit tests (mocked subprocess/network layer) + per-module runnable
 self-checks + 3-OS × 2-Python CI matrix. Real-binary E2E validated on macOS (Apple
 Silicon/Metal) and Linux (NVIDIA T4/CUDA); see
 [Known limitations](#known-limitations).
@@ -285,9 +291,10 @@ first issue) and documenting how `--ppl-chunks` moves the quality figure
 
 ## Scope
 
-FiTuna recommends; it doesn't execute or serve. The output is a `llama-cli`
-command you copy and run — FiTuna never launches it, and it doesn't
-integrate with Ollama, LM Studio, or any inference server.
+FiTuna recommends; it doesn't execute or serve. The output is the quantized
+`.gguf` plus `llama-server` / `llama-cli` commands you copy and run (and,
+with `--export-ollama`, an Ollama `Modelfile` written next to it) — FiTuna
+never launches any of them, and it runs no inference server of its own.
 
 That's a boundary, not an oversight. Actually serving inference is
 llama.cpp's job (and Ollama's, and LM Studio's), and duplicating it would
@@ -296,12 +303,13 @@ differentiated value — FiTuna's only claim is that the *search* is measured,
 not guessed. A server process also sits awkwardly next to a
 zero-runtime-dependency design.
 
+The Ollama half of that is now shipped (`--export-ollama` writes the
+measured `num_gpu`/`num_ctx` into a Modelfile — both tools apply a fixed
+per-model preset otherwise, [the exact gap cited above](https://github.com/ollama/ollama/issues/14674)).
 Two extensions that stay inside this boundary rather than crossing it are
-tracked in [#19](https://github.com/leeyunseokarchive/fituna/issues/19):
-running the winning command directly (`--launch`), and exporting it to an
-Ollama Modelfile or LM Studio preset — since both apply a fixed per-model
-preset today ([the exact gap cited above](https://github.com/ollama/ollama/issues/14674))
-and FiTuna already computes the measured answer neither of them does. The
+still tracked in [#19](https://github.com/leeyunseokarchive/fituna/issues/19):
+running the winning command directly (`--launch`), and an LM Studio preset
+export. The
 MCP server already covers the agent-facing version of "what happens after
 the recommendation": an agent reads `fituna_recommend`'s answer and decides
 what to do with it, no human copying a command required.
