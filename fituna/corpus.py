@@ -12,8 +12,7 @@ Why this exists: the only previously-documented way to get this corpus was
 (hundreds of MB) and contradicts FiTuna's zero-runtime-dependency claim. This
 module replaces it with stdlib ``urllib`` only.
 
-API shape -- verified by hand against the live API on 2026-07-30 (see
-``.superpowers/sdd/task-2-report.md`` for the raw request/response), not
+API shape -- verified by hand against the live API on 2026-07-30, not
 guessed:
 
     GET https://datasets-server.huggingface.co/rows

@@ -2,8 +2,13 @@
 """fituna.cli
 =============
 
-argparse-based CLI. Subcommands: ``run``, ``detect-hw``, ``list-binaries``,
-``doctor``, ``fetch-corpus``, ``help``.
+argparse-based CLI. Subcommands: ``run``, ``quickstart``, ``detect-hw``,
+``list-binaries``, ``doctor``, ``fetch-corpus``, ``help``.
+
+``quickstart`` is an interactive shell over ``run``'s own flags (see
+fituna/quickstart.py): it assembles a ``run`` argv, prints it, parses it back
+through this module's ``_build_parser()`` and calls ``_cmd_run`` in-process.
+It adds no capability ``run`` lacks.
 
 CLI <-> dataclass field mapping (see fituna/config.py for the dataclasses):
 
@@ -49,7 +54,7 @@ from dataclasses import asdict, fields, replace
 from pathlib import Path
 from typing import Optional, Sequence
 
-from fituna import binaries, corpus, doctor, hardware, model_info, report, search
+from fituna import binaries, corpus, doctor, hardware, model_info, quickstart, report, search
 from fituna.cache import ResultCache
 from fituna.config import BinaryPaths, HardwareProfile, TargetSpec
 from fituna.errors import BinaryNotFoundError, FiTunaError, NoFeasibleConfigError
@@ -174,6 +179,14 @@ def _build_parser() -> argparse.ArgumentParser:
         "--split", default=None,
         help="override dataset split name (must be given together with --dataset/--config)",
     )
+
+    qs = sub.add_parser(
+        "quickstart",
+        help="interactive wizard: environment check -> targets -> license -> "
+        "model -> corpus -> the assembled `fituna run` command, executed for you",
+    )
+    qs.add_argument("--llama-bin-dir", default=None, dest="llama_bin_dir")
+    qs.add_argument("--out", default="./out", help="working/output directory")
 
     hp = sub.add_parser(
         "help",
@@ -321,11 +334,6 @@ def _cmd_fetch_corpus(args: argparse.Namespace) -> int:
 # One task-oriented page instead of the argparse dump ("fituna --help" lists
 # every flag of every subcommand; this points at the handful of commands
 # most sessions actually need, in the order a first-time user hits them).
-# NOTE: `quickstart` does not exist as a registered subcommand yet -- it
-# ships in the same release (a later task adds `sub.add_parser("quickstart",
-# ...)` above). Mentioning it here now is deliberate; nothing below asserts
-# every *mentioned* command is registered, only that every *registered*
-# command is mentioned (see tests/test_cli.py).
 _HELP_PAGE = """\
 FiTuna -- llama.cpp 양자화 설정을 실측으로 찾는 CLI
 Find the smallest llama.cpp quant + runtime config that meets your target,
@@ -466,6 +474,11 @@ def _cmd_run(args: argparse.Namespace) -> int:
 
 _DISPATCH = {
     "run": _cmd_run,
+    # Dispatched straight to fituna.quickstart (no _cmd_ wrapper): run_wizard
+    # takes the same argparse.Namespace every other handler here does, and it
+    # sets `args.export_ollama` on it so main()'s exit-3 branch below can
+    # export the best-effort Modelfile exactly as `run --export-ollama` does.
+    "quickstart": quickstart.run_wizard,
     "detect-hw": _cmd_detect_hw,
     "list-binaries": _cmd_list_binaries,
     "doctor": _cmd_doctor,
@@ -605,6 +618,11 @@ def _selfcheck() -> None:
     assert fc_override_args.dataset == "org/name"
     assert fc_override_args.hf_config == "cfg"
     assert fc_override_args.split == "train"
+
+    qs_args = parser.parse_args(["quickstart"])
+    assert qs_args.command == "quickstart"
+    assert qs_args.out == "./out"  # default, same as doctor/run
+    assert qs_args.llama_bin_dir is None
 
     help_args = parser.parse_args(["help"])
     assert help_args.command == "help"

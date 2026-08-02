@@ -223,11 +223,9 @@ def _registered_subcommands() -> list[str]:
 
 
 def test_help_page_mentions_every_registered_subcommand(capsys):
-    # `quickstart` is mentioned in the help page's copy even though it is
-    # not registered as a subcommand yet -- it ships in a later task, same
-    # release. That's fine: this only asserts every *registered* name is
-    # *mentioned* in the page, never the reverse, so the extra mention
-    # doesn't fail this test and the page can't rot once quickstart lands.
+    # Asserts every *registered* name is *mentioned* in the page, never the
+    # reverse -- the page may also name things that aren't subcommands at all
+    # (e.g. `fituna-mcp`, a separate entry point).
     subcommands = _registered_subcommands()
     assert subcommands  # sanity: the parser actually has subcommands
 

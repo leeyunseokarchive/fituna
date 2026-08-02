@@ -53,7 +53,7 @@ library. That is what "zero runtime dependencies" actually means.
 | 4b | Model weights | Midm-2.0-Mini-Instruct (KT Corporation) | MIT | file format (user-supplied) | `docs/RESULTS.md` Run 5 |
 | 5 | Evaluation corpus (EN) | `Salesforce/wikitext`, `wikitext-2-raw-v1` | CC BY-SA 3.0 / GFDL | file format (fetched) | `corpus.py` `PRESETS["en"]` |
 | 6 | Evaluation corpus (KO) | `wikimedia/wikipedia`, `20231101.ko` | CC BY-SA 3.0 / GFDL | file format (fetched) | `corpus.py` `PRESETS["ko"]` |
-| 7 | Data-access API | HuggingFace dataset-viewer | Apache-2.0 (server impl.) | network protocol (HTTP GET) | `corpus.py:52` `API_BASE` |
+| 7 | Data-access API | HuggingFace dataset-viewer | Apache-2.0 (server impl.) | network protocol (HTTP GET) | `corpus.py:51` `API_BASE` |
 | 8 | Agent protocol | Model Context Protocol, rev. `2024-11-05`, over JSON-RPC 2.0 | Apache-2.0 / MIT (in transition) | IPC protocol (stdio) | `mcp_server.py` |
 | 9 | Language runtime | CPython 3.11+ standard library | PSF License Agreement v2 | **imported** | whole package; `pyproject.toml` |
 | 10 | Build backend | setuptools ≥ 77 | MIT | build time only | `pyproject.toml` `[build-system]` |
@@ -95,7 +95,7 @@ are resolved by `fituna/report.py:32` (`_find_beside_binaries()`, via
 `llama-cli` is checked by `fituna doctor` (`doctor.py:312`) as an optional
 check; `llama-imatrix` is resolved by
 `fituna/binaries.py:99` and printed by `fituna list-binaries`
-(`cli.py:254`), and no code path invokes it today. Stating this precisely
+(`cli.py:267`), and no code path invokes it today. Stating this precisely
 matters — claiming FiTuna "uses llama-imatrix" would overstate the
 relationship.
 
@@ -250,7 +250,7 @@ dual-licensed GFDL** — attribution and share-alike apply. Determined by
 querying each dataset's own metadata on 2026-07-30:
 `https://huggingface.co/api/datasets/Salesforce/wikitext` and
 `https://huggingface.co/api/datasets/wikimedia/wikipedia` both return
-`cardData.license: ["cc-by-sa-3.0", "gfdl"]`. `corpus.py:56` records the
+`cardData.license: ["cc-by-sa-3.0", "gfdl"]`. `corpus.py:55` records the
 same provenance in a comment, and each preset's `license_note` carries the
 attribution text.
 
@@ -258,7 +258,7 @@ attribution text.
 to this repository; `.gitignore` keeps `*.txt` outputs out. Because the
 corpus is downloaded to a path of the user's choosing and never
 redistributed by FiTuna, CC BY-SA's share-alike condition is not triggered
-by FiTuna itself — but the user can trigger it, so `cli.py:307`
+by FiTuna itself — but the user can trigger it, so `cli.py:320`
 (`_cmd_fetch_corpus`) **prints the license notice and source URL to stdout
 on every successful fetch**. When `--dataset/--config/--split` override a
 preset, that same code path deliberately prints a *generic* "check this
@@ -284,7 +284,7 @@ stdlib `urllib` against the public REST API.
 **What it is.** HuggingFace's public REST service that serves dataset rows
 as JSON without authentication.
 
-**Where it is used.** `fituna/corpus.py:52`
+**Where it is used.** `fituna/corpus.py:51`
 `API_BASE = "https://datasets-server.huggingface.co/rows"`, called from
 `_fetch_page()` via `urllib.request.urlopen`. `fetch_corpus()` paginates
 with `offset`/`length` (the server caps `length` at 100), validates that
@@ -588,7 +588,7 @@ the obligation set is small and fully discharged in-repo:
 | Obligation | Source | Discharged by |
 |---|---|---|
 | Preserve the MIT notice | llama.cpp, ggml | `THIRD_PARTY_NOTICES.md` §1 reproduces the full MIT text |
-| Attribution + share-alike | CC BY-SA 3.0 corpora | `fituna fetch-corpus` prints the notice and source URL on every fetch (`cli.py:307`); no corpus text is committed |
+| Attribution + share-alike | CC BY-SA 3.0 corpora | `fituna fetch-corpus` prints the notice and source URL on every fetch (`cli.py:320`); no corpus text is committed |
 | Model license compliance | User's chosen weights | Weights are never redistributed; `docs/AI_MODEL_USAGE.md` carries the disclosure template, and every model in the published results is Apache-2.0 |
 | FiTuna's own terms | MIT (`LICENSE`) | Permissive; imposes nothing on users |
 
@@ -659,7 +659,7 @@ FiTuna는 **런타임 의존성이 0개**이지만, 이는 "타 오픈소스SW�
 | 모델 파일 포맷 | GGUF (ggml 사양) | MIT | **파일 포맷 준수** (`struct`로 직접 파싱) | `model_info.py:201` |
 | 모델 가중치 | SmolLM2-135M-Instruct, Qwen3-4B-Instruct-2507, Midm-2.0-Mini-Instruct(KT) | 앞의 둘 Apache-2.0, Midm은 MIT | **사용자 제공 파일** (재배포 없음) | `docs/RESULTS.md`, `notebooks/` |
 | 평가 데이터셋 | `Salesforce/wikitext`(영), `wikimedia/wikipedia` `20231101.ko`(한) | CC BY-SA 3.0 / GFDL | **내려받아 파일로 사용** (저장소 미포함) | `corpus.py` `PRESETS` |
-| 데이터 조회 API | HuggingFace dataset-viewer | 서버 구현체 Apache-2.0 (FiTuna는 HTTP 호출만) | **네트워크 프로토콜** | `corpus.py:52` |
+| 데이터 조회 API | HuggingFace dataset-viewer | 서버 구현체 Apache-2.0 (FiTuna는 HTTP 호출만) | **네트워크 프로토콜** | `corpus.py:51` |
 | 에이전트 연동 프로토콜 | Model Context Protocol(`2024-11-05`) / JSON-RPC 2.0 | Apache-2.0·MIT 전환 중 | **프로토콜 자체 구현** (SDK 미사용) | `mcp_server.py` |
 | 언어·런타임 | CPython 3.11+ 표준 라이브러리 | PSF License Agreement v2 | **임포트** (유일한 링크 항목) | 패키지 전체, `pyproject.toml` |
 | 빌드 백엔드 | setuptools ≥ 77 | MIT | 빌드 시점 한정 | `pyproject.toml` |

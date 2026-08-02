@@ -41,5 +41,6 @@ jobs:
           python -m fituna.report
           python -m fituna.corpus --selfcheck
           python -m fituna.doctor --selfcheck
+          python -m fituna.quickstart --selfcheck
           python -m fituna.cli --selfcheck
           python -m fituna.mcp_server --selfcheck

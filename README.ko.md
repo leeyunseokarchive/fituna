@@ -108,7 +108,31 @@ python3.13 -m venv .venv && source .venv/bin/activate
 pip install -e fituna
 ```
 
-**3. 품질 평가용 코퍼스 준비.** 품질손실은 평문 텍스트 코퍼스에 대한
+**3. 나머지는 마법사에 맡기세요:**
+
+```bash
+fituna quickstart
+```
+
+6단계 — 환경 점검, 목표 설정, 라이선스 조건, 모델(로컬 스캔 / 검증된
+추천 목록 + 다운로드 / HuggingFace 검색 / 직접 경로), 품질 코퍼스, 그리고
+탐색 실행. 완성된 `fituna run ...` 명령을 **실행 전에** 그대로 보여주므로,
+다음부터는 그 한 줄만 쓰시면 됩니다. 터미널(TTY)이 필요하며, CI나 파이프
+환경에서는 `fituna run`을 직접 쓰세요 — 마법사가 조립하는 탐색 파라미터는
+모두 공개된 `run` 플래그로 표현됩니다(argv 일치 테스트로 증명). 모델
+다운로드(검증된 추천 목록)와 HuggingFace 검색은 `run`에 대응되는 기능이
+없는, 마법사만의 편의 기능입니다 — `run --model`은 여전히 이미 디스크에
+있는 `.gguf` 파일을 기대합니다.
+
+속도는 예측하지 않습니다: 메모리 적합 여부만 산술(공개된 파일 크기 vs
+감지된 VRAM/RAM, 가정한 여유분 명시)로 판단하고, 속도는 추측이 아니라
+측정하며, 후보마다 라이선스를 함께 표시하고,
+[`docs/RESULTS.md`](docs/RESULTS.md)의 숫자는 "특정 하드웨어에서 이렇게
+측정됐다"는 기록으로만 보여줍니다.
+
+### 스크립트 경로 (마법사가 대신 조립해 주는 것)
+
+**A. 품질 평가용 코퍼스 준비.** 품질손실은 평문 텍스트 코퍼스에 대한
 perplexity 증가율로 측정되며, 실제 사용할 텍스트와 비슷할 때만 의미가
 있습니다. UTF-8 텍스트 파일이면 무엇이든 됩니다(`--quality-corpus`).
 
@@ -131,7 +155,7 @@ HuggingFace 공개 dataset-viewer REST API에서 표준 라이브러리 `urllib`
 표준출력에 출력합니다. 직접 준비한 데이터셋이 있다면 `--dataset/--config/--split`로
 프리셋을 오버라이드할 수 있습니다(`fituna fetch-corpus --help`).
 
-**4. 실행:**
+**B. 실행:**
 
 ```bash
 fituna doctor                             # 환경이 준비됐는지 확인
@@ -234,6 +258,7 @@ stdio transport는 줄바꿈으로 구분된 JSON-RPC 2.0이라 별도 SDK가 �
 ```
 fituna/
 ├── cli.py         # argparse 진입점, 종료코드 매핑(0/1/2/3)
+├── quickstart.py  # 대화형 마법사(fituna quickstart) — run의 공개 플래그만 조립
 ├── config.py      # frozen-dataclass 인터페이스 계약(단일 진실 공급원)
 ├── hardware.py    # GPU/VRAM/CPU/RAM 자동 감지 + 수동 오버라이드
 ├── binaries.py    # llama.cpp 바이너리 탐색 + 기능 조회
@@ -250,7 +275,7 @@ fituna/
 └── report.py      # 사람/JSON 결과 렌더링 + 실행 명령어 생성
 ```
 
-유닛 테스트 178개(서브프로세스/네트워크 계층 모킹) + 모듈별 실행 가능한
+유닛 테스트 241개(서브프로세스/네트워크 계층 모킹) + 모듈별 실행 가능한
 self-check + 3-OS × 2-Python CI 매트릭스. 실기 E2E 검증은 macOS(Apple
 Silicon/Metal)와 Linux(NVIDIA T4/CUDA)에서 수행됨; [알려진 한계](#알려진-한계)
 참고.
