@@ -10,6 +10,9 @@
 target speed, and a quality budget; get back the smallest config that
 actually hits the numbers on **your** machine.*
 
+**API subscriptions add up. Going local means guessing which model your
+machine can actually run.** Don't guess — measure it, and run your own.
+
 [![CI](https://github.com/leeyunseokarchive/fituna/actions/workflows/ci.yml/badge.svg)](https://github.com/leeyunseokarchive/fituna/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
@@ -86,6 +89,11 @@ your hardware, reproducible from cache.
   and go.
 
 ## Quickstart
+
+Three ways in: a person runs the wizard below (`fituna quickstart`); a
+script or CI job calls `fituna run --json`; an AI agent talks to
+[`fituna-mcp`](#mcp-server--measured-answers-for-ai-agents). The rest of
+this section covers the human path.
 
 **1. Get llama.cpp** (provides the actual quantize/bench/perplexity engines):
 
@@ -172,6 +180,39 @@ directory if `convert_hf_to_gguf.py` is available (source checkout +
 > **Disk usage:** the search quantizes every candidate that reaches the
 > quality stage — ~12 GB for four candidates of a 4B model. Files are reused
 > across runs; narrow `--quant` to bound this.
+
+## Use as a library
+
+Zero runtime dependencies means the modules import directly — no subprocess
+needed for the parts that don't touch llama.cpp binaries:
+
+```python
+from pathlib import Path
+from fituna.hardware import detect_hardware
+from fituna.config import TargetSpec
+
+hw = detect_hardware()
+print(f"{hw.gpu_vendor.value}: {hw.gpu_name}, {hw.vram_mb} MB VRAM, {hw.ram_mb} MB RAM")
+# apple: Apple M3 Pro, 18432 MB VRAM, 18432 MB RAM
+
+target = TargetSpec(
+    model_path=Path("model-F16.gguf"),
+    target_tokens_per_sec=30,
+    max_quality_loss_pct=5,
+    ctx=4096,
+)
+print(target.target_tokens_per_sec, target.max_quality_loss_pct, target.ctx)
+# 30 5 4096
+```
+
+(Real output from a `python3.13 -c` run on the same M3 Pro as the results
+above.) Running the actual search programmatically means calling
+`fituna.search.search()` directly, which additionally needs a `ModelInfo`
+(`fituna.model_info`), resolved `BinaryPaths`, a work directory, and a
+corpus path — exactly what `fituna run`/`quickstart` assemble for you. A
+real search takes minutes, so it's not something to paste inline here; see
+[`fituna/search.py`](fituna/search.py) and
+[`fituna/config.py`](fituna/config.py) for the full interface.
 
 ## How it works
 

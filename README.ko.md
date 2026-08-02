@@ -10,6 +10,9 @@
 품질손실을 입력하면 **당신의 기기**에서 실제로 그 수치를 달성하는 가장
 가벼운 설정을 찾아 돌려줍니다.*
 
+**외부 API는 구독료가 쌓이고, 로컬 LLM은 어떤 모델을 돌려야 할지
+막막하죠?** 추측하지 마세요 — 실측으로 검증하고, 나만의 LLM을 돌리세요.
+
 [![CI](https://github.com/leeyunseokarchive/fituna/actions/workflows/ci.yml/badge.svg)](https://github.com/leeyunseokarchive/fituna/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
@@ -89,6 +92,11 @@ FiTuna는 추측 대신 실측 탐색으로 대체합니다. 이미 설치된 ll
   install`만 하면 바로 씁니다.
 
 ## 빠른 시작
+
+들어오는 길은 세 가지입니다: 사람은 아래 마법사(`fituna quickstart`)를
+실행하고, 스크립트나 CI는 `fituna run --json`을 호출하고, AI 에이전트는
+[`fituna-mcp`](#mcp-서버--ai-에이전트를-위한-실측-답변)와 대화합니다. 이
+섹션의 나머지는 사람이 쓰는 경로를 다룹니다.
 
 **1. llama.cpp 설치** (실제 양자화/벤치/perplexity 엔진 제공):
 
@@ -173,6 +181,39 @@ F16/BF16 `.gguf`를 직접 넘기거나(많은 모델이 이미 공개함), HF �
 > **디스크 사용량:** 탐색은 품질 단계에 도달한 모든 후보를 양자화합니다 —
 > 4B 모델의 후보 4개 기준 약 12 GB. 파일은 재실행 시 재사용되며,
 > `--quant`로 후보를 좁히면 이 용량을 제한할 수 있습니다.
+
+## 라이브러리로 사용하기
+
+런타임 의존성이 0개라서 모듈을 바로 임포트해 쓸 수 있습니다 — llama.cpp
+바이너리를 건드리지 않는 부분은 서브프로세스 없이도 동작합니다:
+
+```python
+from pathlib import Path
+from fituna.hardware import detect_hardware
+from fituna.config import TargetSpec
+
+hw = detect_hardware()
+print(f"{hw.gpu_vendor.value}: {hw.gpu_name}, {hw.vram_mb} MB VRAM, {hw.ram_mb} MB RAM")
+# apple: Apple M3 Pro, 18432 MB VRAM, 18432 MB RAM
+
+target = TargetSpec(
+    model_path=Path("model-F16.gguf"),
+    target_tokens_per_sec=30,
+    max_quality_loss_pct=5,
+    ctx=4096,
+)
+print(target.target_tokens_per_sec, target.max_quality_loss_pct, target.ctx)
+# 30 5 4096
+```
+
+(위 실측 결과와 같은 M3 Pro에서 `python3.13 -c`로 실제 실행한 출력입니다.)
+실제 탐색을 코드로 돌리려면 `fituna.search.search()`를 직접 호출하면
+됩니다 — 이 함수는 추가로 `ModelInfo`(`fituna.model_info`), 해석된
+`BinaryPaths`, 작업 디렉토리, 코퍼스 경로가 필요합니다. 이건 바로
+`fituna run`/`quickstart`가 대신 조립해 주는 것들입니다. 실제 탐색은 몇
+분이 걸리므로 여기에 붙여넣을 만한 게 아닙니다. 전체 인터페이스는
+[`fituna/search.py`](fituna/search.py)와
+[`fituna/config.py`](fituna/config.py)를 참고하세요.
 
 ## 동작 원리
 
