@@ -17,6 +17,7 @@ mutation (verified manually; see the finding this file addresses).
 
 from __future__ import annotations
 
+import argparse
 import json
 import logging
 from pathlib import Path
@@ -209,3 +210,47 @@ def test_export_ollama_failure_on_exit_3_path_still_exits_3_with_a_warning(
 
     assert rc == 3
     assert any("disk full" in r.getMessage() for r in caplog.records)
+
+
+def _registered_subcommands() -> list[str]:
+    """Subcommand names straight from a freshly built parser -- never a
+    hardcoded list here, so this can't drift out of sync with cli.py."""
+    parser = cli._build_parser()
+    subparsers_action = next(
+        a for a in parser._actions if isinstance(a, argparse._SubParsersAction)
+    )
+    return list(subparsers_action.choices)
+
+
+def test_help_page_mentions_every_registered_subcommand(capsys):
+    # `quickstart` is mentioned in the help page's copy even though it is
+    # not registered as a subcommand yet -- it ships in a later task, same
+    # release. That's fine: this only asserts every *registered* name is
+    # *mentioned* in the page, never the reverse, so the extra mention
+    # doesn't fail this test and the page can't rot once quickstart lands.
+    subcommands = _registered_subcommands()
+    assert subcommands  # sanity: the parser actually has subcommands
+
+    rc = cli.main(["help"])
+    out = capsys.readouterr().out
+
+    assert rc == 0
+    for name in subcommands:
+        assert name in out, f"fituna help page does not mention {name!r}"
+
+
+def test_help_with_topic_delegates_to_that_subcommands_h_text(capsys):
+    rc = cli.main(["help", "run"])
+    out = capsys.readouterr().out
+
+    assert rc == 0
+    assert "usage: fituna run" in out
+    assert "--target-tps" in out  # a real `run`-only flag, not boilerplate
+
+
+def test_help_with_unknown_topic_is_a_usage_error(capsys):
+    rc = cli.main(["help", "not-a-real-command"])
+    err = capsys.readouterr().err
+
+    assert rc == 2
+    assert "not-a-real-command" in err

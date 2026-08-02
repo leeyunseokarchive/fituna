@@ -249,7 +249,7 @@ fituna/
 └── report.py      # human/JSON result rendering + run-command builder
 ```
 
-175 unit tests (mocked subprocess/network layer) + per-module runnable
+178 unit tests (mocked subprocess/network layer) + per-module runnable
 self-checks + 3-OS × 2-Python CI matrix. Real-binary E2E validated on macOS (Apple
 Silicon/Metal) and Linux (NVIDIA T4/CUDA); see
 [Known limitations](#known-limitations).

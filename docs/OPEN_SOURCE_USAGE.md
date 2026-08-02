@@ -95,7 +95,7 @@ are resolved by `fituna/report.py:32` (`_find_beside_binaries()`, via
 `llama-cli` is checked by `fituna doctor` (`doctor.py:312`) as an optional
 check; `llama-imatrix` is resolved by
 `fituna/binaries.py:99` and printed by `fituna list-binaries`
-(`cli.py:240`), and no code path invokes it today. Stating this precisely
+(`cli.py:254`), and no code path invokes it today. Stating this precisely
 matters — claiming FiTuna "uses llama-imatrix" would overstate the
 relationship.
 
@@ -258,7 +258,7 @@ attribution text.
 to this repository; `.gitignore` keeps `*.txt` outputs out. Because the
 corpus is downloaded to a path of the user's choosing and never
 redistributed by FiTuna, CC BY-SA's share-alike condition is not triggered
-by FiTuna itself — but the user can trigger it, so `cli.py:293`
+by FiTuna itself — but the user can trigger it, so `cli.py:307`
 (`_cmd_fetch_corpus`) **prints the license notice and source URL to stdout
 on every successful fetch**. When `--dataset/--config/--split` override a
 preset, that same code path deliberately prints a *generic* "check this
@@ -588,7 +588,7 @@ the obligation set is small and fully discharged in-repo:
 | Obligation | Source | Discharged by |
 |---|---|---|
 | Preserve the MIT notice | llama.cpp, ggml | `THIRD_PARTY_NOTICES.md` §1 reproduces the full MIT text |
-| Attribution + share-alike | CC BY-SA 3.0 corpora | `fituna fetch-corpus` prints the notice and source URL on every fetch (`cli.py:293`); no corpus text is committed |
+| Attribution + share-alike | CC BY-SA 3.0 corpora | `fituna fetch-corpus` prints the notice and source URL on every fetch (`cli.py:307`); no corpus text is committed |
 | Model license compliance | User's chosen weights | Weights are never redistributed; `docs/AI_MODEL_USAGE.md` carries the disclosure template, and every model in the published results is Apache-2.0 |
 | FiTuna's own terms | MIT (`LICENSE`) | Permissive; imposes nothing on users |
 

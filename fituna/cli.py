@@ -3,7 +3,7 @@
 =============
 
 argparse-based CLI. Subcommands: ``run``, ``detect-hw``, ``list-binaries``,
-``doctor``, ``fetch-corpus``.
+``doctor``, ``fetch-corpus``, ``help``.
 
 CLI <-> dataclass field mapping (see fituna/config.py for the dataclasses):
 
@@ -32,10 +32,11 @@ CLI <-> dataclass field mapping (see fituna/config.py for the dataclasses):
 Exit codes:
     0 = success (meets_target)
     1 = generic error
-    2 = BinaryNotFoundError, OR argparse's own usage-error exit (missing
+    2 = BinaryNotFoundError, argparse's own usage-error exit (missing
         required / unrecognized flag, via parser.parse_args() -> sys.exit(2)
-        before main()'s FiTunaError mapping runs) -- distinguish by whether
-        stderr's first line starts with "usage: "
+        before main()'s FiTunaError mapping runs -- distinguish by whether
+        stderr's first line starts with "usage: "), OR `fituna help <cmd>`
+        given an unrecognized <cmd> (stderr starts with "fituna help: error: ")
     3 = NoFeasibleConfigError
 """
 
@@ -174,6 +175,19 @@ def _build_parser() -> argparse.ArgumentParser:
         help="override dataset split name (must be given together with --dataset/--config)",
     )
 
+    hp = sub.add_parser(
+        "help",
+        help="print a task-oriented overview, or 'fituna help <command>' for "
+        "that command's full options",
+    )
+    hp.add_argument(
+        "topic",
+        nargs="?",
+        default=None,
+        metavar="command",
+        help="subcommand to show full -h output for",
+    )
+
     return parser
 
 
@@ -304,6 +318,79 @@ def _cmd_fetch_corpus(args: argparse.Namespace) -> int:
     return 0
 
 
+# One task-oriented page instead of the argparse dump ("fituna --help" lists
+# every flag of every subcommand; this points at the handful of commands
+# most sessions actually need, in the order a first-time user hits them).
+# NOTE: `quickstart` does not exist as a registered subcommand yet -- it
+# ships in the same release (a later task adds `sub.add_parser("quickstart",
+# ...)` above). Mentioning it here now is deliberate; nothing below asserts
+# every *mentioned* command is registered, only that every *registered*
+# command is mentioned (see tests/test_cli.py).
+_HELP_PAGE = """\
+FiTuna -- llama.cpp 양자화 설정을 실측으로 찾는 CLI
+Find the smallest llama.cpp quant + runtime config that meets your target,
+measured on your actual hardware.
+
+처음이라면 (getting started):
+  fituna quickstart      대화형 마법사 -- 전 과정을 안내
+                          interactive wizard through the whole flow
+
+자주 쓰는 명령 (common commands):
+  fituna doctor           환경 점검 (Python/바이너리/하드웨어/디스크)
+                          check the environment is ready
+  fituna fetch-corpus     품질 측정용 코퍼스 다운로드
+                          download a corpus for the quality gate
+  fituna run              탐색 실행 -- 목표 tok/s·품질손실을 만족하는 구성 찾기
+                          run the search for a config meeting your target
+  fituna run --json       스크립트/CI용 JSON 출력
+                          machine-readable output for scripts and CI
+  fituna detect-hw        자동 감지된 하드웨어 프로파일 출력
+                          print the auto-detected hardware profile
+  fituna list-binaries    해석된 llama.cpp 바이너리 경로 출력
+                          show resolved llama.cpp binaries
+
+에이전트에서 쓴다면 (from an AI agent):
+  fituna-mcp              MCP 서버 -- 실측 기반 추천 (별도 실행 파일,
+                          fituna 서브커맨드가 아니다)
+                          MCP server exposing measured recommendations
+                          (separate entry point, not a fituna subcommand)
+
+각 명령의 전체 옵션 (full options per command):
+  fituna <command> -h
+  fituna help <command>   위와 동일 / same as -h
+
+더 보기 (more): README.md / README.ko.md, REVIEWERS.md
+"""
+
+
+def _cmd_help(args: argparse.Namespace) -> int:
+    """Bare `fituna help` prints the task-oriented page above. `fituna help
+    <cmd>` looks `<cmd>` up in the *actual* registered subparsers (not a
+    separate hardcoded list) and prints that subparser's own -h text, so it
+    can never drift out of sync with what `fituna <cmd> -h` prints. An
+    unknown <cmd> is a usage error -> exit 2, argparse convention."""
+    if args.topic is None:
+        print(_HELP_PAGE)
+        return 0
+
+    subparsers_action = next(
+        a for a in _build_parser()._actions
+        if isinstance(a, argparse._SubParsersAction)
+    )
+    subparser = subparsers_action.choices.get(args.topic)
+    if subparser is None:
+        known = ", ".join(sorted(subparsers_action.choices))
+        print(
+            f"fituna help: error: unknown command {args.topic!r} "
+            f"(choices: {known})",
+            file=sys.stderr,
+        )
+        return 2
+
+    print(subparser.format_help())
+    return 0
+
+
 def _cmd_run(args: argparse.Namespace) -> int:
     ctx_candidates = _parse_ctx_candidates(args.ctx)
     quant_candidates = _sort_quants_by_quality(args.quant)
@@ -383,6 +470,7 @@ _DISPATCH = {
     "list-binaries": _cmd_list_binaries,
     "doctor": _cmd_doctor,
     "fetch-corpus": _cmd_fetch_corpus,
+    "help": _cmd_help,
 }
 
 
@@ -517,6 +605,24 @@ def _selfcheck() -> None:
     assert fc_override_args.dataset == "org/name"
     assert fc_override_args.hf_config == "cfg"
     assert fc_override_args.split == "train"
+
+    help_args = parser.parse_args(["help"])
+    assert help_args.command == "help"
+    assert help_args.topic is None
+
+    help_topic_args = parser.parse_args(["help", "run"])
+    assert help_topic_args.topic == "run"
+
+    # Every registered subcommand's -h must be reachable through `fituna
+    # help <cmd>` (not just `<cmd> -h` directly) -- exercise the actual
+    # lookup path _cmd_help uses, for every real subcommand.
+    subparsers_action = next(
+        a for a in parser._actions if isinstance(a, argparse._SubParsersAction)
+    )
+    for subparser in subparsers_action.choices.values():
+        subparser.format_help()  # must not raise for any registered name
+
+    assert _cmd_help(argparse.Namespace(topic="not-a-real-command")) == 2
 
     try:
         _parse_ctx_candidates("")

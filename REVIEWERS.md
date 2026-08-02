@@ -72,7 +72,7 @@ Ollama / 대화형 `llama-cli`) — 을 출력하면 정상 동작이다. **종�
 |---|---|---|---|
 | 1 | `nvidia-smi` | `Tesla T4` / `15360MiB` 표. 노트북 파일에 실제 실행 출력이 저장돼 있어 미리 확인 가능 | 수 초 |
 | 2 | llama.cpp를 CUDA로 빌드 | 마지막 줄에 `llama.cpp ready` | **10~20분** (가장 긴 셀) |
-| 3 | FiTuna 설치 + `fituna --help` | `usage: fituna [-h] [-v] {run,detect-hw,list-binaries,doctor,fetch-corpus} ...` | 수십 초 |
+| 3 | FiTuna 설치 + `fituna --help` | `usage: fituna [-h] [-v] {run,detect-hw,list-binaries,doctor,fetch-corpus,help} ...` | 수십 초 |
 | 4 | `fituna detect-hw` | `gpu_vendor: nvidia` / `gpu_name: Tesla T4` / `vram_mb: 15360` / `os_name: linux` | 수 초 |
 | 5 | 데모 모델(SmolLM2-135M F16, Apache 2.0) + 코퍼스 준비 | `model + corpus ready` | 1~2분 |
 | 6 | **측정 탐색 본체** (`fituna run`) | 아래 설명 참고 — T4에서는 `BEST EFFORT` | 약 61초 |
