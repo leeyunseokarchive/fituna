@@ -57,7 +57,7 @@ library. That is what "zero runtime dependencies" actually means.
 | 8 | Agent protocol | Model Context Protocol, rev. `2024-11-05`, over JSON-RPC 2.0 | Apache-2.0 / MIT (in transition) | IPC protocol (stdio) | `mcp_server.py` |
 | 9 | Language runtime | CPython 3.11+ standard library | PSF License Agreement v2 | **imported** | whole package; `pyproject.toml` |
 | 10 | Build backend | setuptools ≥ 77 | MIT | build time only | `pyproject.toml` `[build-system]` |
-| 11 | CI | `actions/checkout@v4`, `actions/setup-python@v5` | MIT | dev / CI only | `.github/workflows/ci.yml` |
+| 11 | CI | `actions/checkout@v5`, `actions/setup-python@v6` | MIT | dev / CI only | `.github/workflows/ci.yml` |
 | 12 | Test framework | pytest | MIT | dev only (`[dev]` extra) | `tests/`, `pyproject.toml` |
 | 13 | Verification environment | Jupyter notebook format, git, CMake, pip, `huggingface_hub` | BSD-3-Clause, GPL-2.0, BSD-3-Clause, MIT, Apache-2.0 | dev / notebook only | `notebooks/colab_nvidia_verification.ipynb` |
 | 14 | GPU/RAM detection | `rocm-smi` (ROCm) | MIT | subprocess (optional) | `hardware.py:111` |
@@ -664,7 +664,7 @@ FiTuna는 **런타임 의존성이 0개**이지만, 이는 "타 오픈소스SW�
 | 에이전트 연동 프로토콜 | Model Context Protocol(`2024-11-05`) / JSON-RPC 2.0 | Apache-2.0·MIT 전환 중 | **프로토콜 자체 구현** (SDK 미사용) | `mcp_server.py` |
 | 언어·런타임 | CPython 3.11+ 표준 라이브러리 | PSF License Agreement v2 | **임포트** (유일한 링크 항목) | 패키지 전체, `pyproject.toml` |
 | 빌드 백엔드 | setuptools ≥ 77 | MIT | 빌드 시점 한정 | `pyproject.toml` |
-| CI | `actions/checkout@v4`, `actions/setup-python@v5` | 둘 다 MIT | 개발·CI 한정 | `.github/workflows/ci.yml` |
+| CI | `actions/checkout@v5`, `actions/setup-python@v6` | 둘 다 MIT | 개발·CI 한정 | `.github/workflows/ci.yml` |
 | 테스트 | pytest | MIT | 개발 한정(`[dev]` 옵션) | `tests/`, `pyproject.toml` |
 | 검증 환경 | Jupyter 노트북 포맷, git, CMake, pip, `huggingface_hub` | BSD-3-Clause, GPL-2.0, BSD-3-Clause, MIT, Apache-2.0 | 노트북 한정 | `notebooks/colab_nvidia_verification.ipynb` |
 | GPU 감지 | `rocm-smi` (ROCm) | MIT (현행 기본 브랜치 `License.txt`) | 서브프로세스(선택) | `hardware.py:111` |
