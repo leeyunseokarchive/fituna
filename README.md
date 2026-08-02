@@ -4,7 +4,9 @@
 
 # 🎯 FiTuna
 
-**Hardware-benchmark-driven auto-tuning for local LLMs.** Give it a model, a
+**Stop guessing your llama.cpp config. Measure it.**
+
+Hardware-benchmark-driven auto-tuning for local LLMs — give it a model, a
 target speed and a quality budget; get back the smallest llama.cpp config that
 actually hits those numbers on **your** machine.
 
@@ -114,8 +116,8 @@ Measure the language you'll run: the same quant can measure 2–3× different
 loss on the two corpora, and in Run 3 that was enough to change the verdict
 the tool returned ([measurement and
 caveats](docs/RESULTS.md#run-3--english-vs-korean-quality-corpus-same-model-same-quants)).
-Both presets are CC BY-SA 3.0 and `fetch-corpus` prints the attribution notice
-when it finishes; `--dataset/--config/--split` override the preset
+Both presets are CC BY-SA 3.0 and `fetch-corpus` prints the license notice
+and source URL when it finishes; `--dataset/--config/--split` override the preset
 ([provenance and licensing](docs/OPEN_SOURCE_USAGE.md)).
 
 ```bash
@@ -271,7 +273,7 @@ stay inside it — `--launch` and an LM Studio preset export — are tracked in
 Contributions welcome — the codebase is small, dependency-free and
 contract-first (start at [`fituna/config.py`](fituna/config.py)); 246 unit
 tests, per-module self-checks and a 3-OS × 2-Python CI matrix guard it.
-Planned work sits in the
+The roadmap lives in the
 [v0.2.0 milestone](https://github.com/leeyunseokarchive/fituna/milestone/1),
 including [#10](https://github.com/leeyunseokarchive/fituna/issues/10) (parser
 test coverage, good first issue). See [CONTRIBUTING.md](CONTRIBUTING.md) ·

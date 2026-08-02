@@ -160,8 +160,9 @@ confirms the change is a review that did not happen; the review on PR #6 killed
 its own headline result after the per-chunk trace failed to support it, and PR
 #4 corrected a false model-license claim in a document that had already been
 published. A finding too large to fix inside its branch is written down where
-it stays visible — named in the review body and carried onto the README
-roadmap — rather than quietly dropped; the standing example is
+it stays visible — named in the review body and filed on the
+[v0.2.0 milestone](https://github.com/leeyunseokarchive/fituna/milestone/1) —
+rather than quietly dropped; the standing example is
 `quality.py` discarding the `±` standard error that `llama-perplexity`
 prints, deferred because capturing it invalidates the cache every published
 number traces to.

@@ -4,7 +4,9 @@
 
 # 🎯 FiTuna
 
-**하드웨어 실측 벤치마크 기반 로컬 LLM 자동 튜닝 도구.** 모델, 목표 속도,
+**llama.cpp 설정, 추측하지 말고 측정하세요.**
+
+하드웨어 실측 벤치마크 기반 로컬 LLM 자동 튜닝 도구 — 모델, 목표 속도,
 허용 품질손실을 입력하면 **당신의 기기**에서 실제로 그 수치를 달성하는 가장
 가벼운 llama.cpp 설정을 찾아 돌려줍니다.
 
@@ -113,8 +115,8 @@ fituna fetch-corpus --lang ko --out kowiki-corpus.txt --rows 500   # 한국어 �
 보이며, Run 3에서는 그 차이만으로 도구가 반환하는 판정이 바뀌었습니다([실측
 내용과 단서
 조항](docs/RESULTS.md#run-3--english-vs-korean-quality-corpus-same-model-same-quants)).
-두 프리셋 모두 CC BY-SA 3.0이며 `fetch-corpus`는 완료 시 저작자표시 고지를
-출력합니다. `--dataset/--config/--split`로 프리셋을 오버라이드할 수 있습니다
+두 프리셋 모두 CC BY-SA 3.0이며 `fetch-corpus`는 완료 시 라이선스 고지와
+출처 URL을 출력합니다. `--dataset/--config/--split`로 프리셋을 오버라이드할 수 있습니다
 ([출처와 라이선스](docs/OPEN_SOURCE_USAGE.md)).
 
 ```bash
@@ -268,8 +270,8 @@ FiTuna는 추천만 합니다 — 실행하거나 서빙하지 않습니다. 출
 
 기여를 환영합니다 — 코드베이스는 작고, 의존성이 없으며, 계약 우선으로
 설계됐습니다([`fituna/config.py`](fituna/config.py)에서 시작하세요). 유닛 테스트
-246개, 모듈별 self-check, 3-OS × 2-Python CI 매트릭스가 이를 지킵니다. 예정된
-작업은 [v0.2.0 마일스톤](https://github.com/leeyunseokarchive/fituna/milestone/1)에
+246개, 모듈별 self-check, 3-OS × 2-Python CI 매트릭스가 이를 지킵니다. 개발
+로드맵(예정 작업)은 [v0.2.0 마일스톤](https://github.com/leeyunseokarchive/fituna/milestone/1)에
 있으며, [#10](https://github.com/leeyunseokarchive/fituna/issues/10)(파서 테스트
 커버리지, good first issue)도 포함됩니다. 자세한 내용은
 [CONTRIBUTING.md](CONTRIBUTING.md) ·
