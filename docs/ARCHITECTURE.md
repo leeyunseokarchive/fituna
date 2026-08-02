@@ -10,6 +10,68 @@ itself — all inference/quantization/perplexity computation happens inside
 the llama.cpp C++ binaries; FiTuna's job is orchestration, output parsing,
 search, and caching. It has zero runtime Python dependencies (stdlib only).
 
+## Pipeline overview
+
+```mermaid
+flowchart LR
+    subgraph Input
+        A["model.gguf<br/>(or HF dir)"]
+        B["target tok/s<br/>quality budget"]
+    end
+
+    A --> C[hardware.py<br/>GPU / VRAM / RAM<br/>auto-detect]
+    B --> D
+
+    subgraph "Stage 1 · Quality (all candidates)"
+        D[quantize.py<br/>llama-quantize] --> E[quality.py<br/>llama-perplexity<br/>loss vs F16 baseline]
+        E --> F{"loss ≤ budget?"}
+        F -- no --> X[dropped]
+    end
+
+    subgraph "Stage 2 · Speed (early-exit walk)"
+        F -- yes, sorted by<br/>measured quality --> G[bench.py<br/>llama-bench full-offload]
+        G -- misses target --> Y[skip quant]
+        G -- hits --> H["binary-search<br/>minimal -ngl"]
+    end
+
+    C --> G
+    H --> I[["result:<br/>quant + ngl + ctx<br/>+ run command"]]
+    E & G <--> K[(cache.py<br/>sqlite3<br/>--resume)]
+```
+
+**Stage 1** measures perplexity loss for *every* candidate — because Stage 2
+walks them in **measured** quality order, and you can't sort by a number you
+haven't measured. (In practice the conventional Q8_0-first ranking was wrong
+on both models we tested.) **Stage 2** early-exits hard: a quant whose
+full-offload bench misses the target is dropped without further benches, and
+the first quant that passes wins — lower-quality quants are never benchmarked.
+
+All subprocess results land in a sqlite3 cache keyed by model fingerprint,
+hardware profile, **and llama.cpp build version** — so `--resume` never
+serves numbers measured under a different backend build.
+
+## Repository layout
+
+```
+fituna/
+├── cli.py         # argparse entry point, exit-code mapping (0/1/2/3)
+├── quickstart.py  # interactive wizard (fituna quickstart) over run's own flags
+├── config.py      # frozen-dataclass interface contract (single source of truth)
+├── hardware.py    # GPU/VRAM/CPU/RAM auto-detection + manual override
+├── binaries.py    # llama.cpp binary discovery + capability introspection
+├── doctor.py      # environment self-diagnosis (fituna doctor subcommand)
+├── corpus.py      # quality-corpus download (fituna fetch-corpus, stdlib urllib)
+├── errors.py      # re-export shim for the FiTunaError hierarchy (defined in config.py)
+├── mcp_server.py  # MCP stdio server (JSON-RPC 2.0, fituna-mcp entry point)
+├── model_info.py  # direct GGUF header parsing (struct), HF-dir conversion
+├── quantize.py    # llama-quantize wrapper (idempotent, atomic writes)
+├── quality.py     # llama-perplexity wrapper (quality-loss measurement)
+├── bench.py       # llama-bench wrapper (throughput measurement)
+├── search.py      # the two-stage search orchestrator
+├── cache.py       # sqlite3 result cache (--resume)
+└── report.py      # human/JSON result rendering + run-command builder
+```
+
 ## Module diagram
 
 ```
@@ -271,3 +333,23 @@ no doctor equivalent of exit code 3 — `NoFeasibleConfigError` is a
   `cache.py` degrades gracefully to "just run the subprocess" when
   `cache is None` (`--resume` not passed) — the cache is never required for
   correctness, only for avoiding redundant subprocess calls across runs.
+- **Recommend, don't serve** — the deliberate scope boundary. FiTuna's output
+  is the quantized `.gguf` plus `llama-server` / `llama-cli` commands the user
+  copies and runs (and, with `--export-ollama`, an Ollama `Modelfile` written
+  next to it); FiTuna never launches any of them and runs no inference server
+  of its own. That's a boundary, not an oversight. Actually serving inference
+  is llama.cpp's job (and Ollama's, and LM Studio's), and duplicating it would
+  compete with the exact tools the README contrasts FiTuna against, for no
+  differentiated value — FiTuna's only claim is that the *search* is measured,
+  not guessed. A server process also sits awkwardly next to a
+  zero-runtime-dependency design. The Ollama half of "what happens after the
+  recommendation" is shipped: `--export-ollama` writes the measured
+  `num_gpu`/`num_ctx` into a Modelfile — both Ollama and LM Studio apply a
+  fixed per-model preset otherwise, [the exact
+  gap](https://github.com/ollama/ollama/issues/14674) the README cites. Two
+  extensions that stay inside this boundary rather than crossing it are
+  tracked in [#19](https://github.com/leeyunseokarchive/fituna/issues/19):
+  running the winning command directly (`--launch`), and an LM Studio preset
+  export. The MCP server already covers the agent-facing version — an agent
+  reads `fituna_recommend`'s answer and decides what to do with it, no human
+  copying a command required.
