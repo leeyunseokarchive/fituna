@@ -16,8 +16,8 @@ search, and caching. It has zero runtime Python dependencies (stdlib only).
                               ┌───────────┐
                               │  cli.py   │  argparse entry point (run /
                               └─────┬─────┘  detect-hw / list-binaries /
-                                    │ doctor / fetch-corpus); builds
-                                    │ TargetSpec, dispatches
+                                    │ doctor / fetch-corpus / help);
+                                    │ builds TargetSpec, dispatches
         ┌───────────────┬──────────┼───────────┬──────────────────┐
         ▼                ▼          ▼           ▼                  ▼
   hardware.py      binaries.py  model_info.py  quantize.py    report.py
