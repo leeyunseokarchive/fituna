@@ -11,11 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`fituna quickstart`** — an interactive six-step wizard (environment
   check → targets → license requirements → model → quality corpus → confirm
-  and run). It is a shell over `fituna run`'s own flags and nothing more: it
-  prints the fully assembled `fituna run ...` command, then parses that same
-  argv back through the CLI parser and executes it in-process, so what is
-  shown and what runs cannot diverge. Requires a TTY (exit 1 otherwise,
-  pointing at `fituna run`).
+  and run). Every search parameter it assembles maps to a public `fituna
+  run` flag — proven by an argv-equality test — while model download (the
+  curated shortlist) and the HuggingFace search are wizard-only
+  conveniences with no `run` equivalent. It prints the fully assembled
+  `fituna run ...` command, then parses that same argv back through the CLI
+  parser and executes it in-process, so what is shown and what runs cannot
+  diverge. Requires a TTY (exit 1 otherwise, pointing at `fituna run`).
   It refuses to predict throughput and says so on screen. Memory fit is
   arithmetic only — published file size vs detected VRAM/RAM, with the
   assumed 20 % margin stated as an assumption. The three project-verified

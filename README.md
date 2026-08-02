@@ -116,7 +116,11 @@ Six steps — environment check, targets, license requirements, model
 own path), quality corpus, then the search itself. It prints the fully
 assembled `fituna run ...` command **before** executing it, so the next run
 is a one-liner you already have. Needs a terminal; in CI or a pipe use
-`fituna run` directly — the wizard can do nothing `run` cannot.
+`fituna run` directly — every search parameter the wizard assembles maps to
+a public `run` flag (proven by an argv-equality test). Model download (the
+curated shortlist) and the HuggingFace search are wizard-only conveniences
+with no `run` equivalent — `run --model` still expects a `.gguf` already on
+disk.
 
 It never predicts throughput: memory fit is arithmetic (published file size
 vs detected VRAM/RAM, with the assumed margin stated), speed is measured

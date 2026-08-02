@@ -719,7 +719,7 @@ copyright and licensing information."
 **Regression check.** Adding a line to every file shifts every line number
 below it. Both consequences were checked and handled:
 
-- `python3.13 -m pytest -q` → **152 passed**, and all 16 module self-checks
+- `python3.13 -m pytest -q` → **245 passed**, and all 16 module self-checks
   listed in `.github/workflows/ci.yml` still exit 0.
 - Four documents cite source locations as `file.py:NNN`, not one:
   `docs/OPEN_SOURCE_USAGE.md` (38 occurrences, 30 distinct `file:line`
@@ -786,7 +786,7 @@ for f in fituna/*.py tests/*.py; do head -1 "$f"; done | sort | uniq -c
 
 # --- 8. nothing broke (same two steps CI runs) --------------------------
 /tmp/runtimeenv/bin/python -m pip install pytest
-/tmp/runtimeenv/bin/python -m pytest -q            # expect: 0 failed (175 passed at the time of writing)
+/tmp/runtimeenv/bin/python -m pytest -q            # expect: 0 failed (245 passed at the time of writing)
 for m in __init__ errors config cache search model_info quantize quality \
          bench hardware binaries report; do /tmp/runtimeenv/bin/python -m fituna.$m || break; done
 for m in corpus doctor cli mcp_server; do /tmp/runtimeenv/bin/python -m fituna.$m --selfcheck || break; done

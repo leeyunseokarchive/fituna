@@ -9,11 +9,16 @@ run``'s public flags. It ends by printing the fully assembled ``fituna run
 path ``fituna/cli.py`` dispatches to -- the wizard graduates its users to the
 CLI rather than becoming a second, divergent interface.
 
-**No wizard-only features.** Every answer collected here turns into one
-``fituna run`` argument (see :func:`build_run_argv`). ``_selfcheck`` and the
-tests both parse that argv back through ``cli._build_parser()``, so a wizard
-capability that ``run`` cannot express fails immediately instead of quietly
-forking the product.
+**Every search parameter maps to a public ``run`` flag.** Every answer that
+feeds the search (target speed, quality-loss ceiling, ctx, license filter)
+turns into one ``fituna run`` argument (see :func:`build_run_argv`);
+``_selfcheck`` and the tests both parse that argv back through
+``cli._build_parser()`` and assert it is exactly the argv actually executed,
+so a search parameter this wizard could express but ``run`` cannot fails
+immediately instead of quietly forking the product. Model download (the
+curated shortlist, HuggingFace search) is a wizard convenience with no
+``run`` equivalent -- ``run --model`` still expects a ``.gguf`` already on
+disk.
 
 The honesty line this module has to embody
 ------------------------------------------
@@ -31,8 +36,7 @@ The honesty line this module has to embody
   the search is what judges them.
 
 HuggingFace search API -- verified by hand against the live API on
-2026-08-02 (raw request/response in ``.superpowers/sdd/task-3-report.md``),
-not guessed, same practice as ``fituna/corpus.py``:
+2026-08-02, not guessed, same practice as ``fituna/corpus.py``:
 
     GET https://huggingface.co/api/models
         ?search=<q>&filter=gguf&limit=<n>&sort=downloads&direction=-1
@@ -56,9 +60,13 @@ Confirmed characteristics that shaped the parser:
   "kanana-open-license"``) -- reading only ``cardData.license`` would file
   every research-only license under the meaningless label "other". A
   ``license:<slug>`` entry also appears in ``tags`` and is used as a fallback.
-- ``cardData`` may be absent entirely (e.g.
+- ``cardData`` may be present with no ``license`` key at all (e.g.
   ``mradermacher/EXAONE-4.0-1.2B-abliterated-i1-GGUF`` in the captured
-  fixture) -- "no license metadata at all" is a real case, not an edge case.
+  fixture, whose ``cardData`` carries only ``base_model``/``tags``) --
+  "no license metadata" is a real case, not an edge case. ``cardData`` being
+  *absent entirely* is covered separately, by the synthetic
+  ``someone/Model-GGUF`` row in ``_selfcheck`` (no ``cardData`` key at all,
+  license recovered from the ``tags`` fallback instead).
 - ``gated`` is ``false`` or a *string* (``"manual"``/``"auto"``, observed on
   ``meta-llama/Llama-2-7b-chat-hf``), so it is truthiness-tested, not
   compared to ``True``.
@@ -73,8 +81,10 @@ Confirmed characteristics that shaped the parser:
 from __future__ import annotations
 
 import argparse
+import http.client
 import json
 import os
+import shlex
 import sys
 import tempfile
 import urllib.error
@@ -218,14 +228,26 @@ CORPUS_CHOICES: tuple[tuple[str, str, str], ...] = (
 # ---------------------------------------------------------------------------
 
 
-def license_allows(license_slug: Optional[str], need: str) -> bool:
+def license_allows(
+    license_slug: Optional[str],
+    need: str,
+    *,
+    model_id: str = "",
+    base_model: Optional[str] = None,
+) -> bool:
     """Does a model under ``license_slug`` satisfy the user's ``need``?
 
     - ``personal``: everything (no filter).
     - ``commercial``: deny-list -- anything whose license slug carries a
-      known non-commercial / research-only marker is out. An unknown or
-      missing license passes the filter but keeps the metadata caveat: this
-      function classifies, it does not give legal advice.
+      known non-commercial / research-only marker is out. Missing license
+      *metadata* does not mean missing evidence: ``model_id`` and
+      ``base_model`` (when supplied) are scanned for the same markers too,
+      lowercased, because an EXAONE derivative with an absent license field
+      but ``exaone`` in its own id or its ``cardData.base_model`` still
+      carries the disqualifying evidence -- it is just filed under a
+      different key. Nothing left over after that scan passes the filter
+      but keeps the metadata caveat: this function classifies, it does not
+      give legal advice.
     - ``redistribution``: allow-list -- permissive licenses only, so an
       unknown or missing license is excluded.
     """
@@ -235,7 +257,8 @@ def license_allows(license_slug: Optional[str], need: str) -> bool:
     if need == "redistribution":
         return slug in _PERMISSIVE
     if need == "commercial":
-        return not any(marker in slug for marker in _NON_COMMERCIAL_MARKERS)
+        haystack = " ".join([slug, model_id.lower(), (base_model or "").lower()])
+        return not any(marker in haystack for marker in _NON_COMMERCIAL_MARKERS)
     raise ValueError(f"unknown license need {need!r}")
 
 
@@ -268,7 +291,7 @@ def _memory_fit_line(size_bytes: int, hw: HardwareProfile) -> str:
     if mem_mb is None:
         return f"메모리: {size} — 감지된 메모리 정보가 없어 판정하지 않습니다"
     budget = mem_mb * 1024 * 1024 * MEMORY_MARGIN
-    verdict = "들어갑니다" if size_bytes <= budget else "부족합니다"
+    verdict = "들어갑니다" if memory_fit(size_bytes, hw) else "부족합니다"
     return (
         f"메모리: {size} vs 감지된 {label} {report.human_size(mem_mb * 1024 * 1024)}"
         f" ({mem_mb} MB) × {MEMORY_MARGIN * 100:.0f} % = {report.human_size(budget)} → {verdict}"
@@ -286,6 +309,10 @@ class HFCandidate:
     gated: bool
     downloads: int
     gguf_files: tuple[str, ...]
+    # cardData.base_model -- kept so the commercial filter can catch a
+    # derivative whose *own* license metadata is absent but whose upstream
+    # model is a known non-commercial one (see license_allows).
+    base_model: Optional[str] = None
 
 
 def _license_of(item: dict) -> tuple[Optional[str], Optional[str]]:
@@ -330,6 +357,7 @@ def parse_hf_search(payload: object) -> list[HFCandidate]:
             for name in [sib.get("rfilename") or ""]
             if name.endswith(".gguf") and "-of-" not in name
         )
+        card = item.get("cardData") or {}
         out.append(
             HFCandidate(
                 model_id=str(item["id"]),
@@ -340,6 +368,7 @@ def parse_hf_search(payload: object) -> list[HFCandidate]:
                 gated=bool(item.get("gated")),
                 downloads=int(item.get("downloads") or 0),
                 gguf_files=files,
+                base_model=card.get("base_model"),
             )
         )
     return out
@@ -488,10 +517,15 @@ def _download(url: str, dest: Path) -> Path:
                                 f"({report.human_size(done)} / {report.human_size(total)})"
                             )
         os.replace(tmp, dest)
-    except OSError as exc:
-        # urllib.error.HTTPError/URLError are OSError subclasses, as are the
-        # bare timeout/reset errors read() can raise mid-stream and a failing
-        # os.replace -- one catch, one message (fituna.corpus convention).
+    except (OSError, TimeoutError, http.client.IncompleteRead) as exc:
+        # urllib.error.HTTPError/URLError and a failing os.replace are OSError
+        # subclasses, as is TimeoutError itself -- but a truncated multi-GB
+        # transfer (Content-Length promised more than the socket delivered)
+        # surfaces from read() as http.client.IncompleteRead, which is *not*
+        # an OSError, so it needs its own name in the tuple. One catch, one
+        # message either way (fituna.corpus convention) -- a dropped
+        # connection here must return the user to the model menu, not throw
+        # away four completed steps.
         tmp.unlink(missing_ok=True)
         raise FiTunaError(f"{url} 다운로드에 실패했습니다: {exc}") from exc
     except BaseException:
@@ -603,7 +637,13 @@ def _step_model(need: str, out_dir: Path, hw: HardwareProfile) -> Path:
     print("[4/6] 모델 선택")
     while True:
         local = _local_ggufs(out_dir)
-        curated = [m for m in CURATED if license_allows(m.license, need)]
+        license_ok = [m for m in CURATED if license_allows(m.license, need)]
+        # A model that does not fit the detected memory is filtered out, not
+        # just flagged: offering a "부족합니다" option that stays selectable
+        # is a trap, not a choice. `memory_fit` returning None (no detected
+        # memory to compare against) must not exclude anything -- "unknown"
+        # is not "doesn't fit".
+        curated = [m for m in license_ok if memory_fit(m.size_bytes, hw) is not False]
 
         print()
         options: list[tuple[str, object]] = []
@@ -625,9 +665,18 @@ def _step_model(need: str, out_dir: Path, hw: HardwareProfile) -> Path:
                 print(f"  {len(options)}) {model.label}")
                 for line in _curated_menu_lines(model, hw):
                     print(line)
-        skipped = len(CURATED) - len(curated)
-        if skipped:
-            print(f"  (라이선스 조건에 맞지 않아 {skipped}개는 목록에서 제외했습니다)")
+        elif license_ok:
+            # Every license-eligible curated model was filtered by memory --
+            # say so instead of silently showing nothing where a section used
+            # to be.
+            print("  이 프로젝트가 직접 검증한 모델: 감지된 메모리에 맞는 모델이 없어 전부 제외했습니다.")
+            print(f"  ({_MEMORY_CAVEAT})")
+        license_excluded = len(CURATED) - len(license_ok)
+        memory_excluded = len(license_ok) - len(curated)
+        if license_excluded:
+            print(f"  (라이선스 조건에 맞지 않아 {license_excluded}개는 목록에서 제외했습니다)")
+        if memory_excluded:
+            print(f"  (감지된 메모리보다 커서 {memory_excluded}개는 목록에서 제외했습니다)")
         options.append(("search", None))
         print(f"  {len(options)}) HuggingFace에서 검색")
         options.append(("manual", None))
@@ -676,9 +725,31 @@ def _download_curated(model: CuratedModel, out_dir: Path) -> Optional[Path]:
     return _download(url, dest)
 
 
+def _resolved_license_link(candidate: HFCandidate) -> str:
+    """The link to print/open for a candidate's license.
+
+    ``cardData.license_link`` is often repo-relative (the live API returns
+    the bare string ``"LICENSE"`` for many models, EXAONE among them) --
+    printed as-is it reads as a stray word, not a link, even though the
+    surrounding caveat tells the user to open it. Anything not already an
+    absolute URL is resolved against the model's own repo on
+    ``huggingface.co``.
+    """
+    link = candidate.license_link
+    if not link:
+        return f"https://huggingface.co/{candidate.model_id}"
+    if link.startswith("http"):
+        return link
+    return f"https://huggingface.co/{candidate.model_id}/blob/main/{link}"
+
+
 def _hf_search_flow(need: str, out_dir: Path) -> Optional[Path]:
     query = _ask("  검색어 (예: qwen3 4b)")
-    candidates = [c for c in _hf_search(query) if license_allows(c.license, need)]
+    candidates = [
+        c
+        for c in _hf_search(query)
+        if license_allows(c.license, need, model_id=c.model_id, base_model=c.base_model)
+    ]
     usable = [c for c in candidates if not c.gated and c.gguf_files]
     for c in candidates:
         if c.gated:
@@ -692,8 +763,7 @@ def _hf_search_flow(need: str, out_dir: Path) -> Optional[Path]:
     print()
     for i, c in enumerate(usable, start=1):
         print(f"  {i}) {c.model_id}  (다운로드 {c.downloads:,}회)")
-        link = c.license_link or f"https://huggingface.co/{c.model_id}"
-        print(f"     라이선스(업로더 기재): {c.license or '표기 없음'} — {link}")
+        print(f"     라이선스(업로더 기재): {c.license or '표기 없음'} — {_resolved_license_link(c)}")
     print(f"  {len(usable) + 1}) 취소하고 돌아가기")
     print(f"  {_METADATA_CAVEAT}")
     print()
@@ -765,10 +835,18 @@ def _lower_target_line(closest) -> Optional[str]:
 
     Derived from the best-effort result the search actually measured -- so it
     is a measurement, not a prediction, which is the only reason the wizard
-    is allowed to print a number here at all.
+    is allowed to print a number here at all. ``search.py`` records a bench
+    that timed out as ``0.0`` tok/s -- a sentinel meaning "never finished",
+    not a measurement -- so a non-positive value here must not be printed as
+    one; the whole point of this line is that its number was really measured.
     """
     if closest is None:
         return None
+    if closest.bench.gen_tok_per_sec <= 0:
+        return (
+            "best-effort 후보의 벤치마크가 타임아웃되어 유효한 실측값이 없습니다 — "
+            "목표를 얼마로 낮추면 통과하는지 알려드릴 수 없습니다."
+        )
     return (
         f"목표를 {closest.bench.gen_tok_per_sec:.2f} tok/s 로 낮추면 아래 best-effort "
         f"구성({closest.config.quant}, ngl={closest.config.ngl}, ctx={closest.config.ctx})이 "
@@ -781,7 +859,7 @@ def _step_run(argv: list[str]) -> int:
     print()
     print("  다음부터는 이 명령을 직접 쓰시면 됩니다:")
     print()
-    print(f"    fituna {' '.join(argv)}")
+    print(f"    fituna {shlex.join(argv)}")
     print()
     if not _ask_yes_no("  지금 실행할까요?", True):
         print("  실행하지 않았습니다. 위 명령을 그대로 복사해 쓰시면 됩니다.")

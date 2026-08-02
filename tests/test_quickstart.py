@@ -275,6 +275,46 @@ def test_curated_shortlist_survives_the_strictest_filter_with_its_badge(wizard, 
     assert "docs/RESULTS.md Run 5" in out  # measured anchor, labelled as a record
 
 
+def test_curated_model_over_detected_memory_is_not_offered(wizard, monkeypatch, tmp_path, capsys):
+    # ~1 GiB of RAM: the 135M SmolLM (~258 MiB) fits, the 4B Qwen3 (~7.5 GiB)
+    # and the 2.3B Midm (~4.3 GiB) do not -- they must not appear as
+    # selectable options at all, not just be flagged "부족합니다".
+    tiny = HardwareProfile(GPUVendor.NONE, None, None, 4, 1024, "linux")
+    monkeypatch.setattr(quickstart.hardware, "detect_hardware", lambda: tiny)
+    monkeypatch.setattr(quickstart, "_download", lambda url, dest: dest)
+    (tmp_path / "c.txt").write_text("hi", encoding="utf-8")
+    # no local *.gguf -> menu is 1) SmolLM (only curated model that fits),
+    # 2) search, 3) manual
+    code, recorded = wizard(_answers(model="1", extra=("y",)))
+    assert code == 0
+    out = capsys.readouterr().out
+    assert "SmolLM2-135M" in out
+    assert "Qwen3-4B" not in out
+    assert "Midm-2.0" not in out
+    assert "감지된 메모리보다 커서 2개는 목록에서 제외했습니다" in out
+    argv = recorded["argv"]
+    assert argv[argv.index("--model") + 1] == str(tmp_path / "SmolLM2-135M-Instruct-f16.gguf")
+
+
+def test_all_curated_models_filtered_by_memory_says_so_instead_of_an_empty_section(
+    wizard, monkeypatch, tmp_path, capsys
+):
+    # ~1 MiB of RAM: nothing in the curated shortlist fits.
+    starved = HardwareProfile(GPUVendor.NONE, None, None, 4, 1, "linux")
+    monkeypatch.setattr(quickstart.hardware, "detect_hardware", lambda: starved)
+    elsewhere = tmp_path / "models"
+    elsewhere.mkdir()
+    (elsewhere / "m.gguf").write_bytes(b"x")
+    (tmp_path / "c.txt").write_text("hi", encoding="utf-8")
+    # no curated model fits and no local *.gguf -> menu is 1) search, 2) manual
+    code, recorded = wizard(_answers(model="2", extra=(str(elsewhere / "m.gguf"),)))
+    assert code == 0
+    out = capsys.readouterr().out
+    assert "감지된 메모리에 맞는 모델이 없어 전부 제외했습니다" in out
+    assert "감지된 메모리보다 커서 3개는 목록에서 제외했습니다" in out
+    assert "SmolLM2" not in out and "Qwen3-4B" not in out and "Midm-2.0" not in out
+
+
 # ---------------------------------------------------------------------------
 # [4/6] memory fit, local scan, HF parser
 # ---------------------------------------------------------------------------
@@ -377,13 +417,44 @@ def test_hf_parser_against_the_captured_real_response():
     assert not any("-of-" in f for f in exaone.gguf_files)  # shards dropped
     assert "EXAONE-4.0-32B-Q4_K_M.gguf" in exaone.gguf_files
 
-    # a repo with no cardData at all is a real case in this capture
+    # a repo whose cardData carries no license key at all is a real case in
+    # this capture (cardData itself is present -- base_model, tags -- just no
+    # license/license_name entry)
     no_card = by_id["mradermacher/EXAONE-4.0-1.2B-abliterated-i1-GGUF"]
     assert no_card.license is None
+    assert no_card.base_model == "addansee2/EXAONE-4.0-1.2B-abliterated"
 
-    # ...and the commercial filter still rejects the EXAONE-licensed ones
-    commercial = [c for c in candidates if quickstart.license_allows(c.license, "commercial")]
-    assert [c.model_id for c in commercial] == [no_card.model_id]
+    # ...and the commercial filter rejects every EXAONE-derived row, even
+    # this one: its own license metadata is absent, but its model_id and
+    # cardData.base_model both name EXAONE -- the disqualifying evidence was
+    # in hand, just filed under a different key than `license`.
+    commercial = [
+        c
+        for c in candidates
+        if quickstart.license_allows(c.license, "commercial", model_id=c.model_id, base_model=c.base_model)
+    ]
+    assert commercial == []
+
+
+def test_relative_license_link_resolves_against_the_repo():
+    # The live API returns a bare, repo-relative "LICENSE" for cardData.license_link
+    # on many models (EXAONE among them, in this real capture) -- printed as-is it
+    # reads as a stray word, not the link the caveat tells the user to open.
+    payload = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    candidates = {c.model_id: c for c in quickstart.parse_hf_search(payload)}
+    exaone = candidates["LGAI-EXAONE/EXAONE-4.0-32B-GGUF"]
+    assert exaone.license_link == "LICENSE"
+    assert quickstart._resolved_license_link(exaone) == (
+        "https://huggingface.co/LGAI-EXAONE/EXAONE-4.0-32B-GGUF/blob/main/LICENSE"
+    )
+
+    # already-absolute links pass through untouched
+    absolute = quickstart.HFCandidate("a/b", "mit", "https://example.com/LICENSE", False, 1, ())
+    assert quickstart._resolved_license_link(absolute) == "https://example.com/LICENSE"
+
+    # no link at all falls back to the repo's own HF page
+    no_link = quickstart.HFCandidate("a/b", "mit", None, False, 1, ())
+    assert quickstart._resolved_license_link(no_link) == "https://huggingface.co/a/b"
 
 
 def test_hf_parser_tolerates_a_shape_change_and_marks_gated():
@@ -577,6 +648,36 @@ def test_exit_3_passthrough_prints_the_measured_lower_target(wizard, tmp_path, c
     assert "24.53 tok/s" in out
     assert "Q4_K_M" in out and "ngl=33" in out
     assert "실제로 측정한 값" in out  # measured, not predicted
+
+
+def test_exit_3_suppresses_a_timed_out_bench_as_the_lower_target(wizard, tmp_path, capsys):
+    # search.py records a bench that timed out as gen_tok_per_sec == 0.0 -- a
+    # sentinel meaning "never finished", not a measurement. If every
+    # candidate times out, `closest` carries that 0.0, and the wizard must
+    # not print "목표를 0.00 tok/s 로 낮추면" as though 0.00 had been measured.
+    (tmp_path / "m.gguf").write_bytes(b"x")
+    (tmp_path / "c.txt").write_text("hi", encoding="utf-8")
+    cfg = CandidateConfig(quant="Q4_K_M", ngl=0, ctx=4096)
+    timed_out = NoFeasibleConfigError(
+        "nothing met the target",
+        closest=SearchResult(
+            config=cfg,
+            bench=BenchResult(cfg, 0.0, 0.0, None, "bench timed out"),
+            quality=QualityResult("Q4_K_M", 9.02, 8.87, 1.73),
+            gguf_path=tmp_path / "m-Q4_K_M.gguf",
+            run_command=["llama-cli"],
+            meets_target=False,
+        ),
+    )
+
+    def raiser(ns):
+        raise timed_out
+
+    with pytest.raises(NoFeasibleConfigError):
+        wizard(_answers(), cmd_run=raiser)
+    out = capsys.readouterr().out
+    assert "0.00" not in out  # the timeout sentinel, never printed as a measurement
+    assert "타임아웃" in out
 
 
 def test_exit_3_reaches_cli_main_as_exit_code_3(monkeypatch, tmp_path):
