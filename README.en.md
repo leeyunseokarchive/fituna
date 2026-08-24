@@ -6,9 +6,10 @@
 
 **Stop guessing your llama.cpp config. Measure it.**
 
-Give it a model, a target speed and a quality budget — get back the smallest
-llama.cpp config (quant × GPU offload × context) that actually hits those
-numbers on your machine, found by real benchmarks.
+Give it a model file, a target speed (tok/s) and a quality budget (%), and
+it finds the lightest llama.cpp configuration — the combination of
+quantization level, GPU offload and context length — that actually hits
+those numbers on your machine, proven by real benchmarks.
 
 **`pip install fituna`**
 
@@ -27,24 +28,28 @@ numbers on your machine, found by real benchmarks.
 
 ## Why
 
-Running a local LLM means picking a quantization level (Q2–Q8), a GPU offload
-layer count (`-ngl`) and a context length — a space most people search by
-trial and error today.
+Running a local LLM through llama.cpp means making three choices: how hard to
+compress the model (quantization level, Q2–Q8 — lower is faster but loses
+quality), how many layers to put on the GPU (`-ngl`), and how long a context
+to allow. That's dozens of combinations, and today most people search them by
+trial and error. Existing tools each solve only half the problem:
 
 | Existing approach | Limitation |
 |---|---|
-| Ollama · LM Studio | Fixed per-model presets; finer quantization control was ["Closed as not planned"](https://github.com/ollama/ollama/issues/14674) |
+| Ollama · LM Studio | Fixed per-model presets that ignore your target; finer quantization control was ["Closed as not planned"](https://github.com/ollama/ollama/issues/14674) |
 | NVIDIA AutoQuantize | CUDA-only — no Apple Silicon |
-| VRAM calculators · chatbot advice | Spec-sheet estimates — blind to your thermals, memory bandwidth, build flags |
+| VRAM calculators · chatbot advice | Spec-sheet estimates — blind to your thermals, memory bandwidth, and build flags |
 
-Measurement keeps overturning intuition: on an Apple M3 Pro the "obviously
-best" Q8_0 failed the speed target, and the answer wasn't a quant alone but
-**Q4_K_M plus the minimal offload `-ngl 33`**. No spec sheet predicts that.
+And once you actually measure, intuition keeps getting overturned: on an
+Apple M3 Pro the "obviously best" Q8_0 failed the speed target, and the
+answer wasn't a quant alone but **Q4_K_M plus the minimal offload
+`-ngl 33`**. No amount of spec-sheet reading produces that answer.
 
 ## Try it in 2 minutes
 
-A full pipeline run (download → quantize → quality-gate → benchmark) on a
-258 MB model, about a minute on an M-series Mac:
+The fastest way to see it work for yourself: a full pipeline run
+(download → quantize → quality-gate → benchmark) on a small 258 MB model
+finishes in about a minute on an M-series Mac:
 
 ```bash
 pip install fituna            # Python 3.11+ venv (macOS system python3 is 3.9)
@@ -54,11 +59,15 @@ fituna run --hf bartowski/SmolLM2-135M-Instruct-GGUF \
   --target-tps 240 --max-quality-loss 5 --ctx 2048 --wikitext wiki.txt --out ./out
 ```
 
-Measured on the same M3 Pro: **58 s cold** to `MEETS TARGET — Q8_0 @ ngl=24,
-249.16 tok/s, 0.29% loss`, ready-to-run `llama-server` command included.
-Re-run with `--resume`: the same answer in **0.8 s** from cache.
+Run exactly this on an M3 Pro and **58 seconds** later you get the verdict
+`MEETS TARGET — Q8_0 @ ngl=24, 249.16 tok/s, 0.29% loss`, along with a
+`llama-server` command you can copy and run as-is. Run the same command
+again with `--resume` and the cache returns the same answer in **0.8 s**.
 
 ## Measured results
+
+Three models of different sizes, each given a target. In all three runs the
+"safe default" Q8_0 failed the speed target:
 
 | Model | Target | What the "obvious" pick measured | What FiTuna found |
 |---|---|---|---|
@@ -87,11 +96,13 @@ flowchart LR
     D -.-> H
 ```
 
-You can't sort by a number you haven't measured, so Stage 1 measures quality
-for **every** candidate. Stage 2 walks them in measured order and drops any
-quant that misses the target without further benches. The cache key includes
-the llama.cpp build version, so numbers from a different backend build are
-never reused. Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+FiTuna works in two stages. Stage 1 quantizes **every** candidate and
+measures its quality loss first — you can't rank candidates by a number you
+haven't measured. Stage 2 then benchmarks them in that measured quality
+order, dropping any quant that misses the target without wasting further
+benches. Every measurement lands in an sqlite3 cache whose key includes the
+llama.cpp build version, so upgrading the engine never silently reuses stale
+numbers. Algorithm details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 ## Install
 
@@ -124,6 +135,10 @@ pip install -e fituna
 </details>
 
 ## Commands
+
+New here? `fituna quickstart` is the easiest entry — a wizard walks you from
+environment check to a finished search without knowing any of the commands
+below. Full options for each: `fituna <command> -h`.
 
 | Command | Role |
 |---|---|
@@ -186,8 +201,9 @@ assembles for you ([search.py](fituna/search.py),
 
 ## MCP server — measured answers for AI agents
 
-Ask a chatbot "which local model config fits my machine?" and it guesses from
-specs. Point it at FiTuna's MCP server and it measures:
+Ask a chatbot "which local model config fits my machine?" and you get a
+guess derived from spec sheets. Connect FiTuna's MCP server and the agent
+gets measured results instead:
 
 ```bash
 claude mcp add fituna -- fituna-mcp      # any MCP client with stdio transport
@@ -203,10 +219,11 @@ Stdlib-only JSON-RPC 2.0 over stdio, no SDK
 
 ## Scope and limitations
 
-FiTuna **recommends, and stops there** — the output is the quantized `.gguf`
-plus `llama-server`/`llama-cli` commands you copy and run (and an Ollama
-Modelfile with `--export-ollama`); serving is llama.cpp's job
-([rationale](docs/ARCHITECTURE.md#why-this-shape)).
+FiTuna **recommends, and stops there**. The output is the quantized `.gguf`
+already produced during the search, plus `llama-server`/`llama-cli` commands
+you copy and run (and an Ollama Modelfile with `--export-ollama`) — actually
+serving the model stays llama.cpp's job
+([rationale](docs/ARCHITECTURE.md#why-this-shape)). Current limitations:
 
 - **Single GPU only** — no `--tensor-split` ([#11](https://github.com/leeyunseokarchive/fituna/issues/11), multi-GPU hardware welcome)
 - **No Windows AMD auto-detection** — pass `--gpu amd --vram-mb <N>`
