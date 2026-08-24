@@ -304,7 +304,7 @@ stay inside it — `--launch` and an LM Studio preset export — are tracked in
 ## Contributing
 
 Contributions welcome — the codebase is small, dependency-free and
-contract-first (start at [`fituna/config.py`](fituna/config.py)); 246 unit
+contract-first (start at [`fituna/config.py`](fituna/config.py)); 256 unit
 tests, per-module self-checks and a 3-OS × 2-Python CI matrix guard it.
 The roadmap lives in the
 [v0.2.0 milestone](https://github.com/leeyunseokarchive/fituna/milestone/1),

@@ -532,7 +532,7 @@ cd fituna
 python3.13 -m pytest -q
 ```
 
-직접 실행 결과: `246 passed in 2.95s` (이 문서 작성 시점 `main` 기준. 테스트가
+직접 실행 결과: `256 passed in 2.92s` (이 문서 작성 시점 `main` 기준. 테스트가
 추가되면 개수는 늘어난다 — 중요한 것은 **실패 0건**이다).
 
 > **`python3`가 아니라 `python3.13`인 이유.** macOS 기본 `python3`는 3.9.6이고,

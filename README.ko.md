@@ -301,7 +301,7 @@ FiTuna는 추천만 합니다 — 실행하거나 서빙하지 않습니다. 출
 
 기여를 환영합니다 — 코드베이스는 작고, 의존성이 없으며, 계약 우선으로
 설계됐습니다([`fituna/config.py`](fituna/config.py)에서 시작하세요). 유닛 테스트
-246개, 모듈별 self-check, 3-OS × 2-Python CI 매트릭스가 이를 지킵니다. 개발
+256개, 모듈별 self-check, 3-OS × 2-Python CI 매트릭스가 이를 지킵니다. 개발
 로드맵(예정 작업)은 [v0.2.0 마일스톤](https://github.com/leeyunseokarchive/fituna/milestone/1)에
 있으며, [#10](https://github.com/leeyunseokarchive/fituna/issues/10)(파서 테스트
 커버리지, good first issue)도 포함됩니다. 자세한 내용은
