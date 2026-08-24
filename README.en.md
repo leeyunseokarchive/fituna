@@ -64,11 +64,17 @@ The fastest way to see it work for yourself: a full pipeline run
 finishes in about a minute on an M-series Mac:
 
 ```bash
-pip install fituna            # Python 3.11+ venv (macOS system python3 is 3.9)
-brew install llama.cpp        # the engines; other platforms: source build, see Install
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install fituna
+brew install llama.cpp
 fituna fetch-corpus --lang en --out wiki.txt
 fituna run --hf bartowski/SmolLM2-135M-Instruct-GGUF \
-  --target-tps 240 --max-quality-loss 5 --ctx 2048 --wikitext wiki.txt --out ./out
+  --target-tps 240 \
+  --max-quality-loss 5 \
+  --ctx 2048 \
+  --quality-corpus wiki.txt \
+  --out ./out
 ```
 
 Run exactly this on an M3 Pro and **58 seconds** later you get the verdict
@@ -149,11 +155,13 @@ numbers. Algorithm details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 ## Install
 
 ```bash
-pip install fituna
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install fituna
 ```
 
-Python 3.11+ (macOS's system `python3` is 3.9 — make the venv with
-`python3.13`). Zero runtime dependencies. You also need llama.cpp:
+Python 3.11+ is required. Replace `python3.11` in the first command with your
+installed Python version. Zero runtime dependencies. You also need llama.cpp:
 
 ```bash
 brew install llama.cpp        # macOS/Linux Homebrew

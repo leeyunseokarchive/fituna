@@ -68,11 +68,17 @@ FiTuna는 수십 가지 조합을 감으로 반복 실행하는 대신, 내 기�
 남짓에 끝납니다:
 
 ```bash
-pip install fituna            # Python 3.11+ 가상환경에 (macOS 시스템 python3는 3.9)
-brew install llama.cpp        # 엔진. 다른 플랫폼은 소스 빌드 (아래 '설치' 참고)
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install fituna
+brew install llama.cpp
 fituna fetch-corpus --lang en --out wiki.txt
 fituna run --hf bartowski/SmolLM2-135M-Instruct-GGUF \
-  --target-tps 240 --max-quality-loss 5 --ctx 2048 --wikitext wiki.txt --out ./out
+  --target-tps 240 \
+  --max-quality-loss 5 \
+  --ctx 2048 \
+  --quality-corpus wiki.txt \
+  --out ./out
 ```
 
 위 명령을 그대로 실행하면 **58초** 만에 `MEETS TARGET —
@@ -82,10 +88,11 @@ Q8_0 @ ngl=24, 249.16 tok/s, 손실 0.29%`라는 판정과 함께, 복사해서 
 
 ## 실측 결과
 
-크기가 다른 세 모델에 각각 목표를 걸고 탐색한 결과입니다. 세 번 모두
-"가장 무난한 선택"이라던 Q8_0이 속도 목표에서 탈락했습니다:
+크기가 다른 세 모델에 각각 목표를 걸고 탐색한 결과입니다. Q8_0은 원본에
+가장 가까운 손실이라 보편적으로 많이 채택되는 양자화 수준인데, 세 번 모두
+이 기본값이 속도 목표에서 탈락했습니다:
 
-| 모델 | 목표 | "당연한" 선택의 실측 | FiTuna가 찾은 답 |
+| 모델 | 목표 | 보편적인 양자화 수준(Q8_0) 실측값 | FiTuna가 찾은 답(결과 속도, 손실률) |
 |---|---|---|---|
 | Qwen3-4B-Instruct | 30 tok/s, ≤5% 손실 | Q8_0: 24.22 tok/s ❌ (품질도 Q6_K보다 나쁘게 측정) | **Q4_K_M @ ngl=33 → 30.81 tok/s, 1.73%** ✅ |
 | SmolLM2-135M | 240 tok/s, ≤5% 손실 | Q8_0: 205.91 tok/s ❌ | **Q6_K → 249.50 tok/s, 0.53%** ✅ (더 작은 Q4_K_M이 더 느린 역전 실측) |
@@ -140,22 +147,30 @@ flowchart LR
     D -.-> H
 ```
 
-FiTuna는 두 단계로 움직입니다. 1단계에서 **모든** 후보를 양자화해 품질
-손실을 먼저 재는데, 측정하지 않은 숫자로는 후보를 줄 세울 수 없기
-때문입니다. 2단계는 그 실측 품질 순서대로 속도를 재고, 목표를 놓친
+FiTuna는 두 단계로 작동합니다.  
+
+1. **품질 손실 측정** : **모든** 후보를 양자화해 품질
+손실을 먼저 측정합니다. 측정하지 않은 숫자로는 후보를 줄 세울 수 없기
+때문입니다.
+
+2. **속도 측정** : 품질 손실 측정 단계에서의 순서대로 속도를 재고, 목표를 놓친
 후보는 추가 벤치마크 없이 바로 버립니다. 모든 측정값은 sqlite3에
 캐시되며, 캐시 키에 llama.cpp 빌드 버전까지 들어가므로 엔진을 업그레이드한
-뒤 예전 수치를 잘못 재사용하는 일이 없습니다. 알고리즘 상세:
+뒤 예전 수치를 잘못 재사용하는 일이 없습니다.
+
+자세한 동작 원리는 아래 문서에서 확인 가능합니다:
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 ## 설치
 
 ```bash
-pip install fituna
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install fituna
 ```
 
-Python 3.11+ 필요(macOS 시스템 `python3`는 3.9 — `python3.13 -m venv`로
-가상환경을 먼저). 런타임 의존성은 없습니다. 엔진인 llama.cpp도 필요합니다:
+Python 3.11+가 필요합니다. 설치한 Python 버전에 맞게 첫 줄의 `python3.11`을
+바꾸세요. 런타임 의존성은 없습니다. 엔진인 llama.cpp도 필요합니다:
 
 ```bash
 brew install llama.cpp        # macOS/Linux Homebrew
