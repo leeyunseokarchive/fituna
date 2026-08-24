@@ -2,7 +2,9 @@
 
 **한국어** | [English](README.en.md)
 
-# 🎯 FiTuna
+<img src="assets/logo.png" width="160" alt="FiTuna 로고 — 아기 참치 캐릭터">
+
+# FiTuna
 
 **llama.cpp 설정, 추측하지 말고 측정하세요.**
 

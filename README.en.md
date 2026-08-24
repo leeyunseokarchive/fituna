@@ -2,7 +2,9 @@
 
 [한국어](README.md) | **English**
 
-# 🎯 FiTuna
+<img src="assets/logo.png" width="160" alt="FiTuna logo — baby tuna character">
+
+# FiTuna
 
 **Stop guessing your llama.cpp config. Measure it.**
 

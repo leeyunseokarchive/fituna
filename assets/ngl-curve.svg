@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 430" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12">
+  <!-- Measured data: docs/RESULTS.md Run 5, Midm-2.0-Mini-Instruct Q4_K_M,
+       Apple M3 Pro, llama.cpp build 9960. Only measured points are drawn. -->
+  <style>
+    text { fill: #c9d1d9; }
+    .dim { fill: #8b949e; }
+    .ok { fill: #7ee787; }
+    .warn { fill: #e3b341; }
+    .series { fill: #79c0ff; }
+  </style>
+  <rect width="760" height="430" rx="10" fill="#0d1117" stroke="#30363d"/>
+  <text x="24" y="30" font-size="13" font-weight="bold">Midm-2.0-Mini (48층) · Q4_K_M — GPU 오프로드 층수별 실측 생성 속도</text>
+  <text x="24" y="48" class="dim" font-size="11">Apple M3 Pro · llama.cpp build 9960 · 실측점만 표시 (docs/RESULTS.md Run 5)</text>
+
+  <!-- grid -->
+  <g stroke="#21262d" stroke-width="1">
+    <line x1="70" y1="340" x2="710" y2="340"/>
+    <line x1="70" y1="280" x2="710" y2="280"/>
+    <line x1="70" y1="220" x2="710" y2="220"/>
+    <line x1="70" y1="160" x2="710" y2="160"/>
+    <line x1="70" y1="100" x2="710" y2="100"/>
+  </g>
+  <g class="dim" font-size="10" text-anchor="end">
+    <text x="62" y="344">0</text>
+    <text x="62" y="284">10</text>
+    <text x="62" y="224">20</text>
+    <text x="62" y="164">30</text>
+    <text x="62" y="104">40</text>
+  </g>
+  <text x="24" y="200" class="dim" font-size="10" transform="rotate(-90 24 200)" text-anchor="middle">생성 tok/s</text>
+
+  <!-- x labels -->
+  <g class="dim" font-size="10" text-anchor="middle">
+    <text x="116" y="360">24</text>
+    <text x="390" y="360">36</text>
+    <text x="527" y="360">42</text>
+    <text x="596" y="360">45</text>
+    <text x="641" y="360">47</text>
+    <text x="664" y="374">48</text>
+  </g>
+  <text x="390" y="384" class="dim" font-size="10" text-anchor="middle">-ngl (GPU에 올린 레이어 수)</text>
+
+  <!-- target line -->
+  <line x1="70" y1="100" x2="710" y2="100" stroke="#8b949e" stroke-width="1" stroke-dasharray="6 4"/>
+  <text x="706" y="94" class="dim" font-size="10" text-anchor="end">목표 40 tok/s</text>
+
+  <!-- series line: solid on clean segments, dashed across the contaminated region -->
+  <path d="M116,274.8 L390,234.6" fill="none" stroke="#79c0ff" stroke-width="2"/>
+  <path d="M390,234.6 L596,145.4" fill="none" stroke="#79c0ff" stroke-width="2" stroke-dasharray="4 4"/>
+  <path d="M596,145.4 L641,104.1 L664,72.3" fill="none" stroke="#79c0ff" stroke-width="2"/>
+
+  <!-- points + direct labels -->
+  <circle cx="116" cy="274.8" r="4.5" class="series"/>
+  <text x="116" y="262" font-size="10" text-anchor="middle">10.86</text>
+  <circle cx="390" cy="234.6" r="4.5" class="series"/>
+  <text x="390" y="222" font-size="10" text-anchor="middle">17.56</text>
+  <!-- ngl=42: thermally contaminated, open marker -->
+  <circle cx="527" cy="198.8" r="4.5" fill="#0d1117" stroke="#e3b341" stroke-width="2"/>
+  <text x="527" y="186" font-size="10" text-anchor="middle" class="warn">23.53 ⚠</text>
+  <circle cx="596" cy="145.4" r="4.5" class="series"/>
+  <text x="596" y="133" font-size="10" text-anchor="middle">32.43</text>
+  <circle cx="641" cy="104.1" r="4.5" class="series"/>
+  <text x="620" y="118" font-size="10" text-anchor="end">39.32</text>
+  <circle cx="664" cy="72.3" r="5" class="ok"/>
+  <text x="664" y="60" font-size="10" text-anchor="middle" class="ok" font-weight="bold">44.62 통과</text>
+
+  <!-- one-layer annotation -->
+  <path d="M690,72 L700,72 L700,104 L690,104" fill="none" stroke="#8b949e" stroke-width="1"/>
+  <text x="704" y="82" class="dim" font-size="10">층 1개 =</text>
+  <text x="704" y="95" class="dim" font-size="10">통과↔탈락</text>
+
+  <!-- half-offload annotation -->
+  <text x="116" y="300" class="dim" font-size="10" text-anchor="middle">절반 오프로드 = 속도 24%</text>
+
+  <text x="24" y="416" class="dim" font-size="10">ngl=0(CPU 전용)은 5분 내 미완료(시간 초과) · ⚠ ngl=42는 서멀 스로틀 오염 — 하한값으로만 취급 · 곡선은 층수에 선형이 아니다</text>
+</svg>
