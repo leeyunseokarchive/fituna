@@ -387,7 +387,7 @@ measured on your actual hardware.
   fituna <command> -h
   fituna help <command>   위와 동일 / same as -h
 
-더 보기 (more): README.md / README.ko.md, REVIEWERS.md
+더 보기 (more): README.md(한국어) / README.en.md, REVIEWERS.md
 """
 
 
