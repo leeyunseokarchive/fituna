@@ -266,12 +266,25 @@ FiTuna는 **추천까지만** 합니다. 산출물은 탐색 중에 이미 만�
 일은 llama.cpp에 맡깁니다([설계 근거](docs/ARCHITECTURE.md#why-this-shape)).
 현재의 한계는 다음과 같습니다:
 
+- **결과는 실행한 기기에서만 유효** — 사양표로 다른 기기의 결과를 추정하지 않습니다. 다른 기기에 적용할 설정이 필요하면 그 기기에서 FiTuna를 실행하세요(크로스플랫폼 CLI라 그대로 동작합니다). 기기마다 답이 다르다는 것이 실측이 필요한 이유입니다 — [같은 모델, M3 Pro와 T4의 상반된 결과](docs/RESULTS.md#run-4--nvidia-tesla-t4-linux-google-colab)
 - **단일 GPU만 지원** — `--tensor-split` 없음 ([#11](https://github.com/leeyunseokarchive/fituna/issues/11), 멀티 GPU 기기 제공 환영)
 - **Windows AMD 자동 감지 불가** — `--gpu amd --vram-mb <N>`으로 수동 지정
 - **품질 = 선택한 코퍼스의 perplexity** — 대리 지표. 실제 작업과 비슷한 텍스트로 측정할 것
 - **판정은 `--ppl-chunks`에 의존** — 예산에 가까운 후보는 재측정 후 신뢰 ([#8](https://github.com/leeyunseokarchive/fituna/issues/8), [측정된 영향](docs/RESULTS.md#how-big-is-a-perplexity-gap-the-error-bar-we-had-been-discarding))
 - **벤치마크는 발열에 민감** — 목표와 몇 tok/s 차이의 판정은 경계선 ([변동성 분석](docs/RESULTS.md#run-to-run-variance-measured-not-hidden))
 - **실기 E2E는 macOS·Linux** — Windows는 단위테스트·CI까지 ([#12](https://github.com/leeyunseokarchive/fituna/issues/12))
+
+## 기여하기
+
+코드베이스는 작고, 런타임 의존성이 없고, 모듈 간 계약이
+[fituna/config.py](fituna/config.py) 한 곳에 모여 있습니다 — 여기부터
+읽으면 전체 구조가 보입니다. 256개 단위 테스트와 3-OS × 2-Python CI
+매트릭스가 변경을 지키고, 모든 변경은 이슈 → 브랜치 → Pull Request
+리뷰를 거쳐 병합됩니다(지금까지 28건). 시작할 곳:
+
+- [v0.3.0 마일스톤](https://github.com/leeyunseokarchive/fituna/milestone/1) — 다음 버전 로드맵: 멀티 GPU, 경계선 판정 자동 플래그, [Ollama·LM Studio 통합 실행](https://github.com/leeyunseokarchive/fituna/issues/19)
+- [good first issue #10](https://github.com/leeyunseokarchive/fituna/issues/10) — llama.cpp 출력 파서 테스트, 첫 기여로 적당한 크기
+- [CONTRIBUTING.md](CONTRIBUTING.md) · [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — 개발 환경 준비와 변경 규칙
 
 ## 라이선스
 

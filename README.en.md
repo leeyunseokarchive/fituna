@@ -267,6 +267,7 @@ you copy and run (and an Ollama Modelfile with `--export-ollama`) — actually
 serving the model stays llama.cpp's job
 ([rationale](docs/ARCHITECTURE.md#why-this-shape)). Current limitations:
 
+- **Results are valid only on the machine that ran them** — FiTuna never extrapolates another machine's numbers from a spec sheet. Need a config for a different machine? Run FiTuna there (it's a cross-platform CLI). Machines disagreeing is exactly why measurement beats estimation — [same model, opposite verdicts on M3 Pro vs T4](docs/RESULTS.md#run-4--nvidia-tesla-t4-linux-google-colab)
 - **Single GPU only** — no `--tensor-split` ([#11](https://github.com/leeyunseokarchive/fituna/issues/11), multi-GPU hardware welcome)
 - **No Windows AMD auto-detection** — pass `--gpu amd --vram-mb <N>`
 - **Quality = perplexity on the corpus you choose** — a proxy; measure on text resembling your workload
