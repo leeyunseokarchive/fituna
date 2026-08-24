@@ -81,6 +81,33 @@ Apple M3 Pro, llama.cpp build 9960. 전체 로그·재실행 변동성 분석:
 [docs/USE_CASES.md](docs/USE_CASES.md) · NVIDIA/Linux 재현(무료 T4):
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/leeyunseokarchive/fituna/blob/main/notebooks/colab_nvidia_verification.ipynb)
 
+## 챗봇에게 물어보면 되지 않나?
+
+당연한 반문이라, 실제로 실험했다. FiTuna의 실측 시나리오 3건과 동일한
+질문을 챗봇(Claude, 프로젝트 정보가 없는 새 세션)에게 그대로 묻고, 답변
+전문을 기록한 뒤 실측값과 대조했다 — **세 번 모두 챗봇의 1순위 추천이
+실측에서 목표 미달이었다**:
+
+| 시나리오 · 목표 | 챗봇 추천 · 예측 | 같은 설정의 실측 | 실측이 찾은 답 |
+|---|---|---|---|
+| Qwen3-4B · 30 tok/s | Q5_K_M — "35~45 예상" | **29.59 미달**¹ | Q4_K_M @ ngl=33 → 30.81 ✅ |
+| SmolLM2 · 240 tok/s | Q8_0 — "여유 있게 넘김" | **205.91 미달** | Q6_K → 249.50 ✅ |
+| Midm(한국어) · 40 tok/s | Q6_K — "50~70 예상", "Q4_K_M 피하라" | **38.96 미달**¹ | **피하라던 Q4_K_M** @ ngl=48 → 44.62 ✅ |
+
+¹ 1 tok/s 안팎의 경계선 판정 — 단, 예측 수치의 30%+ 괴리는 마진 문제가 아니다.
+
+세 답변 모두 `-ngl 99`(전량 오프로드)를 권했고 — "목표를 만족하는 최소
+오프로드"라는 개념은 실측 없이 존재할 수 없다 — 셋 다 정직하게 "직접
+`llama-bench`로 재보라"로 끝났다. **FiTuna가 바로 그 실측이다.** 질문·답변
+전문과 방법·한계(챗봇 응답의 세션별 변동 포함):
+[docs/CHATBOT_COMPARISON.md](docs/CHATBOT_COMPARISON.md)
+
+실측 없이 알 수 없는 게 무엇인지는 오프로드 곡선이 가장 잘 보여준다.
+층 하나 차이로 목표 통과와 탈락이 갈리고, 절반을 올리면 속도는 절반이
+아니라 4분의 1이 된다:
+
+![Midm-2.0-Mini Q4_K_M의 GPU 오프로드 층수별 실측 생성 속도 곡선 — 층 1개 차이로 목표 통과와 탈락이 갈린다](assets/ngl-curve.svg)
+
 ## 동작 원리
 
 ```mermaid
