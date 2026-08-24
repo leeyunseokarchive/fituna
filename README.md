@@ -6,9 +6,9 @@
 
 **llama.cpp 설정, 추측하지 말고 측정하세요.**
 
-모델과 목표 속도, 허용 품질손실을 입력하면 — 내 기기에서 실제로 그 수치를
-달성하는 가장 가벼운 llama.cpp 설정(양자화 × GPU 오프로드 × 컨텍스트)을
-실측 벤치마크로 찾아 돌려줍니다.
+모델 파일과 목표 속도(tok/s), 허용 품질손실(%)을 입력하면, 내 기기에서
+실제로 그 수치를 달성하는 가장 가벼운 llama.cpp 설정 — 양자화 레벨,
+GPU 오프로드, 컨텍스트 길이의 조합 — 을 실측 벤치마크로 찾아 줍니다.
 
 **`pip install fituna`**
 
@@ -27,23 +27,28 @@
 
 ## 왜 필요한가
 
-로컬 LLM은 양자화 레벨(Q2–Q8), GPU 오프로드 레이어 수(`-ngl`), 컨텍스트
-길이를 직접 골라야 하는데, 지금은 대부분 시행착오로 찾습니다.
+llama.cpp로 로컬 LLM을 돌리려면 세 가지를 골라야 합니다. 모델을 얼마나
+압축할지(양자화 레벨, Q2–Q8 — 낮을수록 빠르지만 품질이 떨어집니다),
+모델의 레이어 몇 개를 GPU에 올릴지(`-ngl`), 대화 맥락을 얼마나 길게
+잡을지(컨텍스트 길이). 조합은 수십 가지인데, 지금은 대부분 하나씩 돌려
+보며 감으로 찾습니다. 기존 도구들도 이 문제를 절반만 풉니다:
 
 | 기존 방법 | 한계 |
 |---|---|
-| Ollama · LM Studio | 모델별 고정 프리셋. 세밀한 양자화 제어 요청은 ["Closed as not planned"](https://github.com/ollama/ollama/issues/14674) |
-| NVIDIA AutoQuantize | CUDA 전용 — Apple Silicon 불가 |
-| VRAM 계산기 · 챗봇 조언 | 사양표 추정 — 내 기기의 발열·메모리 대역폭·빌드 플래그를 모름 |
+| Ollama · LM Studio | 모델별 고정 프리셋을 적용할 뿐, 내 목표에 맞춰 주지 않음. 세밀한 양자화 제어 요청은 ["Closed as not planned"](https://github.com/ollama/ollama/issues/14674)로 닫힘 |
+| NVIDIA AutoQuantize | CUDA 전용 — Apple Silicon에서는 쓸 수 없음 |
+| VRAM 계산기 · 챗봇 조언 | 사양표 기반 추정 — 내 기기의 발열, 메모리 대역폭, llama.cpp 빌드 옵션까지는 모름 |
 
-실측은 자주 직관을 뒤집습니다. Apple M3 Pro 실측에서 "당연히 가장 좋을"
-Q8_0이 속도 목표에서 탈락했고, 답은 양자화 하나가 아니라 **Q4_K_M에 최소
-오프로드 `-ngl 33`을 더한 조합**이었습니다. 사양표로는 예측할 수 없습니다.
+그리고 실제로 재 보면 직관은 자주 뒤집힙니다. Apple M3 Pro 실측에서
+"당연히 가장 좋을" Q8_0이 속도 목표에서 탈락했고, 정답은 양자화 하나가
+아니라 **Q4_K_M에 최소 오프로드 `-ngl 33`을 더한 조합**이었습니다. 이런
+답은 사양표를 아무리 들여다봐도 나오지 않습니다.
 
 ## 2분 체험
 
-258 MB 모델로 전체 파이프라인(다운로드 → 양자화 → 품질 게이트 → 벤치마크)을
-1분 남짓에 돌려볼 수 있습니다:
+정말 되는지 직접 확인하는 가장 빠른 길입니다. 258 MB짜리 작은 모델로
+전체 파이프라인(다운로드 → 양자화 → 품질 게이트 → 벤치마크)이 1분
+남짓에 끝납니다:
 
 ```bash
 pip install fituna            # Python 3.11+ 가상환경에 (macOS 시스템 python3는 3.9)
@@ -53,11 +58,15 @@ fituna run --hf bartowski/SmolLM2-135M-Instruct-GGUF \
   --target-tps 240 --max-quality-loss 5 --ctx 2048 --wikitext wiki.txt --out ./out
 ```
 
-같은 M3 Pro에서 실측: **콜드런 58초**에 `MEETS TARGET — Q8_0 @ ngl=24,
-249.16 tok/s, 손실 0.29%`와 바로 쓸 `llama-server` 명령까지 출력.
-`--resume` 재실행은 캐시에서 **0.8초**에 같은 답을 냈습니다.
+위 명령을 그대로 M3 Pro에서 실행하면 **58초** 만에 `MEETS TARGET —
+Q8_0 @ ngl=24, 249.16 tok/s, 손실 0.29%`라는 판정과 함께, 복사해서 바로
+쓸 수 있는 `llama-server` 명령이 출력됩니다. 같은 명령을 `--resume`으로
+다시 돌리면 캐시에서 **0.8초** 만에 같은 답이 나옵니다.
 
 ## 실측 결과
+
+크기가 다른 세 모델에 각각 목표를 걸고 탐색한 결과입니다. 세 번 모두
+"가장 무난한 선택"이라던 Q8_0이 속도 목표에서 탈락했습니다:
 
 | 모델 | 목표 | "당연한" 선택의 실측 | FiTuna가 찾은 답 |
 |---|---|---|---|
@@ -86,10 +95,12 @@ flowchart LR
     D -.-> H
 ```
 
-측정하지 않은 숫자로는 정렬할 수 없으므로 1단계가 **모든** 후보의 품질을
-먼저 잽니다. 2단계는 실측 품질 순서대로 시험하고, 목표를 놓친 후보는 추가
-벤치 없이 버립니다. 캐시 키에 llama.cpp 빌드 버전이 들어가므로 다른 빌드의
-수치를 재사용하는 일이 없습니다. 상세:
+FiTuna는 두 단계로 움직입니다. 1단계에서 **모든** 후보를 양자화해 품질
+손실을 먼저 재는데, 측정하지 않은 숫자로는 후보를 줄 세울 수 없기
+때문입니다. 2단계는 그 실측 품질 순서대로 속도를 재고, 목표를 놓친
+후보는 추가 벤치마크 없이 바로 버립니다. 모든 측정값은 sqlite3에
+캐시되며, 캐시 키에 llama.cpp 빌드 버전까지 들어가므로 엔진을 업그레이드한
+뒤 예전 수치를 잘못 재사용하는 일이 없습니다. 알고리즘 상세:
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 ## 설치
@@ -123,6 +134,10 @@ pip install -e fituna
 </details>
 
 ## 명령어
+
+처음이라면 `fituna quickstart`가 가장 쉽습니다 — 아래 명령들을 몰라도
+마법사가 환경 점검부터 탐색 실행까지 순서대로 안내합니다. 각 명령의 전체
+옵션은 `fituna <명령> -h`로 볼 수 있습니다.
 
 | 명령 | 역할 |
 |---|---|
@@ -182,8 +197,9 @@ print(f"{hw.gpu_vendor.value}: {hw.gpu_name}, {hw.vram_mb} MB VRAM")
 
 ## MCP 서버 — AI 에이전트에게 실측 답변을
 
-챗봇은 "내 컴퓨터에 맞는 설정"을 사양표에서 추측합니다. FiTuna MCP 서버를
-연결하면 측정합니다:
+챗봇에게 "내 컴퓨터에 맞는 로컬 모델 설정"을 물으면 사양표에서 추측한
+답이 돌아옵니다. FiTuna의 MCP 서버를 연결하면 에이전트가 추측 대신 실측
+결과를 받아 갑니다:
 
 ```bash
 claude mcp add fituna -- fituna-mcp      # stdio를 지원하는 모든 MCP 클라이언트
@@ -199,9 +215,11 @@ claude mcp add fituna -- fituna-mcp      # stdio를 지원하는 모든 MCP 클�
 
 ## 범위와 한계
 
-FiTuna는 **추천까지만** 합니다 — 산출물은 양자화된 `.gguf`와 복사해 쓰는
-`llama-server`/`llama-cli` 명령(+`--export-ollama` 시 Ollama Modelfile)이고,
-서빙은 llama.cpp의 일입니다([설계 근거](docs/ARCHITECTURE.md#why-this-shape)).
+FiTuna는 **추천까지만** 합니다. 산출물은 탐색 중에 이미 만들어진 양자화
+`.gguf` 파일과 복사해 쓰는 `llama-server`/`llama-cli` 명령이고
+(`--export-ollama`를 주면 Ollama Modelfile도 함께), 모델을 실제로 띄우는
+일은 llama.cpp에 맡깁니다([설계 근거](docs/ARCHITECTURE.md#why-this-shape)).
+현재의 한계는 다음과 같습니다:
 
 - **단일 GPU만 지원** — `--tensor-split` 없음 ([#11](https://github.com/leeyunseokarchive/fituna/issues/11), 멀티 GPU 기기 제공 환영)
 - **Windows AMD 자동 감지 불가** — `--gpu amd --vram-mb <N>`으로 수동 지정
