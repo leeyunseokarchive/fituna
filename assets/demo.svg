@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 460" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12.5">
+  <!-- Real measured run: Apple M3 Pro, llama.cpp build 9960, 2026-08-24.
+       58 s cold; every number below is from that run, not a mock-up. -->
+  <style>
+    .l { opacity: 0; animation: r 0.15s linear forwards; }
+    @keyframes r { to { opacity: 1; } }
+    .c1  { animation-delay: 0.3s; }
+    .c2  { animation-delay: 0.9s; }
+    .c3  { animation-delay: 1.8s; }
+    .c4  { animation-delay: 2.9s; }
+    .c5  { animation-delay: 3.7s; }
+    .c6  { animation-delay: 4.5s; }
+    .c7  { animation-delay: 5.3s; }
+    .c8  { animation-delay: 6.1s; }
+    .c9  { animation-delay: 7.0s; }
+    .c10 { animation-delay: 8.2s; }
+    .c11 { animation-delay: 9.6s; }
+    .c12 { animation-delay: 9.8s; }
+    .c13 { animation-delay: 10.0s; }
+    .c14 { animation-delay: 10.2s; }
+    .c15 { animation-delay: 10.6s; }
+    .c16 { animation-delay: 11.0s; }
+    .c17 { animation-delay: 11.4s; }
+    @media (prefers-reduced-motion: reduce) {
+      .l { animation: none; opacity: 1; }
+    }
+    text { fill: #c9d1d9; }
+    .dim { fill: #8b949e; }
+    .ok  { fill: #7ee787; }
+    .hi  { fill: #79c0ff; }
+    .cmd { fill: #e3b341; }
+  </style>
+  <rect width="760" height="460" rx="10" fill="#0d1117" stroke="#30363d"/>
+  <circle cx="24" cy="22" r="6" fill="#ff5f57"/>
+  <circle cx="44" cy="22" r="6" fill="#febc2e"/>
+  <circle cx="64" cy="22" r="6" fill="#28c840"/>
+  <text x="380" y="26" text-anchor="middle" class="dim" font-size="11">fituna — 58 s, measured on an Apple M3 Pro</text>
+
+  <g transform="translate(24, 56)">
+    <text class="l c1" y="0"><tspan class="ok">$</tspan> <tspan class="cmd">fituna run --hf bartowski/SmolLM2-135M-Instruct-GGUF \</tspan></text>
+    <text class="l c1" x="30" y="18"><tspan class="cmd">    --target-tps 240 --max-quality-loss 5 --ctx 2048 --wikitext wiki.txt --out ./out</tspan></text>
+    <text class="l c2" y="44"><tspan class="dim">license: apache-2.0 (weights published by bartowski/…; their terms, not FiTuna's)</tspan></text>
+    <text class="l c3" y="62">computing baseline perplexity on base GGUF</text>
+    <text class="l c4" y="80">[Q8_0]   quantizing … evaluating quality</text>
+    <text class="l c5" y="98">[Q6_K]   quantizing … evaluating quality</text>
+    <text class="l c6" y="116">[Q5_K_M] quantizing … evaluating quality</text>
+    <text class="l c7" y="134">[Q4_K_M] quantizing … evaluating quality</text>
+    <text class="l c8" y="152">[Q3_K_M] quality loss 19.54% &gt; 5.00% cap, skipping <tspan class="dim">(early-exit A)</tspan></text>
+    <text class="l c9" y="170">[Q2_K]   quality loss 38.34% &gt; 5.00% cap, skipping <tspan class="dim">(early-exit A)</tspan></text>
+    <text class="l c10" y="188">[Q8_0]   bench full-offload (ngl=30)</text>
+    <text class="l c11" y="206">[Q8_0]   found ngl=24 meeting target -- done</text>
+    <text class="l c12" y="236" font-weight="bold">FiTuna result: <tspan class="ok">MEETS TARGET</tspan></text>
+    <text class="l c13" x="14" y="258">  quant : <tspan class="hi">Q8_0</tspan>   ngl : <tspan class="hi">24</tspan>   ctx : <tspan class="hi">2048</tspan></text>
+    <text class="l c14" x="14" y="276">  gen tok/s : <tspan class="ok">249.16</tspan>   quality loss : <tspan class="ok">0.29%</tspan> <tspan class="dim">(baseline PPL 18.24 → 18.29)</tspan></text>
+    <text class="l c15" x="14" y="302">  artifact: out/SmolLM2-135M-Instruct-…-Q8_0.gguf <tspan class="dim">(144.8 MB — produced during the search)</tspan></text>
+    <text class="l c16" x="14" y="328">  llama-server -m out/SmolLM2-…-Q8_0.gguf -ngl 24 -c 2048 --port 8080</text>
+    <text class="l c17" y="358"><tspan class="ok">$</tspan> <tspan class="cmd">fituna run … --resume</tspan>   <tspan class="dim"># same answer from cache in 0.8 s</tspan></text>
+  </g>
+</svg>

@@ -58,6 +58,8 @@ FiTuna result: MEETS TARGET
 
 ## 2분 체험
 
+![실제 fituna 실행: Apple M3 Pro에서 다운로드부터 llama-server 명령 출력까지 58초](assets/demo.svg)
+
 258 MB 모델로 실측 탐색 전 과정(다운로드 → 후보 6종 양자화 → 품질 게이트 →
 벤치마크)을 돌려볼 수 있습니다. M 시리즈 Mac 기준 1분 남짓이면 끝납니다:
 

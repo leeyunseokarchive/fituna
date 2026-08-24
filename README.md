@@ -58,6 +58,8 @@ None of that is predictable from a spec sheet ([full logs](docs/RESULTS.md)).
 
 ## Try it in 2 minutes
 
+![A real fituna run: 58 seconds on an Apple M3 Pro from download to a ready-to-run llama-server command](assets/demo.svg)
+
 A full measured search on a 258 MB model — small enough that the whole
 loop (download → quantize 6 candidates → quality-gate → benchmark) finishes
 in about a minute on an M-series Mac:
