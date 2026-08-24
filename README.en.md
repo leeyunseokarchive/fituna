@@ -34,13 +34,23 @@ Running a local LLM through llama.cpp means making three choices: how hard to
 compress the model (quantization level, Q2–Q8 — lower is faster but loses
 quality), how many layers to put on the GPU (`-ngl`), and how long a context
 to allow. That's dozens of combinations, and today most people search them by
-trial and error. Existing tools each solve only half the problem:
+trial and error.
 
-| Existing approach | Limitation |
-|---|---|
-| Ollama · LM Studio | Fixed per-model presets that ignore your target; finer quantization control was ["Closed as not planned"](https://github.com/ollama/ollama/issues/14674) |
-| NVIDIA AutoQuantize | CUDA-only — no Apple Silicon |
-| VRAM calculators · chatbot advice | Spec-sheet estimates — blind to your thermals, memory bandwidth, and build flags |
+What you actually want answered are three questions. **① Will this machine
+hit my target speed? ② What is the quality loss, in percent? ③ What is the
+lightest config that still meets the target?** — and no tool answered them:
+
+| | ① Target speed | ② Quality loss | ③ Minimal config |
+|---|---|---|---|
+| VRAM calculators | Only "does it fit" | Not addressed | Not addressed |
+| Chatbot advice | Estimates — [wrong in all 3 measured trials](docs/CHATBOT_COMPARISON.md) | Generalities | "Offload everything" |
+| NVIDIA AutoQuantize | No speed-target input | Addressed — but CUDA-only | CUDA-only |
+| **FiTuna** | **Measured verdict** | **Measured verdict** | **Binary-searched** |
+
+Runners like Ollama and LM Studio are absent from this table on purpose —
+they execute a given config rather than answer these questions, a different
+and complementary job. The config FiTuna finds can be handed straight to
+Ollama via `--export-ollama`.
 
 And once you actually measure, intuition keeps getting overturned: on an
 Apple M3 Pro the "obviously best" Q8_0 failed the speed target, and the
