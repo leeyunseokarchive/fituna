@@ -82,6 +82,36 @@ Apple M3 Pro, llama.cpp build 9960. Full logs and run-to-run variance:
 [docs/USE_CASES.md](docs/USE_CASES.md) · Reproduce on NVIDIA/Linux (free T4):
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/leeyunseokarchive/fituna/blob/main/notebooks/colab_nvidia_verification.ipynb)
 
+## Couldn't you just ask a chatbot?
+
+Fair question — so we ran the experiment. We asked a chatbot (Claude, in
+fresh sessions with no knowledge of this project) the exact same three
+questions FiTuna's measured scenarios answer, recorded the full replies,
+and compared them against the measurements — **all three first-choice
+recommendations missed the target when measured**:
+
+| Scenario · target | Chatbot's pick · prediction | Same config, measured | What measurement found |
+|---|---|---|---|
+| Qwen3-4B · 30 tok/s | Q5_K_M — "expect 35–45" | **29.59 — miss**¹ | Q4_K_M @ ngl=33 → 30.81 ✅ |
+| SmolLM2 · 240 tok/s | Q8_0 — "clears it easily" | **205.91 — miss** | Q6_K → 249.50 ✅ |
+| Midm (Korean) · 40 tok/s | Q6_K — "expect 50–70", "avoid Q4_K_M" | **38.96 — miss**¹ | **the Q4_K_M it said to avoid** @ ngl=48 → 44.62 ✅ |
+
+¹ Marginal verdicts (within ~1 tok/s) — but a 30%+ error in the predicted
+speed is not a margin problem.
+
+All three replies recommended `-ngl 99` (offload everything) — the concept
+of a *minimal* offload that still meets the target cannot exist without
+measurement — and all three honestly ended with "benchmark it yourself with
+`llama-bench`." **FiTuna is that benchmark.** Full transcripts, method, and
+limitations (including session-to-session variance of chatbot answers):
+[docs/CHATBOT_COMPARISON.md](docs/CHATBOT_COMPARISON.md)
+
+The offload curve shows best what can't be known without measuring: one
+layer separates pass from fail, and offloading half the layers gives a
+quarter — not half — of the speed:
+
+![Measured generation speed of Midm-2.0-Mini Q4_K_M per GPU offload layer count — a single layer separates pass from fail](assets/ngl-curve.en.svg)
+
 ## How it works
 
 ```mermaid
