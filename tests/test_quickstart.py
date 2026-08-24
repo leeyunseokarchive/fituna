@@ -776,3 +776,101 @@ def test_quickstart_is_a_registered_subcommand_with_run_compatible_flags():
     assert args.out == "./out"
     assert args.llama_bin_dir is None
     assert cli._DISPATCH["quickstart"] is quickstart.run_wizard
+
+
+# ---------------------------------------------------------------------------
+# fituna run --hf (non-interactive HF download)
+# ---------------------------------------------------------------------------
+
+
+def test_pick_f16_file_single_match():
+    names = ["m-Q4_K_M.gguf", "m-f16.gguf", "README.md"]
+    assert quickstart.pick_f16_file(names, "org/repo") == "m-f16.gguf"
+
+
+def test_pick_f16_file_accepts_bf16_and_is_case_insensitive():
+    assert quickstart.pick_f16_file(["Model-BF16.gguf"], "org/repo") == "Model-BF16.gguf"
+
+
+def test_pick_f16_file_does_not_match_f16_inside_a_word():
+    with pytest.raises(quickstart.FiTunaError, match="no F16/BF16"):
+        quickstart.pick_f16_file(["mf16x.gguf"], "org/repo")
+
+
+def test_pick_f16_file_zero_matches_lists_the_ggufs(capsys):
+    with pytest.raises(quickstart.FiTunaError) as exc:
+        quickstart.pick_f16_file(["m-Q4_K_M.gguf", "m-Q8_0.gguf"], "org/repo")
+    assert "m-Q4_K_M.gguf" in str(exc.value)
+    assert "org/repo:<filename>" in str(exc.value)
+
+
+def test_pick_f16_file_multiple_matches_refuses_to_guess():
+    with pytest.raises(quickstart.FiTunaError, match="more than one"):
+        quickstart.pick_f16_file(["a-f16.gguf", "b-bf16.gguf"], "org/repo")
+
+
+def test_resolve_hf_model_rejects_empty_repo(tmp_path):
+    with pytest.raises(quickstart.FiTunaError, match="repo"):
+        quickstart.resolve_hf_model(":file.gguf", tmp_path)
+
+
+def test_resolve_hf_model_reuses_file_already_on_disk(tmp_path, capsys):
+    (tmp_path / "m-f16.gguf").write_bytes(b"gguf")
+    got = quickstart.resolve_hf_model("org/repo:m-f16.gguf", tmp_path)
+    assert got == tmp_path / "m-f16.gguf"
+    assert "reusing" in capsys.readouterr().out
+
+
+def test_resolve_hf_model_downloads_named_file_without_listing_api(tmp_path, monkeypatch):
+    calls = []
+
+    def fake_download(url, dest):
+        calls.append(url)
+        dest.write_bytes(b"gguf")
+        return dest
+
+    monkeypatch.setattr(quickstart, "_download", fake_download)
+    monkeypatch.setattr(
+        quickstart,
+        "_hf_repo_listing",
+        lambda repo: pytest.fail("named file must not hit the listing API"),
+    )
+    got = quickstart.resolve_hf_model("org/repo:m-f16.gguf", tmp_path)
+    assert got == tmp_path / "m-f16.gguf"
+    assert calls == ["https://huggingface.co/org/repo/resolve/main/m-f16.gguf"]
+
+
+def test_resolve_hf_model_bare_repo_picks_f16_and_reports_license(
+    tmp_path, monkeypatch, capsys
+):
+    monkeypatch.setattr(
+        quickstart,
+        "_hf_repo_listing",
+        lambda repo: {
+            "siblings": [{"rfilename": "m-f16.gguf"}, {"rfilename": "m-Q4_K_M.gguf"}],
+            "cardData": {"license": "apache-2.0"},
+        },
+    )
+    monkeypatch.setattr(
+        quickstart, "_download", lambda url, dest: (dest.write_bytes(b"g"), dest)[1]
+    )
+    got = quickstart.resolve_hf_model("org/repo", tmp_path)
+    assert got == tmp_path / "m-f16.gguf"
+    assert "apache-2.0" in capsys.readouterr().out
+
+
+def test_run_parser_model_and_hf_are_mutually_exclusive_and_one_required(capsys):
+    parser = cli._build_parser()
+    common = ["--target-tps", "20", "--max-quality-loss", "5", "--wikitext", "w.txt"]
+    with pytest.raises(SystemExit):
+        parser.parse_args(["run", *common])
+    capsys.readouterr()
+    with pytest.raises(SystemExit):
+        parser.parse_args(
+            ["run", "--model", "m.gguf", "--hf", "org/repo", *common]
+        )
+    err = capsys.readouterr().err
+    assert "not allowed with" in err
+    args = parser.parse_args(["run", "--hf", "org/repo", *common])
+    assert args.hf == "org/repo"
+    assert args.model is None
