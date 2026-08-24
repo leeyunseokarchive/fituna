@@ -7,7 +7,7 @@
 **llama.cpp 설정, 추측하지 말고 측정하세요.**
 
 하드웨어 실측 벤치마크 기반 로컬 LLM 자동 튜닝 도구 — 모델, 목표 속도,
-허용 품질손실을 입력하면 **당신의 기기**에서 실제로 그 수치를 달성하는 가장
+허용 품질손실을 입력하면 **내 기기**에서 실제로 그 수치를 달성하는 가장
 가벼운 llama.cpp 설정을 찾아 돌려줍니다.
 
 **외부 API는 구독료가 쌓이고, 로컬 LLM은 어떤 모델을 돌려야 할지
@@ -51,9 +51,9 @@ FiTuna result: MEETS TARGET
 *(출력 형식은 현재 버전 기준 재구성, 수치는 Run 2 실측입니다.)*
 
 실제로 Apple M3 Pro에서 돌린 결과입니다. "당연히 가장 좋을" Q8_0이 속도
-목표에서 **탈락**했고, Q5_K_M은 0.41 tok/s 차이로 놓쳤습니다. 답은 양자화
+목표에서 **탈락**했고 Q5_K_M은 0.41 tok/s 차이로 놓쳤습니다. 답은 양자화
 하나가 아니라 양자화에 최소 GPU 오프로드(전체 36이 아닌 `-ngl 33`)를 더한
-조합이었고, 사양표만으로는 어느 것도 예측할 수 없었습니다([전체
+조합이었고 사양표만으로는 어느 것도 예측할 수 없었습니다([전체
 로그](docs/RESULTS.md)).
 
 ## 2분 체험
@@ -75,7 +75,7 @@ fituna run --hf bartowski/SmolLM2-135M-Instruct-GGUF \
 `MEETS TARGET — Q8_0 @ ngl=24, 249.16 tok/s, 손실 0.29%`, 산출물과 바로 쓸
 `llama-server` 명령까지 출력. `--resume` 재실행은 캐시에서 **0.8초**에 같은
 답을 냈습니다. (공개된 Run 1은 같은 모델·같은 목표인데 코퍼스 스냅샷이 달라
-Q6_K를 먼저 측정했습니다 — 실측 품질 순서가 벤치 순서를 정하고, 이게 바로
+Q6_K를 먼저 측정했습니다 — 실측 품질 순서가 벤치 순서를 정하고 이게 바로
 가정 대신 측정이 필요한 이유입니다.)
 
 ## 설치
@@ -115,11 +115,11 @@ fituna quickstart
 ```
 
 6단계 — 환경 점검, 목표 설정, 라이선스 조건, 모델, 품질 코퍼스, 탐색 실행 —
-이고, 완성된 `fituna run ...` 명령을 **실행 전에** 그대로 보여주므로 다음부터는
-그 한 줄만 쓰면 됩니다. 터미널(TTY)이 필요하며, CI나 파이프에서는 `fituna run`을
+을 거칩니다. 완성된 `fituna run ...` 명령을 **실행 전에** 그대로 보여주므로 다음부터는
+그 한 줄만 쓰면 됩니다. 터미널(TTY)이 필요합니다. CI나 파이프에서는 `fituna run`을
 직접 쓰세요. 탐색 파라미터는 모두 공개된 `run` 플래그로 표현됩니다(argv 일치
 테스트로 증명). 마법사에는 검증된 추천 목록과 대화형 HuggingFace 검색이
-있고, 스크립트 경로에서는 `run --model`이 디스크의 `.gguf`를 받거나
+있고 스크립트 경로에서는 `run --model`이 디스크의 `.gguf`를 받거나
 `run --hf repo[:filename]`이 F16/BF16 GGUF를 먼저 내려받습니다(TTY 불필요 —
 저장소에 F16 파일이 없거나 여러 개면 추측하지 않고 목록을 보여주며, API가
 라이선스를 보고하면 함께 출력합니다).
@@ -133,7 +133,7 @@ VRAM/RAM, 가정한 여유분 명시)로 판단하고, 속도는 측정하며, �
 
 ### 스크립트 경로 (마법사가 대신 조립해 주는 것)
 
-품질손실은 평문 텍스트 코퍼스에 대한 perplexity 증가율이므로, 실제 사용할
+품질손실은 평문 텍스트 코퍼스의 perplexity 증가율이므로 실제 사용할
 텍스트와 비슷할 때만 의미가 있습니다. UTF-8 파일이면 무엇이든 됩니다
 (`--quality-corpus`). 두 프리셋은 명령 하나로 받습니다:
 
@@ -143,7 +143,7 @@ fituna fetch-corpus --lang ko --out kowiki-corpus.txt --rows 500   # 한국어 �
 ```
 
 실제로 쓸 언어로 측정하세요: 같은 quant도 두 코퍼스에서 2~3배 다른 손실을
-보이며, Run 3에서는 그 차이만으로 도구가 반환하는 판정이 바뀌었습니다([실측
+보이며 Run 3에서는 그 차이만으로 도구가 반환하는 판정이 바뀌었습니다([실측
 내용과 단서
 조항](docs/RESULTS.md#run-3--english-vs-korean-quality-corpus-same-model-same-quants)).
 두 프리셋 모두 CC BY-SA 3.0이며 `fetch-corpus`는 완료 시 라이선스 고지와
@@ -163,7 +163,7 @@ F16/BF16 `.gguf`를 직접 넘기거나(많은 모델이 이미 공개함), HF �
 `pip install torch transformers` 필요, 패키지 매니저 빌드에는 미포함).
 
 > **디스크 사용량:** 탐색은 품질 단계에 도달한 모든 후보를 양자화합니다 —
-> 4B 모델의 후보 4개 기준 약 12 GB. 파일은 재실행 시 재사용되며, `--quant`로
+> 4B 모델의 후보 4개 기준 약 12 GB. 파일은 재실행 시 재사용됩니다. `--quant`로
 > 후보를 좁히면 이 용량을 제한할 수 있습니다.
 
 ## 왜 필요한가
@@ -176,24 +176,24 @@ F16/BF16 `.gguf`를 직접 넘기거나(많은 모델이 이미 공개함), HF �
   제어 요청은 ["Closed as not planned"](https://github.com/ollama/ollama/issues/14674)로
   종료됐습니다.
 - **NVIDIA Model Optimizer**의 AutoQuantize는 CUDA 전용입니다.
-- **VRAM 계산기·챗봇 조언**은 사양표에서 추정합니다 — 사양표는 당신 기기의
+- **VRAM 계산기·챗봇 조언**은 사양표에서 추정합니다 — 사양표는 내 기기의
   발열 상태, 메모리 대역폭, llama.cpp 빌드 플래그를 모릅니다.
 
-FiTuna는 이미 설치된 llama.cpp 바이너리 위에서의 실측 탐색으로 추측을
-대체합니다 — 당신의 하드웨어에서 검증되고, 캐시에서 재현됩니다.
+FiTuna는 이미 설치된 llama.cpp 바이너리 위에서 실측 탐색을 돌려 추측을
+대체합니다 — 내 하드웨어에서 검증되고 캐시에서 재현됩니다.
 
 ## 기능
 
 - 🔍 **목표 기반 탐색** — 입력: 모델 + 목표 tok/s + 허용 품질손실 %.
   출력: quant × `-ngl` × ctx 설정 + 바로 실행 가능한 명령어.
-- 📏 **가정이 아닌 실측** — 후보를 *실측* perplexity 순서로 걷고(우리
-  실험에서는 Q6_K가 Q8_0을 이겼습니다 — [데이터](docs/RESULTS.md)), 최소 GPU
+- 📏 **가정이 아닌 실측** — 후보를 *실측* perplexity 순서대로 시험합니다(우리
+  실험에서는 Q6_K가 Q8_0을 이겼습니다 — [데이터](docs/RESULTS.md)). 최소 GPU
   오프로드는 이진탐색으로 찾습니다.
 - ⚡ **공격적인 조기종료** — 품질 게이트 탈락·가망 없는 quant는 벤치마크를
   낭비하지 않고 건너뜁니다. 시간 안에 안 끝나는 벤치는 "너무 느림"으로
   처리하지, 크래시로 처리하지 않습니다.
 - 🗃️ **재현 가능한 캐시** — sqlite3, 모델 지문 × 하드웨어 × llama.cpp 빌드
-  버전으로 키잉. `--resume`은 1초 미만으로 재응답하며 중단에도 살아남습니다.
+  버전을 키로 씁니다. `--resume`은 1초 미만으로 재응답하며 중단에도 살아남습니다.
 - 🖥️ **하드웨어 자동 감지** — NVIDIA(`nvidia-smi`), AMD(`rocm-smi`),
   Apple Silicon 통합메모리(`system_profiler`), 수동 오버라이드 지원.
 - 🪶 **런타임 의존성 0개** — 순수 Python 3.11+ 표준 라이브러리.
@@ -204,7 +204,7 @@ FiTuna는 이미 설치된 llama.cpp 바이너리 위에서의 실측 탐색으�
 |---|---|---|---|
 | Qwen3-4B-Instruct (Apache 2.0) | 30 tok/s, ≤5% 손실 | Q8_0: 24.22 tok/s ❌ (게다가 Q6_K보다 *더 나쁜* 품질로 측정됨) | **Q4_K_M @ ngl=33 → 30.81 tok/s, 1.73% 손실** ✅ |
 | SmolLM2-135M (Apache 2.0) | 240 tok/s, ≤5% 손실 | Q8_0: 205.91 tok/s ❌ | **Q6_K → 249.50 tok/s, 0.53% 손실** ✅ (게다가 Q4_K_M이 Q6_K보다 *더 느리게* 측정됨) |
-| Midm-2.0-Mini-Instruct, 한국어 (MIT) | 40 tok/s, ≤5% 손실 | Q8_0: 34.26 tok/s ❌ | **Q4_K_M @ ngl=48 → 44.62 tok/s, 2.58% 손실** ✅ (두 코퍼스가 중간 순위를 다르게 보고하지만, 청크별 트레이스를 보면 그 순위 변화는 [입증할 수 없었습니다](docs/RESULTS.md#how-big-is-a-perplexity-gap-the-error-bar-we-had-been-discarding)) |
+| Midm-2.0-Mini-Instruct, 한국어 (MIT) | 40 tok/s, ≤5% 손실 | Q8_0: 34.26 tok/s ❌ | **Q4_K_M @ ngl=48 → 44.62 tok/s, 2.58% 손실** ✅ (두 코퍼스가 중간 순위를 다르게 보고하지만 청크별 트레이스를 보면 그 순위 변화는 [입증할 수 없었습니다](docs/RESULTS.md#how-big-is-a-perplexity-gap-the-error-bar-we-had-been-discarding)) |
 
 Apple M3 Pro, llama.cpp build 9960. 전체 로그·소요시간·재실행 변동성
 분석(직접 발견해 기록한 서멀 스로틀 이상치 포함):
@@ -216,11 +216,11 @@ Apple M3 Pro, llama.cpp build 9960. 전체 로그·소요시간·재실행 변�
 
 ## 동작 원리
 
-**1단계**는 *모든* 후보의 perplexity 손실을 측정합니다. **2단계**가 후보를
-*실측* 품질 순서로 걷는데, 측정하지 않은 숫자로는 정렬할 수 없기 때문입니다.
+**1단계**는 *모든* 후보의 perplexity 손실을 측정합니다. **2단계**는 후보를
+*실측* 품질 순서대로 시험하는데, 측정하지 않은 숫자로는 정렬할 수 없기 때문입니다.
 2단계는 강하게 조기종료합니다: 풀오프로드에서 목표를 놓친 quant는 추가 벤치
-없이 탈락하고, 통과하는 첫 quant가 승자입니다. 결과는 모델 지문 × 하드웨어
-프로파일 × **llama.cpp 빌드 버전**으로 키잉된 sqlite3에 캐시되므로 `--resume`이
+없이 탈락하고 통과하는 첫 quant가 승자입니다. 결과는 모델 지문 × 하드웨어
+프로파일 × **llama.cpp 빌드 버전**을 키로 삼는 sqlite3에 캐시되므로 `--resume`이
 다른 백엔드 빌드의 수치를 재사용하지 않습니다. 다이어그램·모듈 지도·전체
 알고리즘: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · 계약:
 [`fituna/config.py`](fituna/config.py)
@@ -238,7 +238,7 @@ print(f"{hw.gpu_vendor.value}: {hw.gpu_name}, {hw.vram_mb} MB VRAM, {hw.ram_mb} 
 ```
 
 (위 실측 결과와 같은 M3 Pro에서 `python3.13 -c`로 실제 실행한 출력입니다.)
-탐색을 코드로 돌리려면 `fituna.search.search()`를 호출하면 되며, 추가로
+탐색을 코드로 돌리려면 `fituna.search.search()`를 호출하면 되며 추가로
 `ModelInfo`, 해석된 `BinaryPaths`, 작업 디렉토리, 코퍼스 경로가 필요합니다 —
 바로 `fituna run`/`quickstart`가 대신 조립해 주는 것들입니다
 ([`search.py`](fituna/search.py), [`config.py`](fituna/config.py)).
@@ -255,7 +255,7 @@ claude mcp add fituna -- fituna-mcp      # 또는 stdio transport를 지원하�
 | 도구 | 하는 일 |
 |---|---|
 | `fituna_detect_hardware` | FiTuna가 감지한 GPU 벤더/이름, VRAM, CPU 코어, RAM |
-| `fituna_recommend` | 목표 스펙에 대해 실측 탐색을 실행합니다. 승자 설정, 실측 tok/s, 실측 품질손실, 바로 실행 가능한 명령어를 반환합니다. 처음엔 느리고, 재요청 시 ~1초(캐시). |
+| `fituna_recommend` | 목표 스펙으로 실측 탐색을 실행합니다. 승자 설정, 실측 tok/s, 실측 품질손실, 바로 실행 가능한 명령어를 반환합니다. 처음엔 느리고 재요청 시 ~1초(캐시). |
 
 나머지 부분처럼 표준 라이브러리만 씁니다 — MCP stdio는 줄바꿈으로 구분된
 JSON-RPC 2.0이라 SDK가 필요 없습니다([`fituna/mcp_server.py`](fituna/mcp_server.py)).
@@ -263,9 +263,9 @@ JSON-RPC 2.0이라 SDK가 필요 없습니다([`fituna/mcp_server.py`](fituna/mc
 ## 범위
 
 FiTuna는 추천만 합니다 — 실행하거나 서빙하지 않습니다. 출력은 양자화된 `.gguf`와
-복사해서 직접 돌리는 `llama-server`·`llama-cli` 명령어이며(`--export-ollama`를
-쓰면 그 옆에 Ollama `Modelfile`도 생성), FiTuna는 그중 어느 것도 실행하지
-않습니다. 이건 **의도적인 경계선**입니다: 추론 서빙은 llama.cpp의 일이고, 중복
+복사해서 직접 돌리는 `llama-server`·`llama-cli` 명령어입니다(`--export-ollama`를
+쓰면 그 옆에 Ollama `Modelfile`도 생성). FiTuna는 그중 어느 것도 실행하지
+않습니다. 이건 **의도적인 경계선**입니다: 추론 서빙은 llama.cpp의 일이고 중복
 구현해도 차별화되는 가치가 없습니다([근거](docs/ARCHITECTURE.md#why-this-shape)).
 경계선 안에 머무르는 두 확장 — `--launch`와 LM Studio 프리셋 내보내기 — 는
 [#19](https://github.com/leeyunseokarchive/fituna/issues/19)에서 추적 중입니다.
@@ -278,12 +278,12 @@ FiTuna는 추천만 합니다 — 실행하거나 서빙하지 않습니다. 출
   실측할 멀티 GPU 기기가 없습니다).
 - **Windows AMD 자동 감지** — `rocm-smi`는 Windows에 주류 배포판이 없음.
   `--gpu amd --vram-mb <N>` 사용.
-- **품질 = 선택한 코퍼스에 대한 perplexity** — 대리 지표일 뿐, 도메인 품질을
+- **품질 = 선택한 코퍼스의 perplexity** — 대리 지표일 뿐, 도메인 품질을
   보장하지 않습니다. 실제 작업과 비슷한 텍스트로 게이트하세요
   (`--quality-corpus`; [EN-vs-KO 실측
   비교](docs/RESULTS.md#run-3--english-vs-korean-quality-corpus-same-model-same-quants)).
 - **품질 판정은 `--ppl-chunks`에 의존합니다** — 손실은 `chunks × 512` 토큰에
-  대한 추정치이며 절대값이 청크 수에 따라 커지므로, 예산에 가까운 후보는
+  대한 추정치이며 절대값이 청크 수에 따라 커지므로 예산에 가까운 후보는
   재측정한 뒤 PASS를 신뢰하세요([실측된
   영향](docs/RESULTS.md#how-big-is-a-perplexity-gap-the-error-bar-we-had-been-discarding)).
   `quality.py`는 여전히 PPL만 파싱하고 llama-perplexity의 오차범위를 버립니다
@@ -303,7 +303,7 @@ FiTuna는 추천만 합니다 — 실행하거나 서빙하지 않습니다. 출
 설계됐습니다([`fituna/config.py`](fituna/config.py)에서 시작하세요). 유닛 테스트
 256개, 모듈별 self-check, 3-OS × 2-Python CI 매트릭스가 이를 지킵니다. 개발
 로드맵(예정 작업)은 [v0.2.0 마일스톤](https://github.com/leeyunseokarchive/fituna/milestone/1)에
-있으며, [#10](https://github.com/leeyunseokarchive/fituna/issues/10)(파서 테스트
+있으며 [#10](https://github.com/leeyunseokarchive/fituna/issues/10)(파서 테스트
 커버리지, good first issue)도 포함됩니다. 자세한 내용은
 [CONTRIBUTING.md](CONTRIBUTING.md) ·
 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) · [CHANGELOG.md](CHANGELOG.md) ·
