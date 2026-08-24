@@ -150,7 +150,9 @@ haven't measured. Stage 2 then benchmarks them in that measured quality
 order, dropping any quant that misses the target without wasting further
 benches. Every measurement lands in an sqlite3 cache whose key includes the
 llama.cpp build version, so upgrading the engine never silently reuses stale
-numbers. Algorithm details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+numbers.
+
+See how it works in detail: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 ## Install
 
