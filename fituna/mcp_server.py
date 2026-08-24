@@ -43,7 +43,7 @@ from fituna.cache import ResultCache
 from fituna.config import FiTunaError, NoFeasibleConfigError, TargetSpec
 
 PROTOCOL_VERSION = "2024-11-05"
-SERVER_INFO = {"name": "fituna", "version": "0.1.0"}
+SERVER_INFO = {"name": "fituna", "version": "0.2.0"}
 
 _TOOLS: list[dict[str, Any]] = [
     {

@@ -84,6 +84,7 @@ import argparse
 import http.client
 import json
 import os
+import re
 import shlex
 import sys
 import tempfile
@@ -548,8 +549,10 @@ def _download(url: str, dest: Path) -> Path:
                         now = int(done * 20 / total)  # every 5 %
                         if now != step:
                             step = now
+                            # language-neutral on purpose: this line is shared
+                            # by the Korean wizard and the English --hf path
                             print(
-                                f"  내려받는 중 {done * 100 // total:3d}% "
+                                f"  {done * 100 // total:3d}% "
                                 f"({report.human_size(done)} / {report.human_size(total)})"
                             )
         os.replace(tmp, dest)
@@ -568,6 +571,72 @@ def _download(url: str, dest: Path) -> Path:
         tmp.unlink(missing_ok=True)
         raise
     return dest
+
+
+# ---------------------------------------------------------------------------
+# non-interactive HF download -- the `fituna run --hf` path. English messages:
+# unlike the wizard above (Korean, interactive), this is reached from the
+# plain CLI/CI surface whose output language is English.
+# ---------------------------------------------------------------------------
+
+_F16_NAME = re.compile(r"(?:^|[-_.])(?:bf16|f16|fp16)(?:[-_.]|$)", re.IGNORECASE)
+
+
+def pick_f16_file(filenames: list[str], repo: str) -> str:
+    """Pick the single F16/BF16 .gguf from a repo file listing.
+
+    Zero or several matches are both errors: guessing a multi-GB download
+    is worse than asking the user to name the file (``--hf repo:filename``).
+    """
+    ggufs = [n for n in filenames if n.lower().endswith(".gguf")]
+    matches = [n for n in ggufs if _F16_NAME.search(Path(n).stem)]
+    if len(matches) == 1:
+        return matches[0]
+    listing = "\n".join(f"  {n}" for n in ggufs) or "  (no .gguf files found)"
+    kind = "no F16/BF16 .gguf" if not matches else "more than one F16/BF16 .gguf"
+    raise FiTunaError(
+        f"{repo} has {kind}; pass the exact file as --hf '{repo}:<filename>'. "
+        f"Files in the repo:\n{listing}"
+    )
+
+
+def _hf_repo_listing(repo: str) -> dict:
+    url = f"https://huggingface.co/api/models/{urllib.parse.quote(repo)}"
+    try:
+        with urllib.request.urlopen(url, timeout=TIMEOUT_SEC) as resp:
+            return json.loads(resp.read())
+    except OSError as exc:
+        raise FiTunaError(f"could not query HuggingFace for {repo}: {exc}") from exc
+    except json.JSONDecodeError as exc:
+        raise FiTunaError(f"unexpected HuggingFace API response for {repo}: {exc}") from exc
+
+
+def resolve_hf_model(spec: str, out_dir: Path) -> Path:
+    """Resolve ``--hf repo[:filename]`` to a local .gguf, downloading if needed.
+
+    The license of the downloaded weights is the model publisher's, not
+    FiTuna's -- printed when the API reports one, flagged when it doesn't
+    (a bare .gguf carries no license metadata).
+    """
+    repo, _, filename = spec.partition(":")
+    repo = repo.strip().strip("/")
+    if not repo:
+        raise FiTunaError(f"--hf expects 'repo[:filename]', got {spec!r}")
+    if not filename:
+        info = _hf_repo_listing(repo)
+        filename = pick_f16_file([s.get("rfilename", "") for s in info.get("siblings", [])], repo)
+        license_id = (info.get("cardData") or {}).get("license")
+        print(
+            f"license: {license_id} (weights published by {repo}; their terms, not FiTuna's)"
+            if license_id
+            else f"license: not reported by the HuggingFace API for {repo} -- check the model card"
+        )
+    dest = out_dir / Path(filename).name
+    if dest.exists():
+        print(f"model already on disk, reusing: {dest}")
+        return dest
+    print(f"downloading {HF_RESOLVE.format(repo=repo, filename=filename)}")
+    return _download(HF_RESOLVE.format(repo=repo, filename=filename), dest)
 
 
 def _hf_search(query: str) -> list[HFCandidate]:

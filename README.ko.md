@@ -14,6 +14,7 @@
 막막하죠?** 추측하지 마세요 — 실측으로 검증하고, 나만의 LLM을 돌리세요.
 
 [![CI](https://github.com/leeyunseokarchive/fituna/actions/workflows/ci.yml/badge.svg)](https://github.com/leeyunseokarchive/fituna/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/fituna.svg)](https://pypi.org/project/fituna/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![Zero dependencies](https://img.shields.io/badge/runtime%20deps-0-brightgreen.svg)](docs/SBOM.md)
@@ -50,14 +51,42 @@ FiTuna result: MEETS TARGET
 *(출력 형식은 현재 버전 기준 재구성, 수치는 Run 2 실측입니다.)*
 
 실제로 Apple M3 Pro에서 돌린 결과입니다. "당연히 가장 좋을" Q8_0이 속도
-목표에서 **탈락**했고, Q5_K_M은 **0.41 tok/s** 차이로 놓쳤으며, 답은 양자화
-하나가 아니라 그 양자화 *플러스* 최소 GPU 오프로드(전체 36이 아닌 `-ngl 33`)
-였습니다. 사양표만으로는 예측할 수 없습니다([전체 로그](docs/RESULTS.md)).
+목표에서 **탈락**했고, Q5_K_M은 0.41 tok/s 차이로 놓쳤습니다. 답은 양자화
+하나가 아니라 양자화에 최소 GPU 오프로드(전체 36이 아닌 `-ngl 33`)를 더한
+조합이었고, 사양표만으로는 어느 것도 예측할 수 없었습니다([전체
+로그](docs/RESULTS.md)).
+
+## 2분 체험
+
+![실제 fituna 실행: Apple M3 Pro에서 다운로드부터 llama-server 명령 출력까지 58초](assets/demo.svg)
+
+258 MB 모델로 실측 탐색 전 과정(다운로드 → 후보 6종 양자화 → 품질 게이트 →
+벤치마크)을 돌려볼 수 있습니다. M 시리즈 Mac 기준 1분 남짓이면 끝납니다:
+
+```bash
+pip install fituna            # Python 3.11+ (macOS 시스템 python3는 3.9 — python3.13 -m venv 먼저)
+brew install llama.cpp        # FiTuna가 구동하는 엔진. 다른 플랫폼은 아래 소스 빌드 참고
+fituna fetch-corpus --lang en --out wiki.txt
+fituna run --hf bartowski/SmolLM2-135M-Instruct-GGUF \
+  --target-tps 240 --max-quality-loss 5 --ctx 2048 --wikitext wiki.txt --out ./out
+```
+
+같은 M3 Pro에서 위 명령을 그대로 다시 실행한 결과: **콜드런 58초**, 판정
+`MEETS TARGET — Q8_0 @ ngl=24, 249.16 tok/s, 손실 0.29%`, 산출물과 바로 쓸
+`llama-server` 명령까지 출력. `--resume` 재실행은 캐시에서 **0.8초**에 같은
+답을 냈습니다. (공개된 Run 1은 같은 모델·같은 목표인데 코퍼스 스냅샷이 달라
+Q6_K를 먼저 측정했습니다 — 실측 품질 순서가 벤치 순서를 정하고, 이게 바로
+가정 대신 측정이 필요한 이유입니다.)
 
 ## 설치
 
-아직 PyPI에 게시되지 않았습니다 — git에서 직접, Python 3.11+로 만든
-가상환경에 설치하세요(macOS 시스템 `python3`는 3.9입니다):
+```bash
+pip install fituna
+```
+
+[PyPI](https://pypi.org/project/fituna/)에서 받으며 런타임 의존성은 없습니다.
+Python 3.11+가 필요합니다(macOS 시스템 `python3`는 3.9 — `python3.13`으로
+가상환경을 만드세요). 개발용은 git에서 설치하세요:
 
 ```bash
 git clone https://github.com/leeyunseokarchive/fituna
@@ -89,9 +118,11 @@ fituna quickstart
 이고, 완성된 `fituna run ...` 명령을 **실행 전에** 그대로 보여주므로 다음부터는
 그 한 줄만 쓰면 됩니다. 터미널(TTY)이 필요하며, CI나 파이프에서는 `fituna run`을
 직접 쓰세요. 탐색 파라미터는 모두 공개된 `run` 플래그로 표현됩니다(argv 일치
-테스트로 증명). 모델 다운로드(검증된 추천 목록)와 HuggingFace 검색은 `run`에
-대응이 없는 마법사만의 편의 기능이고, `run --model`은 이미 디스크에 있는
-`.gguf`를 기대합니다.
+테스트로 증명). 마법사에는 검증된 추천 목록과 대화형 HuggingFace 검색이
+있고, 스크립트 경로에서는 `run --model`이 디스크의 `.gguf`를 받거나
+`run --hf repo[:filename]`이 F16/BF16 GGUF를 먼저 내려받습니다(TTY 불필요 —
+저장소에 F16 파일이 없거나 여러 개면 추측하지 않고 목록을 보여주며, API가
+라이선스를 보고하면 함께 출력합니다).
 
 속도는 예측하지 않습니다: 메모리 적합 여부만 산술(공개된 파일 크기 vs 감지된
 VRAM/RAM, 가정한 여유분 명시)로 판단하고, 속도는 측정하며, 추천 목록·HuggingFace
@@ -270,7 +301,7 @@ FiTuna는 추천만 합니다 — 실행하거나 서빙하지 않습니다. 출
 
 기여를 환영합니다 — 코드베이스는 작고, 의존성이 없으며, 계약 우선으로
 설계됐습니다([`fituna/config.py`](fituna/config.py)에서 시작하세요). 유닛 테스트
-246개, 모듈별 self-check, 3-OS × 2-Python CI 매트릭스가 이를 지킵니다. 개발
+256개, 모듈별 self-check, 3-OS × 2-Python CI 매트릭스가 이를 지킵니다. 개발
 로드맵(예정 작업)은 [v0.2.0 마일스톤](https://github.com/leeyunseokarchive/fituna/milestone/1)에
 있으며, [#10](https://github.com/leeyunseokarchive/fituna/issues/10)(파서 테스트
 커버리지, good first issue)도 포함됩니다. 자세한 내용은

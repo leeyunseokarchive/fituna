@@ -7,7 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-08-24
+
 ### Added
+
+- **Published to PyPI** — `pip install fituna` now works; git checkout is
+  only needed for development. First published version: 0.2.0. (A 0.1.0
+  upload made the same day contains a pre-0.2.0 snapshot and predates the
+  `--hf` flag; use 0.2.0.)
+
+- **`fituna run --hf repo[:filename]`** — non-interactive HuggingFace
+  download on the script path. With a bare repo it queries the HF API,
+  picks the single F16/BF16 `.gguf` (refusing to guess when there are zero
+  or several — the error lists the repo's `.gguf` files to pick from), and
+  prints the model's license when the API reports one, flagging when it
+  doesn't. With `repo:filename` it downloads exactly that file, no listing
+  call. Files land in `--out` and are reused on later runs. Uses the same
+  atomic temp-file download as the wizard, whose progress line is now
+  language-neutral because both surfaces share it.
 
 - **`fituna quickstart`** — an interactive six-step wizard (environment
   check → targets → license requirements → model → quality corpus → confirm
@@ -205,4 +222,5 @@ separate from CI.
 - `--wikitext` was renamed to `--quality-corpus`; the old name remains an
   alias, so this is not a breaking change.
 
+[0.2.0]: https://github.com/leeyunseokarchive/fituna/releases/tag/v0.2.0
 [0.1.0]: https://github.com/leeyunseokarchive/fituna/releases/tag/v0.1.0

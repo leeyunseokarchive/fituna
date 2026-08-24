@@ -85,7 +85,16 @@ def _build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     run = sub.add_parser("run", help="search for a config meeting the target spec")
-    run.add_argument("--model", required=True, help="path to .gguf file or HF model dir")
+    model_src = run.add_mutually_exclusive_group(required=True)
+    model_src.add_argument("--model", help="path to .gguf file or HF model dir")
+    model_src.add_argument(
+        "--hf",
+        help=(
+            "HuggingFace repo to download an F16/BF16 .gguf from, as "
+            "'repo[:filename]' (e.g. bartowski/SmolLM2-135M-Instruct-GGUF); "
+            "saved into --out and reused on later runs"
+        ),
+    )
     run.add_argument("--target-tps", type=float, required=True, dest="target_tps")
     run.add_argument(
         "--max-quality-loss", type=float, required=True, dest="max_quality_loss"
@@ -422,7 +431,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
     work_dir = Path(args.out)
     work_dir.mkdir(parents=True, exist_ok=True)
 
-    model_path = Path(args.model)
+    model_path = quickstart.resolve_hf_model(args.hf, work_dir) if args.hf else Path(args.model)
     base_gguf = model_info.ensure_base_gguf(model_path, work_dir, bins)
     minfo = model_info.read_model_info(base_gguf, bins)
     if model_info.is_already_quantized(minfo):

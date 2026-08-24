@@ -14,6 +14,7 @@ actually hits those numbers on **your** machine.
 machine can actually run.** Don't guess — measure it, and run your own.
 
 [![CI](https://github.com/leeyunseokarchive/fituna/actions/workflows/ci.yml/badge.svg)](https://github.com/leeyunseokarchive/fituna/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/fituna.svg)](https://pypi.org/project/fituna/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![Zero dependencies](https://img.shields.io/badge/runtime%20deps-0-brightgreen.svg)](docs/SBOM.md)
@@ -55,10 +56,39 @@ target, Q5_K_M missed by **0.41 tok/s**, and the answer wasn't a quant alone —
 it was a quant *plus* the minimal GPU offload (`-ngl 33`, not the full 36).
 None of that is predictable from a spec sheet ([full logs](docs/RESULTS.md)).
 
+## Try it in 2 minutes
+
+![A real fituna run: 58 seconds on an Apple M3 Pro from download to a ready-to-run llama-server command](assets/demo.svg)
+
+A full measured search on a 258 MB model — small enough that the whole
+loop (download → quantize 6 candidates → quality-gate → benchmark) finishes
+in about a minute on an M-series Mac:
+
+```bash
+pip install fituna            # Python 3.11+ (macOS system python3 is 3.9 — use python3.13 -m venv first)
+brew install llama.cpp        # the engines FiTuna drives; other platforms: build from source, see below
+fituna fetch-corpus --lang en --out wiki.txt
+fituna run --hf bartowski/SmolLM2-135M-Instruct-GGUF \
+  --target-tps 240 --max-quality-loss 5 --ctx 2048 --wikitext wiki.txt --out ./out
+```
+
+Fresh run of exactly this on the same M3 Pro: **58 s cold**, verdict
+`MEETS TARGET — Q8_0 @ ngl=24, 249.16 tok/s, 0.29% loss`, artifact and
+ready-to-run `llama-server` command printed. Re-run with `--resume`: same
+answer in **0.8 s** from cache. (Our published Run 1, same model and target
+but a different corpus snapshot, measured Q6_K first — the measured
+quality order decides who gets benched first, which is exactly why FiTuna
+measures instead of assuming.)
+
 ## Install
 
-Not on PyPI yet — install from git, into a virtualenv built with Python 3.11+
-(macOS's system `python3` is 3.9):
+```bash
+pip install fituna
+```
+
+Installs from [PyPI](https://pypi.org/project/fituna/), zero runtime
+dependencies. Python 3.11+ required (macOS's system `python3` is 3.9 — make
+the venv with `python3.13`). For development, install from git instead:
 
 ```bash
 git clone https://github.com/leeyunseokarchive/fituna
@@ -91,8 +121,11 @@ corpus, search — and it prints the assembled `fituna run ...` command
 **before** executing it, so the next run is a one-liner you already have. It
 needs a terminal; in CI or a pipe use `fituna run` directly, since every
 search parameter maps to a public `run` flag (proven by an argv-equality
-test). Model download (a curated shortlist) and HuggingFace search are
-wizard-only conveniences; `run --model` expects a `.gguf` on disk.
+test). The wizard adds a curated model shortlist and interactive HuggingFace
+search; on the script path, `run --model` takes a `.gguf` already on disk and
+`run --hf repo[:filename]` downloads an F16/BF16 GGUF from HuggingFace first
+(no TTY needed — it refuses to guess when a repo has zero or several F16
+files, and prints the model's license when the API reports one).
 
 It never predicts throughput: memory fit is arithmetic (published file size vs
 detected VRAM/RAM, assumed margin stated), speed is measured, and curated or
@@ -271,7 +304,7 @@ stay inside it — `--launch` and an LM Studio preset export — are tracked in
 ## Contributing
 
 Contributions welcome — the codebase is small, dependency-free and
-contract-first (start at [`fituna/config.py`](fituna/config.py)); 246 unit
+contract-first (start at [`fituna/config.py`](fituna/config.py)); 256 unit
 tests, per-module self-checks and a 3-OS × 2-Python CI matrix guard it.
 The roadmap lives in the
 [v0.2.0 milestone](https://github.com/leeyunseokarchive/fituna/milestone/1),

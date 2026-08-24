@@ -146,6 +146,13 @@ cmake --build llama.cpp/build --target llama-quantize llama-bench llama-perplexi
 ```bash
 python3.13 -m venv .venv
 source .venv/bin/activate
+pip install fituna
+```
+
+PyPI 게시본(v0.2.0+)이 저장소 최신 릴리스와 같다. 최신 main을 검증하려면
+GitHub에서 바로 설치해도 된다:
+
+```bash
 pip install git+https://github.com/leeyunseokarchive/fituna
 ```
 
@@ -159,8 +166,6 @@ pip install -e fituna
 ```
 
 - 런타임 의존성이 0개(표준 라이브러리만 사용)라 설치는 수 초면 끝난다.
-- **`pip install fituna`(PyPI)는 아직 동작하지 않는다.** 이 프로젝트는 PyPI에
-  등록 전이며, 위의 GitHub 주소 설치가 유일한 정식 경로다.
 - 시스템 `python3`가 3.11 미만이면(예: macOS 기본 python3는 3.9.6) 3.11 이상
   인터프리터로 가상환경을 만들어야 한다. 위처럼 `python3.13 -m venv .venv`.
 - **가상환경 없이 시스템 `python3`에 그대로 `pip install`하면 최신 Homebrew·
@@ -527,7 +532,7 @@ cd fituna
 python3.13 -m pytest -q
 ```
 
-직접 실행 결과: `246 passed in 2.95s` (이 문서 작성 시점 `main` 기준. 테스트가
+직접 실행 결과: `256 passed in 2.92s` (이 문서 작성 시점 `main` 기준. 테스트가
 추가되면 개수는 늘어난다 — 중요한 것은 **실패 0건**이다).
 
 > **`python3`가 아니라 `python3.13`인 이유.** macOS 기본 `python3`는 3.9.6이고,

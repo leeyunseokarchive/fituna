@@ -58,7 +58,7 @@ matrix, alongside the test suite. A self-check that fails fails the build.
 
 ## 3. Mocked-subprocess unit tests
 
-The suite is 246 tests across `tests/`, and it is designed to pass on a machine
+The suite is 256 tests across `tests/`, and it is designed to pass on a machine
 with **no llama.cpp installed and no network access**. Every external effect is
 monkeypatched at its boundary:
 
