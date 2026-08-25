@@ -81,11 +81,54 @@ fituna run --hf bartowski/SmolLM2-135M-Instruct-GGUF \
   --out ./out --resume
 ```
 
-위 명령을 그대로 실행하면 **58초** 만에 `MEETS TARGET —
-Q8_0 @ ngl=24, 249.16 tok/s, 손실 0.29%`라는 판정과 함께, 복사해서 바로
-쓸 수 있는 `llama-server` 명령이 출력됩니다.(M3 PRO 기준) `--resume`은 처음
-실행할 때부터 붙여야 캐시가 채워집니다 — 그 상태로 동일 명령을 한 번 더
-실행하면 캐시에서 **0.8초** 만에 같은 답이 나옵니다.
+`fituna run`의 각 플래그가 뜻하는 것:
+
+| 플래그 | 의미 | |
+|---|---|---|
+| `--hf bartowski/SmolLM2-…` | 사용할 모델 — HuggingFace 저장소명. F16 GGUF를 자동 다운로드 | 필수¹ |
+| `--target-tps 240` | 목표 생성 속도 (tok/s) | 필수 |
+| `--max-quality-loss 5` | 허용 품질손실 상한 (%) — 이 이상 나빠지는 후보는 탈락 | 필수 |
+| `--ctx 2048` | 컨텍스트 길이 (한 번에 유지할 대화 맥락 크기) | 선택 (기본 4096) |
+| `--quality-corpus wiki.txt` | 품질 측정용 텍스트 — 바로 위에서 받은 파일 | 필수 |
+| `--out ./out` | 산출물·캐시 저장 폴더 | 선택 (기본 `./out`) |
+| `--resume` | 측정값을 캐시에 저장·재사용 — 첫 실행부터 붙이는 것을 권장 | 선택 |
+
+¹ 이미 받아 둔 모델 파일이 있다면 `--hf` 대신 `--model <경로.gguf>`.
+
+### 예시 결과
+
+위 명령이 끝나면 이런 결과가 출력됩니다 (Apple M3 Pro 실행 예):
+
+```
+FiTuna result: MEETS TARGET
+
+  quant           : Q8_0        # <- 찾아낸 최적 양자화 레벨
+  ngl             : 26          # <- 목표를 만족하는 최소 GPU 오프로드 층수
+  ctx             : 2048        # <- 검증된 컨텍스트 길이
+
+  prompt tok/s (pp): 2017.64
+  gen tok/s    (tg): 261.78     # <- 실측 생성 속도 -- 목표 240을 통과
+
+  perplexity      : 18.2931 (baseline 18.2407)
+  quality loss    : 0.29%       # <- 실측 품질손실 -- 허용치 5% 이내
+
+  artifact: out/SmolLM2-135M-Instruct-8078a5b74b5a-Q8_0.gguf  (144.8 MB -- already produced during the search)
+
+  1) local API server (OpenAI-compatible):
+       /opt/homebrew/bin/llama-server -m out/SmolLM2-135M-Instruct-8078a5b74b5a-Q8_0.gguf -ngl 26 -c 2048 --port 8080
+  2) import into Ollama: re-run with --export-ollama to write a Modelfile beside the artifact
+  3) terminal chat (interactive check):
+       /opt/homebrew/bin/llama-cli -m out/SmolLM2-135M-Instruct-8078a5b74b5a-Q8_0.gguf -ngl 26 -c 2048
+```
+
+읽는 법: 첫 줄이 판정입니다 — `MEETS TARGET`은 목표를 만족하는 구성을
+찾았다는 뜻이고, 이어서 그 구성(quant × ngl × ctx)과 실측 근거(속도·품질손실)가
+나옵니다. `artifact:`의 양자화 모델 파일은 탐색 중에 이미 만들어져 있으므로,
+아래 1)~3) 중 원하는 명령을 복사하면 즉시 사용할 수 있습니다. 전체 소요는
+**1분 안팎**(M3 Pro 실측 58~83초), 같은 명령을 한 번 더 실행하면 캐시에서
+**1초 안에** 같은 답이 나옵니다. 절대 수치와 승자 quant는 기기·실행 시점에
+따라 달라질 수 있습니다 —
+[재실행 변동성 실측](docs/RESULTS.md#run-to-run-variance-measured-not-hidden).
 
 ## 실측 결과
 
@@ -258,7 +301,7 @@ print(f"{hw.gpu_vendor.value}: {hw.gpu_name}, {hw.vram_mb} MB VRAM")
 
 </details>
 
-## MCP 서버 — AI 에이전트에게 추측이 아닌 실측 답변을
+## MCP 서버
 
 기존에 챗봇에게 "내 컴퓨터에서 잘 돌아가는 로컬 모델은 무엇인가?"라고 물으면 공식 사양표 기반의 추측성
 답이 돌아옵니다. 이는 실측 결과에서 보다시피, **정확하지 않을 때가 많습니다.** 이때, FiTuna의 MCP 서버를 AI 에이전트와 연결하면 에이전트가 **추측이 아닌, 실측 결과를 반영합니다**:

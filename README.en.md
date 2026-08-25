@@ -77,12 +77,57 @@ fituna run --hf bartowski/SmolLM2-135M-Instruct-GGUF \
   --out ./out --resume
 ```
 
-Run exactly this on an M3 Pro and **58 seconds** later you get the verdict
-`MEETS TARGET — Q8_0 @ ngl=24, 249.16 tok/s, 0.29% loss`, along with a
-`llama-server` command you can copy and run as-is. `--resume` has to be
-present on this first run too, so it populates the cache — with that, running
-the exact same command again returns the same answer from the cache in
-**0.8 s**.
+What each `fituna run` flag means:
+
+| Flag | Meaning | |
+|---|---|---|
+| `--hf bartowski/SmolLM2-…` | The model to use — a HuggingFace repo; the F16 GGUF is downloaded automatically | required¹ |
+| `--target-tps 240` | Target generation speed (tok/s) | required |
+| `--max-quality-loss 5` | Quality-loss budget (%) — candidates worse than this are rejected | required |
+| `--ctx 2048` | Context length (how much conversation history to keep) | optional (default 4096) |
+| `--quality-corpus wiki.txt` | Text for quality measurement — the file fetched just above | required |
+| `--out ./out` | Output/cache directory | optional (default `./out`) |
+| `--resume` | Store and reuse measurements in the cache — recommended from the first run | optional |
+
+¹ Already have a model file on disk? Use `--model <path.gguf>` instead of `--hf`.
+
+### Example result
+
+When the command finishes, you get output like this (a real run on an
+Apple M3 Pro):
+
+```
+FiTuna result: MEETS TARGET
+
+  quant           : Q8_0        # <- the optimal quantization level it found
+  ngl             : 26          # <- the minimum GPU offload layers meeting the target
+  ctx             : 2048        # <- the verified context length
+
+  prompt tok/s (pp): 2017.64
+  gen tok/s    (tg): 261.78     # <- measured generation speed -- clears the 240 target
+
+  perplexity      : 18.2931 (baseline 18.2407)
+  quality loss    : 0.29%       # <- measured quality loss -- within the 5% budget
+
+  artifact: out/SmolLM2-135M-Instruct-8078a5b74b5a-Q8_0.gguf  (144.8 MB -- already produced during the search)
+
+  1) local API server (OpenAI-compatible):
+       /opt/homebrew/bin/llama-server -m out/SmolLM2-135M-Instruct-8078a5b74b5a-Q8_0.gguf -ngl 26 -c 2048 --port 8080
+  2) import into Ollama: re-run with --export-ollama to write a Modelfile beside the artifact
+  3) terminal chat (interactive check):
+       /opt/homebrew/bin/llama-cli -m out/SmolLM2-135M-Instruct-8078a5b74b5a-Q8_0.gguf -ngl 26 -c 2048
+```
+
+How to read it: the first line is the verdict — `MEETS TARGET` means a
+configuration satisfying your target was found, followed by that
+configuration (quant × ngl × ctx) and the measured evidence (speed and
+quality loss). The quantized model on the `artifact:` line was already
+produced during the search, so copying any of commands 1)–3) puts it to work
+immediately. The whole run takes **about a minute** (58–83 s measured on an
+M3 Pro), and running the exact same command again answers from the cache in
+**under a second**. Absolute numbers and the winning quant can vary by
+machine and by run —
+[measured run-to-run variance](docs/RESULTS.md#run-to-run-variance-measured-not-hidden).
 
 ## Measured results
 

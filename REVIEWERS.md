@@ -100,25 +100,29 @@ Ollama / 대화형 `llama-cli`) — 을 출력하면 정상 동작이다. **종�
 
 위 배지를 클릭하면 Colab에서 노트북이 열린다. **실행 전 반드시** 상단 메뉴
 `런타임 → 런타임 유형 변경 → T4 GPU`(무료 등급으로 가능)를 설정한다. 그 다음
-셀을 위에서부터 순서대로 실행한다.
+셀을 위에서부터 순서대로 실행한다. 노트북 안내문·주석은 전부 한국어이며,
+"셀 6이 `BEST EFFORT`로 나오는 것이 정상"이라는 설명도 노트북 맨 위에
+포함돼 있다 — 이 문서 없이 노트북만 열어도 판정 기준을 놓치지 않는다.
 
 | 셀 | 하는 일 | 기대 출력 | 소요 |
 |---|---|---|---|
 | 1 | `nvidia-smi` | `Tesla T4` / `15360MiB` 표. 노트북 파일에 실제 실행 출력이 저장돼 있어 미리 확인 가능 | 수 초 |
 | 2 | llama.cpp를 CUDA로 빌드 | 마지막 줄에 `llama.cpp ready` | **10~20분** (가장 긴 셀) |
-| 3 | FiTuna 설치 + `fituna --help` | 두 줄로 감기는 `usage: fituna [-h] [-v]` / `{run,detect-hw,list-binaries,doctor,fetch-corpus,quickstart,help} ...` | 수십 초 |
+| 3 | FiTuna 설치(PyPI) + `fituna --help` | 두 줄로 감기는 `usage: fituna [-h] [-v]` / `{run,detect-hw,list-binaries,doctor,fetch-corpus,quickstart,help} ...` | 수 초 |
 | 4 | `fituna detect-hw` | `gpu_vendor: nvidia` / `gpu_name: Tesla T4` / `vram_mb: 15360` / `os_name: linux` | 수 초 |
-| 5 | 데모 모델(SmolLM2-135M F16, Apache 2.0) + 코퍼스 준비 | `model + corpus ready` | 1~2분 |
-| 6 | **측정 탐색 본체** (`fituna run`) | 아래 설명 참고 — T4에서는 `BEST EFFORT` | 약 61초 |
-| 7 | 동일 명령 재실행(`--resume`) | 6번과 **동일한** 결과 블록 | 약 1.45초 |
+| 5 | 품질 측정용 코퍼스 다운로드 | `Wrote 1000 rows ...` + 라이선스 고지 | 수 초~수십 초 |
+| 6 | **측정 탐색 본체** (`fituna run --hf`) — 데모 모델(SmolLM2-135M F16, Apache 2.0, 258 MB)도 이 셀이 자동 다운로드 | 아래 설명 참고 — T4에서는 `BEST EFFORT` | 약 1~2분 |
+| 7 | 동일 명령 재실행(`--resume`) | 6번과 **동일한** 결과 블록 | 1초대 |
 
-셀 3에서 매번 최신 PyPI 배포본을 `pip install`하므로, 이 노트북의 실제 출력은
-언제 실행하든 그 시점의 published 버전을 그대로 보여준다 — 아래 4장의 로컬
-재현과 달리 이 절은 "예전 형식으로 고정된 기록"을 갖지 않는다.
+셀 3은 매번 PyPI 게시본을 `pip install fituna`로 설치한다 — 언제 실행하든
+심사 시점에 게시돼 있는 버전이 그대로 검증된다. 셀 6은 로컬 경로 B(4-6)와
+같은 v0.2.0 `--hf` 플래그를 쓰므로, 모델을 따로 받는 단계가 없다.
 
-셀 6·7의 수치(61초 / 1.45초)와 결과는 `docs/RESULTS.md`의
-[Run 4](docs/RESULTS.md#run-4--nvidia-tesla-t4-linux-google-colab)에 실측으로
-기록된 값이다.
+`docs/RESULTS.md`의
+[Run 4](docs/RESULTS.md#run-4--nvidia-tesla-t4-linux-google-colab)가 같은
+조건의 T4 실측 기록이다(콜드 61초 / 캐시 1.45초 — 당시 노트북은 모델을
+별도 셀에서 받는 이전 구성이라, 현재 셀 6은 다운로드가 합쳐진 만큼 조금
+더 걸린다).
 
 > ### ⚠️ 셀 6의 출력이 `BEST EFFORT`인 것은 정상이다
 >
