@@ -8,6 +8,25 @@
 이 문서의 모든 명령·출력·소요시간은 저장소의
 [`docs/RESULTS.md`](docs/RESULTS.md)에 이미 실측으로 기록된 값이거나, 이 문서를
 작성하면서 **직접 실행해 관찰한 값**이다. 각 수치의 출처는 그 자리에 명시했다.
+막히는 것이 있으면 `fituna help`가 언제나 한국어·영어 병기로 다음 할 일을
+알려준다.
+
+> **먼저 이것부터 — 실측 결과를 90초 안에 본다.** llama.cpp만 설치돼 있다면
+> (4-1절), 아래 두 줄이 전부다. HuggingFace에서 모델을 자동으로 받아 곧바로
+> 탐색한다 — README의 "1분 데모"와 동일한, v0.2.0 `--hf` 플래그다:
+>
+> ```bash
+> fituna fetch-corpus --lang en --out wiki.txt
+> fituna run --hf bartowski/SmolLM2-135M-Instruct-GGUF \
+>   --target-tps 240 --max-quality-loss 5 --ctx 2048 \
+>   --quality-corpus wiki.txt --out ./out --resume
+> ```
+>
+> 이 문서를 작성하며 직접 실행한 결과(2026-08-25, Apple M3 Pro, 콜드): 다운로드
+> 포함 **82.57초**만에 `FiTuna result: MEETS TARGET` — Q8_0 @ ngl=24, 247.23
+> tok/s, 손실 0.29% — 와 함께 `llama-server`/Ollama/`llama-cli` 세 가지 사용법이
+> 출력된다. 같은 명령을 그대로 한 번 더 실행하면 캐시에서 **1.10초**에 동일
+> 결과가 나온다(7장). 전체 출력·단계별 설명·대안 경로는 4장에 이어진다.
 
 ---
 
@@ -19,7 +38,7 @@ FiTuna는 로컬 LLM(llama.cpp)을 돌릴 때 **어떤 양자화 레벨(quant)�
 
 | | |
 |---|---|
-| **입력** | F16 GGUF 모델 파일, 목표 생성속도(tok/s), 허용 품질저하(%), 컨텍스트 길이, 품질 측정용 텍스트 코퍼스 |
+| **입력** | F16 GGUF 모델 파일(로컬 경로 또는 `--hf`로 HuggingFace 저장소 지정), 목표 생성속도(tok/s), 허용 품질저하(%), 컨텍스트 길이, 품질 측정용 텍스트 코퍼스 |
 | **처리** | llama.cpp 바이너리(`llama-quantize` → `llama-perplexity` → `llama-bench`)를 직접 호출해 후보를 **실제로 양자화하고, 실제로 perplexity를 재고, 실제로 벤치마크**한다 |
 | **출력** | 목표를 만족하는 가장 작은 구성(quant × `-ngl` × ctx) + 실측 tok/s + 실측 품질손실 + **이미 만들어진 gguf 산출물(artifact)** 과 그걸 바로 쓰는 세 가지 방법 — 로컬 API 서버(`llama-server`) / Ollama(`--export-ollama`) / 대화형 확인용 `llama-cli` 커맨드 |
 
@@ -32,11 +51,26 @@ Ollama / 대화형 `llama-cli`) — 을 출력하면 정상 동작이다. **종�
 버그가 아니다.** 이 구분은 5장에서 자세히 설명한다 — 검증 전에 5장을 먼저
 읽어도 좋다.
 
-> **버전 참고.** 이 문서의 4-6·5-2에 있는 2026-07-30 실행 기록(타임스탬프가 찍힌
-> 전체 출력)은 결과 블록이 `run command:` 한 줄로 끝나던 0.2 이전 형식을 그대로
-> 보존한 **실측 기록**이며, 재현 여부 판정을 위해 손대지 않는다. 현재 버전은 그
-> 자리를 산출물(artifact) 블록 + 세 가지 사용법으로 대체했다 — 각 절 아래에 현재
-> 버전으로 재현한 실제 출력을 별도 박스로 덧붙였다.
+**심사 관점별로 바로 갈 곳.** 무엇을 검증하고 싶은지에 따라 아래 표에서 바로
+찾아가도 된다 — 순서대로 읽지 않아도 된다.
+
+| 확인하고 싶은 것 | 보면 되는 곳 |
+|---|---|
+| 정말 설치·실행이 되는가 (설치 → 실행 → 결과) | 4장, 또는 위 "먼저 이것부터" |
+| 목표 미달일 때 수치를 지어내지 않고 정직하게 보고하는가 | 5-2절 (종료 코드 3, best-effort) |
+| 크래시·traceback을 사용자에게 그대로 노출하지 않는가 | 5-3절 |
+| 다른 하드웨어(NVIDIA/Linux)에서도 동작하는가 | 3장 (경로 A, Tesla T4, 브라우저만) |
+| 재실행 시 캐시가 실제로 재계산을 건너뛰는가 | 7장 |
+| 테스트가 실제로 통과하는가 | 5-4절 (`pytest` 256개, 직접 실행 가능) |
+| AI 에이전트 연동(MCP)이 실제로 응답하는가 | 4-8절 |
+| 알려진 한계를 숨기지 않고 고지하는가 | 6장, README "범위와 한계" |
+
+> **버전 참고.** 이 문서의 본문 명령은 2026-08-25에 PyPI 0.2.0을 새 가상환경에
+> 설치해 `--hf`(HuggingFace 자동 다운로드, v0.2.0 신규 기능)로 재검증했다. 이미
+> 받아 둔 GGUF 파일로 재현하는 예전 방식(`--model` + 수동 `curl`)과 그 경로로
+> 측정된 2026-07-30 실행 기록(결과 블록이 `run command:` 한 줄로 끝나던 0.2
+> 이전 형식 포함) — 은 각 절 아래 접이식 상자에 **손대지 않고 그대로** 남겨
+> 뒀다. 어느 경로로 재현하든 결과는 동일하다.
 
 ---
 
@@ -46,12 +80,12 @@ Ollama / 대화형 `llama-cli`) — 을 출력하면 정상 동작이다. **종�
 |---|---|---|
 | 필요한 것 | 웹 브라우저 + 구글 계정 | macOS 또는 Linux, Python 3.11+, 그리고 llama.cpp 설치 수단 — Homebrew(`brew install llama.cpp`) 또는 소스 빌드용 `git` + `cmake`(4-1 참고) |
 | 설치 | 없음 (Colab 무료 T4 GPU 사용) | llama.cpp + FiTuna 설치 필요 |
-| 소요 시간 | 약 20~30분 (대부분 llama.cpp CUDA 빌드) | 약 3분 (llama.cpp 설치 시간 제외) |
+| 소요 시간 | 약 20~30분 (대부분 llama.cpp CUDA 빌드) | 약 2분 (llama.cpp 설치 시간 제외) |
 | 검증 대상 하드웨어 | NVIDIA Tesla T4 / Linux / CUDA | 검증자의 실제 기기 |
 
-경로 B의 "약 3분"은 4장의 실측 단계(코퍼스 내려받기 4-4 + 모델 내려받기 4-5 +
-탐색 실행 4-6 + 재현 확인 4-7)를 합산한 값이다. 설치(4-2)·점검(4-3)은 수 초 내로
-끝나 반올림에 흡수된다.
+경로 B의 "약 2분"은 4장의 실측 단계(코퍼스 내려받기 4-4 + 탐색 실행
+4-6 — 모델 다운로드 포함 + 재현 확인 4-7)를 합산한 값이다. 설치(4-2)·점검(4-3)은
+수 초 내로 끝나 반올림에 흡수된다.
 
 설치를 전혀 하지 않고 확인하려면 **경로 A**, 로컬에 llama.cpp를 설치할 수 있는
 환경이면 **경로 B**가 더 빠르다. 둘 중 하나만 수행해도 기능 확인에는 충분하다.
@@ -77,6 +111,10 @@ Ollama / 대화형 `llama-cli`) — 을 출력하면 정상 동작이다. **종�
 | 5 | 데모 모델(SmolLM2-135M F16, Apache 2.0) + 코퍼스 준비 | `model + corpus ready` | 1~2분 |
 | 6 | **측정 탐색 본체** (`fituna run`) | 아래 설명 참고 — T4에서는 `BEST EFFORT` | 약 61초 |
 | 7 | 동일 명령 재실행(`--resume`) | 6번과 **동일한** 결과 블록 | 약 1.45초 |
+
+셀 3에서 매번 최신 PyPI 배포본을 `pip install`하므로, 이 노트북의 실제 출력은
+언제 실행하든 그 시점의 published 버전을 그대로 보여준다 — 아래 4장의 로컬
+재현과 달리 이 절은 "예전 형식으로 고정된 기록"을 갖지 않는다.
 
 셀 6·7의 수치(61초 / 1.45초)와 결과는 `docs/RESULTS.md`의
 [Run 4](docs/RESULTS.md#run-4--nvidia-tesla-t4-linux-google-colab)에 실측으로
@@ -174,6 +212,8 @@ pip install -e fituna
 - 가상환경을 활성화한 채로는 `fituna` 명령이 곧바로 PATH에 잡힌다. 활성화를
   깜빡했거나 `--user`로 전역 설치해 `fituna: command not found`가 나오면,
   **`python3.13 -m fituna` 로 완전히 동일하게 사용할 수 있다**(6장 참고).
+- 막히는 지점이 있으면 어느 단계에서든 `fituna help` (또는
+  `fituna help <명령>`)가 한국어·영어를 함께 보여 준다.
 
 ### 4-3. 환경 점검 — `fituna doctor`
 
@@ -209,37 +249,140 @@ FiTuna doctor
 없다.**
 
 ```bash
-fituna fetch-corpus --lang en --out wikitext-2-raw-test.txt
+fituna fetch-corpus --lang en --out wiki.txt
 ```
 
-실제 출력 (직접 실행, 종료 코드 0, 결과 파일 316,241 바이트):
+실제 출력 (직접 실행, 종료 코드 0):
 
 ```
-2026-07-30 03:08:17,471 INFO fituna: fetched 100/1000 rows
-... (100행 단위 진행 로그, 이 문서에서는 중간 생략)
-2026-07-30 03:08:47,972 INFO fituna: fetched 1000/1000 rows
-Wrote 1000 rows to wikitext-2-raw-test.txt
+... (100행 단위 진행 로그, 이 문서에서는 앞부분 생략)
+2026-08-25 03:15:20,263 INFO fituna: fetched 800/1000 rows
+2026-08-25 03:15:20,648 INFO fituna: fetched 900/1000 rows
+2026-08-25 03:15:21,023 INFO fituna: fetched 1000/1000 rows
+Wrote 1000 rows to wiki.txt
 Corpus: Salesforce/wikitext (wikitext-2-raw-v1, test split). License: CC BY-SA 3.0 (also dual-licensed GFDL) -- attribution and share-alike apply. Source: https://huggingface.co/datasets/Salesforce/wikitext
 ```
 
-최초 실행은 위처럼 38초 걸렸으나, 곧바로 재실행하면 4~5초로 끝난다(직접
-재확인: 결과 파일은 동일하게 316,241 바이트). **네트워크·HuggingFace API 상태에
-따라 다름** — 4-5절과 같은 사정이다.
+직접 실행: 약 4.6초. **네트워크·HuggingFace API 상태에 따라 다름** — 이전
+측정(2026-07-30)에서는 최초 실행 38초, 재실행 4~5초였다(캐시 없이 매번
+새로 받는 구조라 소요시간은 그때그때의 네트워크 상태를 반영한다).
 
 한국어 코퍼스가 필요하면 `fituna fetch-corpus --lang ko --out kowiki-corpus.txt
 --rows 500` (직접 실행: 약 5초, 5.9 MB).
 
-### 4-5. 데모 모델 내려받기 (SmolLM2-135M-Instruct, Apache 2.0, 258 MB)
+### 4-5. 모델 준비 — `--hf`가 있으면 이 단계가 필요 없다
+
+FiTuna는 로컬 GGUF 파일(`--model`)뿐 아니라, HuggingFace 저장소를 바로 받아
+탐색하는 `--hf repo[:filename]`을 지원한다(v0.2.0). `--hf`를 쓰면 모델을 따로
+받아 둘 필요 없이 다음 절의 `fituna run` 한 줄로 다운로드부터 탐색까지 끝난다 —
+license가 자동으로 출력되고, 파일은 `--out`에 저장돼 이후 재실행에서 재사용된다.
+
+<details>
+<summary><b>다른 방법 — 이미 받아 둔 GGUF 파일로 재현 (<code>--model</code>, 2026-07-30 실측 기록)</b></summary>
+
+오프라인이거나, 정확히 어떤 파일이 쓰이는지 다운로드 시점에 직접 확인하고
+싶다면 이 방법도 동일하게 동작한다:
 
 ```bash
 curl -L -o SmolLM2-135M-Instruct-f16.gguf \
   https://huggingface.co/bartowski/SmolLM2-135M-Instruct-GGUF/resolve/main/SmolLM2-135M-Instruct-f16.gguf
 ```
 
-직접 실행 결과: 258 MB(270,885,952 바이트), 약 41초(네트워크 속도에 따라 다름).
-135M 파라미터 모델이라 전체 탐색이 1~2분 안에 끝나므로 검증용으로 적합하다.
+직접 실행 결과(2026-07-30): 258 MB(270,885,952 바이트), 약 41초(네트워크
+속도에 따라 다름). 135M 파라미터 모델이라 전체 탐색이 1~2분 안에 끝나므로
+검증용으로 적합하다. 이 파일로 4-6을 재현하려면 아래 4-6의 접이식 상자
+("이전 실측 기록")에 있는 `--model` 명령을 그대로 쓰면 된다.
+
+</details>
 
 ### 4-6. 탐색 실행 — `fituna run`
+
+```bash
+fituna run --hf bartowski/SmolLM2-135M-Instruct-GGUF \
+  --target-tps 240 --max-quality-loss 5 --ctx 2048 \
+  --quality-corpus wiki.txt --out ./out --resume
+```
+
+직접 실행한 전체 출력 (2026-08-25, 콜드 캐시, **82.57초**, 종료 코드 **0**):
+
+```
+2026-08-25 03:22:26,473 INFO fituna: computing baseline perplexity on base GGUF
+2026-08-25 03:22:28,563 INFO fituna: [Q8_0] quantizing
+2026-08-25 03:22:28,951 INFO fituna: [Q8_0] evaluating quality
+2026-08-25 03:22:30,858 INFO fituna: [Q6_K] quantizing
+2026-08-25 03:22:31,328 INFO fituna: [Q6_K] evaluating quality
+2026-08-25 03:22:33,278 INFO fituna: [Q5_K_M] quantizing
+2026-08-25 03:22:33,762 INFO fituna: [Q5_K_M] evaluating quality
+2026-08-25 03:22:35,768 INFO fituna: [Q4_K_M] quantizing
+2026-08-25 03:22:36,352 INFO fituna: [Q4_K_M] evaluating quality
+2026-08-25 03:22:38,394 INFO fituna: [Q3_K_M] quantizing
+2026-08-25 03:22:38,915 INFO fituna: [Q3_K_M] evaluating quality
+2026-08-25 03:22:40,855 INFO fituna: [Q3_K_M] quality loss 19.54% > 5.00% cap, skipping (early-exit A)
+2026-08-25 03:22:40,855 INFO fituna: [Q2_K] quantizing
+2026-08-25 03:22:41,219 INFO fituna: [Q2_K] evaluating quality
+2026-08-25 03:22:43,169 INFO fituna: [Q2_K] quality loss 38.34% > 5.00% cap, skipping (early-exit A)
+2026-08-25 03:22:43,169 INFO fituna: [Q8_0] bench full-offload (ngl=30)
+2026-08-25 03:23:23,632 INFO fituna: [Q8_0] found ngl=24 meeting target -- done
+license: apache-2.0 (weights published by bartowski/SmolLM2-135M-Instruct-GGUF; their terms, not FiTuna's)
+downloading https://huggingface.co/bartowski/SmolLM2-135M-Instruct-GGUF/resolve/main/SmolLM2-135M-Instruct-f16.gguf
+    0% (1.0 MB / 270.9 MB)
+    ...(진행률 로그, 이 문서에서는 중간 생략)...
+  100% (270.9 MB / 270.9 MB)
+FiTuna result: MEETS TARGET
+
+  quant           : Q8_0
+  ngl             : 24
+  ctx             : 2048
+
+  prompt tok/s (pp): 1702.06
+  gen tok/s    (tg): 247.23
+
+  perplexity      : 18.2931 (baseline 18.2407)
+  quality loss    : 0.29%
+
+  artifact: out/SmolLM2-135M-Instruct-14784d04f46c-Q8_0.gguf  (144.8 MB -- already produced during the search)
+
+  1) local API server (OpenAI-compatible):
+       /opt/homebrew/bin/llama-server -m out/SmolLM2-135M-Instruct-14784d04f46c-Q8_0.gguf -ngl 24 -c 2048 --port 8080
+  2) import into Ollama: re-run with --export-ollama to write a Modelfile beside the artifact
+  3) terminal chat (interactive check):
+       /opt/homebrew/bin/llama-cli -m out/SmolLM2-135M-Instruct-14784d04f46c-Q8_0.gguf -ngl 24 -c 2048
+```
+
+읽는 법:
+
+- `computing baseline perplexity` → 후보별 `quantizing` / `evaluating quality`:
+  1단계(품질 실측). 모든 후보의 품질을 먼저 잰다. `license:`와 `downloading`
+  줄은 로그(stderr)와는 별도로 표준출력(stdout)에 찍히므로, 터미널을 파이프로
+  넘기지 않는 한 다운로드 진행률이 위 로그와 실시간으로 섞여 보인다 — 위
+  인용문은 파이프로 캡처하며 표준출력이 뒤늦게 flush된 결과라 순서가 바뀌어
+  보일 뿐, 실제 터미널에서는 다운로드가 먼저 진행된다.
+- `bench full-offload` → `found ngl=24 meeting target -- done`: 2단계(속도 탐색).
+  품질이 좋은 순서로 벤치하고, 목표를 만족하면 **즉시 멈춘다**(조기종료). 이때
+  `-ngl`은 전량 오프로드(30)가 아니라 **목표를 만족하는 최소값(24)**을 이진
+  탐색으로 찾은 결과다.
+- **`--resume`은 첫 실행에도 붙여야 한다.** `--resume`이 있어야 이번 결과가
+  캐시에 저장되고, 다음 실행(4-7)이 그 캐시를 읽는다 — 빠뜨리면 재실행도
+  처음부터 다시 계산한다(7장에서 캐시 키 구조를 설명한다).
+- 작업 디렉토리 `./out`에 양자화된 GGUF 6개(전체 quant 후보)와 원본 F16
+  (270.9 MB)이 함께 생성된다. 이번 실행 기준 `./out` 전체 합계는 **924 MB**
+  (직접 측정, `du -sh`).
+
+> **주의 — 승자 quant와 절대 수치는 기기·세션마다 다르다.** 위 실행에서는
+> Q8_0이 247.23 tok/s로 목표를 통과했지만, 같은 기기에서 이전에 측정된 기록
+> (`docs/RESULTS.md` Run 1)에서는 Q8_0이 205.91 tok/s로 미달이고 Q6_K(249.50
+> tok/s)가 승자였다. 벤치마크 수치는 발열·부하 상태에 민감하기 때문이며, 이
+> 편차는 프로젝트가 숨기지 않고
+> [런간 편차 절](docs/RESULTS.md#run-to-run-variance-measured-not-hidden)에
+> 실측과 함께 문서화해 두었다. **판정 기준은 절대값 일치가 아니라 로그의
+> 형태**다(8장).
+
+<details>
+<summary><b>이전 실측 기록 (2026-07-30, <code>--model</code> 방식) — 손대지 않은 원본</b></summary>
+
+4-5의 접이식 상자에서 `curl`로 받은 파일을 그대로 쓰는 명령과, 그 시점의 실제
+출력이다. `--hf` 도입 이전 결과이며, 결과 블록이 `run command:` 한 줄로 끝나는
+0.2 이전 형식을 그대로 보존한다.
 
 ```bash
 fituna run --model SmolLM2-135M-Instruct-f16.gguf \
@@ -279,72 +422,46 @@ FiTuna result: MEETS TARGET
     /opt/homebrew/bin/llama-cli -m out/SmolLM2-135M-Instruct-83beb8b331ac-Q8_0.gguf -ngl 28 -c 4096
 ```
 
-읽는 법:
+현재 버전(0.2+)은 마지막 `run command:` 한 줄 대신 산출물(artifact) 블록 + 세
+가지 사용법을 출력한다 — 위 본문 4-6의 출력이 바로 그 현재 형태이며, 같은
+측정값(quant/tok-s/perplexity)을 현재 코드의 `to_human()`에 그대로 통과시켜도
+같은 모양이 나오는 것을 이 문서 작성 중 별도로 확인했다.
 
-- `computing baseline perplexity` → 후보별 `quantizing` / `evaluating quality`:
-  1단계(품질 실측). 모든 후보의 품질을 먼저 잰다.
-- `bench full-offload` → `found ngl=28 meeting target -- done`: 2단계(속도 탐색).
-  품질이 좋은 순서로 벤치하고, 목표를 만족하면 **즉시 멈춘다**(조기종료). 이때
-  `-ngl`은 전량 오프로드(30)가 아니라 **목표를 만족하는 최소값(28)**을 이진
-  탐색으로 찾은 결과다.
-- 위 기록에서 마지막 `run command:` 줄은 그대로 복사해 실행할 수 있었다(0.2
-  이전 형식). **현재 버전은 이 자리를 산출물(artifact) 블록 + 세 가지 사용법으로
-  대체했다** — 아래 참고 박스가 같은 측정값을 현재 버전으로 재현한 실제 출력이다.
-  `llama-cli` 커맨드는 여전히 나오지만 옵션 3) "대화형 확인용"으로 격하되었고,
-  프롬프트 플래그가 없어 대화형 입력을 기다리므로 스크립트로 비대화형 실행할
-  때는 `-p "..." -n 64 -no-cnv` 같은 플래그를 덧붙여야 stdin에서 멈추지 않는다.
-- 작업 디렉토리 `./out`에 양자화된 GGUF 4개가 생성된다(직접 측정: 합계 478 MB).
-
-> **현재 버전(0.2+) 출력 형태 — 위와 같은 측정값을, 현재 코드의 `to_human()`을
-> 직접 호출해(고정된 `SearchResult`를 넘겨) 재현한 실제 출력.** `fituna run`을
-> 새로 돌리지 않고 이미 확보된 실측값(quant/tok/s/perplexity)을 그대로 현재
-> 렌더러에 통과시킨 것이므로, 벤치마크 숫자 자체는 위 4-6 기록과 동일하고
-> **블록의 형태만** 현재 버전 것이다:
->
-> ```
-> FiTuna result: MEETS TARGET
->
->   quant           : Q8_0
->   ngl             : 28
->   ctx             : 4096
->
->   prompt tok/s (pp): 1669.37
->   gen tok/s    (tg): 257.62
->
->   perplexity      : 18.2931 (baseline 18.2407)
->   quality loss    : 0.29%
->
->   artifact: out/SmolLM2-135M-Instruct-83beb8b331ac-Q8_0.gguf  (145.0 MB -- already produced during the search)
->
->   1) local API server (OpenAI-compatible):
->        /opt/homebrew/bin/llama-server -m out/SmolLM2-135M-Instruct-83beb8b331ac-Q8_0.gguf -ngl 28 -c 4096 --port 8080
->   2) import into Ollama: re-run with --export-ollama to write a Modelfile beside the artifact
->   3) terminal chat (interactive check):
->        /opt/homebrew/bin/llama-cli -m out/SmolLM2-135M-Instruct-83beb8b331ac-Q8_0.gguf -ngl 28 -c 4096
-> ```
->
-> `--export-ollama`를 추가하면 2)가 `ollama create <name> -f out/Modelfile`로
-> 바뀌고, `out/Modelfile`이 실제로 쓰인다(내용: `FROM ./<gguf 파일명>` +
-> `PARAMETER num_gpu <ngl>` + `PARAMETER num_ctx <ctx>` 세 줄 — 직접 실행해 확인,
-> `docs/DEMO_SCRIPT.md` 참고).
-
-> **주의 — 승자 quant와 절대 수치는 기기·세션마다 다르다.** 위 실행에서는
-> Q8_0이 257.62 tok/s로 목표를 통과했지만, 같은 기기에서 이전에 측정된 기록
-> (`docs/RESULTS.md` Run 1)에서는 Q8_0이 205.91 tok/s로 미달이고 Q6_K(249.50
-> tok/s)가 승자였다. 벤치마크 수치는 발열·부하 상태에 민감하기 때문이며, 이
-> 편차는 프로젝트가 숨기지 않고
-> [런간 편차 절](docs/RESULTS.md#run-to-run-variance-measured-not-hidden)에
-> 실측과 함께 문서화해 두었다. **판정 기준은 절대값 일치가 아니라 로그의
-> 형태**다(8장).
+</details>
 
 ### 4-7. 재현성 확인 — 같은 명령 한 번 더
 
 4-6과 **완전히 같은 명령**을 그대로 다시 실행한다.
 
-직접 실행 결과: **0.64초**, 결과 블록은 4-6과 완전히 동일, 종료 코드 0.
-`quantizing` / `bench` 로그가 같은 타임스탬프에 한꺼번에 찍히는데, 실제로 다시
-계산한 것이 아니라 `./out/.fituna_cache.sqlite3` 캐시에서 즉시 읽어 온 것이다
-(7장).
+직접 실행 결과(2026-08-25): **1.10초**, 결과 블록은 4-6과 완전히 동일, 종료
+코드 0. `quantizing` / `bench` 로그가 같은 타임스탬프에 한꺼번에 찍히는데,
+실제로 다시 계산한 것이 아니라 `./out/.fituna_cache.sqlite3` 캐시에서 즉시
+읽어 온 것이다(7장). `--model` 방식의 과거 기록(0.64초, 2026-07-30)도 같은
+자릿수이며 `docs/RESULTS.md` Run 1(0.75초)·Run 2(0.88초)와도 일관된다.
+
+### 4-8. (선택) MCP 서버 확인 — AI 에이전트 연동
+
+README가 강조하는 또 다른 표면인 `fituna-mcp`도 표준 라이브러리만으로 구현된
+JSON-RPC 2.0/stdio 서버라 별도 설치 없이 바로 왕복 확인이 가능하다:
+
+```bash
+printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}\n{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"fituna_detect_hardware","arguments":{}}}\n' \
+  | fituna-mcp
+```
+
+직접 실행 결과(2026-08-25, 두 줄):
+
+```
+{"jsonrpc": "2.0", "id": 1, "result": {"protocolVersion": "2024-11-05", "capabilities": {"tools": {}}, "serverInfo": {"name": "fituna", "version": "0.2.0"}}}
+{"jsonrpc": "2.0", "id": 2, "result": {"content": [{"type": "text", "text": "{\"gpu_vendor\": \"apple\", \"gpu_name\": \"Apple M3 Pro\", \"vram_mb\": 18432, \"cpu_cores\": 11, \"ram_mb\": 18432, \"os_name\": \"darwin\"}"}]}}
+```
+
+`serverInfo.version`이 설치한 FiTuna 버전과 일치하는지, `fituna_detect_hardware`
+결과가 4-3의 `doctor` 출력과 같은 하드웨어를 가리키는지가 확인 포인트다.
+`fituna_recommend` 도구는 같은 형태로 4-6과 동일한 탐색을 수행해 추천을
+JSON으로 반환한다 — 실제 AI 에이전트가 이 서버를 붙이는 방법은
+[README "MCP 서버"](README.md#mcp-서버--ai-에이전트에게-추측이-아닌-실측-답변을)를
+참고한다.
 
 ---
 
@@ -386,7 +503,95 @@ argparse가 처리하며 stderr 첫 줄이 항상 `usage: ...`로 시작한다. 
 
 이 상황은 목표치를 비현실적으로 높게 주면 언제든 재현할 수 있다. 아래는 이
 문서를 작성하면서 **직접 실행한 실제 출력**이다(4-6과 같은 모델·같은 코퍼스,
-목표만 5000 tok/s로 변경).
+목표만 5000 tok/s로 변경, `--export-ollama`도 함께 켜서 Ollama 연동까지 한 번에
+확인한다):
+
+```bash
+fituna run --hf bartowski/SmolLM2-135M-Instruct-GGUF \
+  --target-tps 5000 --max-quality-loss 5 --ctx 2048 \
+  --quality-corpus wiki.txt --out ./out --resume --export-ollama
+echo $?
+```
+
+```
+2026-08-25 03:19:05,686 INFO fituna: [Q8_0] quantizing
+2026-08-25 03:19:05,686 INFO fituna: [Q6_K] quantizing
+2026-08-25 03:19:05,686 INFO fituna: [Q5_K_M] quantizing
+2026-08-25 03:19:05,686 INFO fituna: [Q4_K_M] quantizing
+2026-08-25 03:19:05,686 INFO fituna: [Q3_K_M] quantizing
+2026-08-25 03:19:05,686 INFO fituna: [Q3_K_M] quality loss 19.54% > 5.00% cap, skipping (early-exit A)
+2026-08-25 03:19:05,686 INFO fituna: [Q2_K] quantizing
+2026-08-25 03:19:05,686 INFO fituna: [Q2_K] quality loss 38.34% > 5.00% cap, skipping (early-exit A)
+2026-08-25 03:19:05,686 INFO fituna: [Q8_0] bench full-offload (ngl=30)
+2026-08-25 03:19:05,686 INFO fituna: [Q8_0] full-offload 335.99 tok/s < target 5000.00, skipping (early-exit B)
+2026-08-25 03:19:08,590 INFO fituna: [Q6_K] bench full-offload (ngl=30)
+2026-08-25 03:19:11,458 INFO fituna: [Q6_K] full-offload 330.75 tok/s < target 5000.00, skipping (early-exit B)
+2026-08-25 03:19:11,458 INFO fituna: [Q5_K_M] bench full-offload (ngl=30)
+2026-08-25 03:19:14,293 INFO fituna: [Q5_K_M] full-offload 328.19 tok/s < target 5000.00, skipping (early-exit B)
+2026-08-25 03:19:14,293 INFO fituna: [Q4_K_M] bench full-offload (ngl=30)
+2026-08-25 03:19:14,293 INFO fituna: [Q4_K_M] full-offload 333.84 tok/s < target 5000.00, skipping (early-exit B)
+2026-08-25 03:19:14,293 INFO fituna: no candidate met target after exhausting all quant candidates
+2026-08-25 03:19:14,293 ERROR fituna: no quant/ngl/ctx combination met target_tokens_per_sec within max_quality_loss_pct
+2026-08-25 03:19:14,293 INFO fituna: closest best-effort attempt:
+FiTuna result: BEST EFFORT (target not met)
+
+  quant           : Q8_0
+  ngl             : 30
+  ctx             : 2048
+
+  prompt tok/s (pp): 5497.56
+  gen tok/s    (tg): 335.99
+
+  perplexity      : 18.2931 (baseline 18.2407)
+  quality loss    : 0.29%
+
+  artifact: out/SmolLM2-135M-Instruct-b76f0d9ed1fe-Q8_0.gguf  (144.8 MB -- already produced during the search)
+
+  1) local API server (OpenAI-compatible):
+       /opt/homebrew/bin/llama-server -m out/SmolLM2-135M-Instruct-b76f0d9ed1fe-Q8_0.gguf -ngl 30 -c 2048 --port 8080
+  2) import into Ollama:
+       ollama create <name> -f out/Modelfile
+  3) terminal chat (interactive check):
+       /opt/homebrew/bin/llama-cli -m out/SmolLM2-135M-Instruct-b76f0d9ed1fe-Q8_0.gguf -ngl 30 -c 2048
+```
+
+`echo $?`의 출력:
+
+```
+3
+```
+
+`out/Modelfile`도 실제로 쓰여 있다(직접 확인):
+
+```
+FROM ./SmolLM2-135M-Instruct-b76f0d9ed1fe-Q8_0.gguf
+PARAMETER num_gpu 30
+PARAMETER num_ctx 2048
+```
+
+주목할 점 — `2)`가 "재실행하라"는 안내가 아니라 실제 `ollama create` 명령이다.
+`--export-ollama`를 준 사용자는 목표를 달성하지 못한 경우에도(종료 코드 3)
+`out/Modelfile`을 실제로 받는다.
+
+> **주의 — 여기서도 승자 quant와 절대 수치는 기기·세션마다 다르다.** 위
+> 출력은 Q8_0을 최선으로 보고하지만, 이는 고정된 기대 출력이 아니라 이
+> 세션에서 관측된 값이다. 목표 미달일 때 어느 후보가 "가장 근접"으로 뽑히는지는
+> 4-6과 똑같이 발열·부하에 민감한 벤치 수치로 결정되므로, 다른 기기·다른
+> 세션에서는 다른 quant와 다른 품질손실이 나올 수 있다. 4-6의 주의사항이 그대로 적용된다 —
+> **판정 기준은 절대값 일치가 아니라, 종료 코드 3과 함께 완결된 best-effort
+> 결과 블록이 나오는가**이다.
+
+`ERROR` 로그가 한 줄 찍히지만, 그 뒤에 **`closest best-effort attempt:`와 완결된
+결과 블록, 실행 가능한 커맨드가 정상적으로 출력**된다. 즉 사용자는 빈손으로
+끝나지 않는다. 위 실행은 8.6초가 걸렸다(4-6에서 만든 캐시를 재사용한 상태).
+
+`docs/RESULTS.md`의 [Run 4](docs/RESULTS.md#run-4--nvidia-tesla-t4-linux-google-colab)
+(NVIDIA Tesla T4)도 실제 종료 코드 3 사례이며, 대회 제출 문서에 **정상 실측
+결과**로 기재되어 있다. 경로 A(Colab)를 따라가면 셀 6에서 이 상황을 그대로 보게
+된다.
+
+<details>
+<summary><b>이전 실측 기록 (2026-07-30, <code>--model</code> 방식, <code>--export-ollama</code> 미사용)</b></summary>
 
 ```bash
 fituna run --model SmolLM2-135M-Instruct-f16.gguf \
@@ -403,11 +608,11 @@ echo $?
 2026-07-30 03:11:49,743 INFO fituna: [Q4_K_M] quantizing
 2026-07-30 03:11:49,743 INFO fituna: [Q8_0] bench full-offload (ngl=30)
 2026-07-30 03:11:49,743 INFO fituna: [Q8_0] full-offload 298.59 tok/s < target 5000.00, skipping (early-exit B)
-2026-07-30 03:11:49,743 INFO fituna: [Q6_K] bench full-offload (ngl=30)
-2026-07-30 03:11:53,407 INFO fituna: [Q6_K] full-offload 296.04 tok/s < target 5000.00, skipping (early-exit B)
-2026-07-30 03:11:53,407 INFO fituna: [Q5_K_M] bench full-offload (ngl=30)
-2026-07-30 03:11:57,161 INFO fituna: [Q5_K_M] full-offload 288.35 tok/s < target 5000.00, skipping (early-exit B)
-2026-07-30 03:11:57,161 INFO fituna: [Q4_K_M] bench full-offload (ngl=30)
+2026-07-30 03:11:53,407 INFO fituna: [Q6_K] bench full-offload (ngl=30)
+2026-07-30 03:11:57,161 INFO fituna: [Q6_K] full-offload 296.04 tok/s < target 5000.00, skipping (early-exit B)
+2026-07-30 03:11:57,161 INFO fituna: [Q5_K_M] bench full-offload (ngl=30)
+2026-07-30 03:12:00,852 INFO fituna: [Q5_K_M] full-offload 288.35 tok/s < target 5000.00, skipping (early-exit B)
+2026-07-30 03:12:00,852 INFO fituna: [Q4_K_M] bench full-offload (ngl=30)
 2026-07-30 03:12:00,852 INFO fituna: [Q4_K_M] full-offload 295.31 tok/s < target 5000.00, skipping (early-exit B)
 2026-07-30 03:12:00,852 INFO fituna: no candidate met target after exhausting all quant candidates
 2026-07-30 03:12:00,852 ERROR fituna: no quant/ngl/ctx combination met target_tokens_per_sec within max_quality_loss_pct
@@ -429,64 +634,11 @@ FiTuna result: BEST EFFORT (target not met)
     /opt/homebrew/bin/llama-cli -m out/SmolLM2-135M-Instruct-83beb8b331ac-Q8_0.gguf -ngl 30 -c 4096
 ```
 
-`echo $?`의 출력:
+종료 코드: `3`. 이때는 `--export-ollama`를 주지 않았고, 현재 버전과 달리
+"`--export-ollama`로 재실행하라"는 문구만 출력했다 — 본문에서 보듯 현재
+버전은 이 경로에서도 `out/Modelfile`을 실제로 쓴다(수정됨).
 
-```
-3
-```
-
-> **주의 — 여기서도 승자 quant와 절대 수치는 기기·세션마다 다르다.** 위
-> 출력은 Q8_0을 최선으로 보고하지만, 이는 고정된 기대 출력이 아니라 이
-> 세션에서 관측된 값이다. 목표 미달일 때 어느 후보가 "가장 근접"으로 뽑히는지는
-> 4-6과 똑같이 발열·부하에 민감한 벤치 수치로 결정되므로, 다른 기기·다른
-> 세션에서는 다른 quant와 다른 품질손실이 나올 수 있다. 4-6의 주의사항이 그대로 적용된다 —
-> **판정 기준은 절대값 일치가 아니라, 종료 코드 3과 함께 완결된 best-effort
-> 결과 블록이 나오는가**이다.
-
-`ERROR` 로그가 한 줄 찍히지만, 그 뒤에 **`closest best-effort attempt:`와 완결된
-결과 블록, 실행 가능한 커맨드가 정상적으로 출력**된다. 즉 사용자는 빈손으로
-끝나지 않는다. 위 실행은 11.7초가 걸렸다(4-6에서 만든 캐시를 재사용한 상태).
-
-`docs/RESULTS.md`의 [Run 4](docs/RESULTS.md#run-4--nvidia-tesla-t4-linux-google-colab)
-(NVIDIA Tesla T4)도 실제 종료 코드 3 사례이며, 대회 제출 문서에 **정상 실측
-결과**로 기재되어 있다. 경로 A(Colab)를 따라가면 셀 6에서 이 상황을 그대로 보게
-된다.
-
-> **현재 버전(0.2+) 출력 형태 — 목표 미달(종료 코드 3) + `--export-ollama` 동시
-> 사용.** 위 4-6 참고 박스와 같은 방식으로, 실측값을 고정한 `SearchResult`를
-> `NoFeasibleConfigError.closest`로 발생시켜 현재 코드의 `main()`을 그대로
-> 통과시킨 실제 출력이다(exit code 3):
->
-> ```
-> ERROR fituna: no quant/ngl/ctx combination met target_tokens_per_sec within max_quality_loss_pct
-> INFO fituna: closest best-effort attempt:
-> FiTuna result: BEST EFFORT (target not met)
->
->   quant           : Q6_K
->   ngl             : 30
->   ctx             : 4096
->
->   prompt tok/s (pp): 1580.20
->   gen tok/s    (tg): 205.50
->
->   perplexity      : 18.4438 (baseline 18.2407)
->   quality loss    : 0.83%
->
->   artifact: out/SmolLM2-135M-Instruct-83beb8b331ac-Q6_K.gguf  (110.0 MB -- already produced during the search)
->
->   1) local API server (OpenAI-compatible):
->        /opt/homebrew/bin/llama-server -m out/SmolLM2-135M-Instruct-83beb8b331ac-Q6_K.gguf -ngl 30 -c 4096 --port 8080
->   2) import into Ollama:
->        ollama create <name> -f out/Modelfile
->   3) terminal chat (interactive check):
->        /opt/homebrew/bin/llama-cli -m out/SmolLM2-135M-Instruct-83beb8b331ac-Q6_K.gguf -ngl 30 -c 4096
-> ```
->
-> 주목할 점: `2)`가 "재실행하라"는 안내가 아니라 실제 `ollama create` 명령이다.
-> `--export-ollama`를 준 사용자는 목표를 달성하지 못한 경우에도(종료 코드 3)
-> `out/Modelfile`을 실제로 받는다 — 이전 버전은 이 경로에서 Modelfile을 쓰지
-> 않고 "`--export-ollama`로 재실행하라"는, 이미 준 플래그를 다시 주라는 안내를
-> 출력했었다(수정됨).
+</details>
 
 ### 5-3. 오작동·크래시와 구분하는 방법
 
@@ -500,21 +652,20 @@ FiTuna result: BEST EFFORT (target not met)
 즉 **Python traceback이 화면에 노출되었는가**가 핵심 구분선이다. 파일 없음·
 네트워크 실패 같은 예상 가능한 실패는 traceback 없이 한 줄짜리 영문 설명
 메시지와 종료 코드 1로 처리된다(인자 오류는 이와 별개로 종료 코드 2이며 5-1절
-참고. 직접 확인:
-아래 명령은 그대로 붙여넣을 수 있고, 모델 파일이 없어도 즉시 끝난다 — 직접 실행:
+참고). 아래 명령은 그대로 붙여넣을 수 있고, 모델 파일이 없어도 즉시 끝난다 —
+직접 실행:
 
 ```bash
 fituna run --model nope.gguf \
   --target-tps 30 --max-quality-loss 5 --ctx 4096 \
-  --quality-corpus wikitext-2-raw-test.txt --out ./out
+  --quality-corpus wiki.txt --out ./out
 echo $?
 ```
 
 ```
-2026-07-30 12:19:44,866 ERROR fituna: nope.gguf is neither a .gguf file nor an HF-format model directory -- nothing to convert.
+2026-08-25 03:19:25,380 ERROR fituna: nope.gguf is neither a .gguf file nor an HF-format model directory -- nothing to convert.
 1
 ```
-
 
 ### 5-4. 모델·GPU 없이 할 수 있는 오프라인 점검
 
@@ -532,15 +683,15 @@ cd fituna
 python3.13 -m pytest -q
 ```
 
-직접 실행 결과: `256 passed in 2.92s` (이 문서 작성 시점 `main` 기준. 테스트가
+직접 실행 결과: `256 passed in 2.75s` (2026-08-25, `main` 기준. 테스트가
 추가되면 개수는 늘어난다 — 중요한 것은 **실패 0건**이다).
 
 > **`python3`가 아니라 `python3.13`인 이유.** macOS 기본 `python3`는 3.9.6이고,
 > FiTuna는 3.11 이상을 요구한다. 가상환경을 활성화했다면 `python3`도 3.13을
->가리키지만, 새 셸을 열었거나 `source`를 빠뜨리면 시스템 3.9.6이 잡혀
-> 테스트 1건이 실패한다(직접 재현: `/usr/bin/python3 -m pytest -q` →
-> `1 failed, 245 passed in 2.50s`). 인터프리터를 명시하면 이 함정 자체가
-> 사라진다.
+> 가리키지만, 새 셸을 열었거나 `source`를 빠뜨리면 시스템 3.9.6이 잡혀
+> 테스트가 실패한다(직접 재현: 시스템 `python3` — 3.9.6 — 로 실행하면
+> `test_doctor.py`의 python 버전 체크 하나가 FAIL로 갈리면서 `1 failed, 255
+> passed`가 된다). 인터프리터를 명시하면 이 함정 자체가 사라진다.
 
 모듈별 자체 점검도 개별 실행할 수 있다 (직접 실행, 모두 종료 코드 0, 각각
 `OK` 한 줄만 출력):
@@ -600,16 +751,18 @@ error: externally-managed-environment
 ### 종료 코드 2 — 원인 두 가지 (인자 오류 / llama.cpp 바이너리를 찾지 못함)
 
 **인자 오류.** 필수 플래그를 빼고 `fituna run`만 실행해 직접 재현한 실제
-출력이다. stderr 첫 줄이 `usage:`로 시작한다.
+출력이다(2026-08-25, v0.2.0 — `--model`과 `--hf`가 상호배타 그룹으로 묶여
+`usage:` 줄이 `(--model MODEL | --hf HF)`로 바뀌었다). stderr 첫 줄이
+`usage:`로 시작한다.
 
 ```
-usage: fituna run [-h] --model MODEL --target-tps TARGET_TPS
+usage: fituna run [-h] (--model MODEL | --hf HF) --target-tps TARGET_TPS
                   --max-quality-loss MAX_QUALITY_LOSS [--ctx CTX]
                   [--quant QUANT] [--gpu {none,nvidia,amd,apple}]
                   [--vram-mb VRAM_MB] [--llama-bin-dir LLAMA_BIN_DIR]
                   --quality-corpus WIKITEXT [--ppl-chunks PPL_CHUNKS]
                   [--out OUT] [--json] [--resume] [--export-ollama]
-fituna run: error: the following arguments are required: --model, --target-tps, --max-quality-loss, --quality-corpus/--wikitext
+fituna run: error: the following arguments are required: --target-tps, --max-quality-loss, --quality-corpus/--wikitext
 ```
 
 오타난 플래그(`fituna run ... --bogus-flag foo`)도 같은 종료 코드 2, 같은
@@ -636,7 +789,8 @@ Build llama.cpp (https://github.com/ggml-org/llama.cpp#building-the-project) and
 - 조치: 바이너리가 있는 디렉토리를 `--llama-bin-dir`로 넘긴다. 소스 빌드했다면
   보통 `llama.cpp/build/bin`이다.
 - 먼저 `fituna doctor --llama-bin-dir /path/to/bin`으로 확인하면 어떤 바이너리가
-  없는지 항목별로 알려 준다. 이때 doctor 자체도 종료 코드 2를 반환한다(직접 확인).
+  없는지 항목별로 `[FAIL]`/`[WARN]` 표에 정리해 알려 준다(이때 doctor 자체도
+  종료 코드 2를 반환한다 — 직접 확인).
 
 **구분법**: stderr 첫 줄이 `usage:`면 인자 오류, `ERROR fituna:`면 환경(바이너리)
 문제다.
@@ -653,7 +807,8 @@ Build llama.cpp (https://github.com/ggml-org/llama.cpp#building-the-project) and
 ### 디스크 부족
 
 - `fituna doctor`의 `disk-space` 항목이 20 GB 미만이면 `WARN`을 낸다.
-- 필요 용량 실측: SmolLM2-135M 4개 후보 = **478 MB**(이 문서 작성 중 직접 측정),
+- 필요 용량 실측: SmolLM2-135M 전체 6개 후보 + F16 원본 = **924 MB**(이 문서
+  작성 중 `--hf`로 직접 측정, `--quant`로 후보를 좁히면 그만큼 줄어든다),
   Qwen3-4B 4개 후보 = **12.1 GB**(`docs/RESULTS.md` Run 2).
 - 조치: `--quant`로 후보를 줄인다. 예: `--quant Q6_K,Q4_K_M`. 양자화된 파일은
   재실행 시 재사용되므로 반복 실행에서 추가로 늘지 않는다.
@@ -696,11 +851,17 @@ ERROR fituna: could not reach the HuggingFace dataset-viewer API: The read opera
 
 ## 7. 재현성 확인 방법
 
-**같은 명령을 `--resume`으로 다시 돌리면 1초 안에 동일한 결과가 나온다.**
+**같은 명령을 `--resume`으로 다시 돌리면 1초 안에 동일한 결과가 나온다 —
+단, `--resume`은 처음 실행할 때부터 붙여야 한다.** 캐시 객체 자체가
+`--resume`이 있을 때만 생성되므로(`fituna/cli.py`), 첫 실행에 `--resume`을
+빠뜨리면 그 실행은 캐시를 쓰지도 채우지도 않는다 — 이후 `--resume`을 붙여
+다시 돌려도 "처음 보는 요청"이라 전체를 다시 계산한다. 4장의 모든 명령이
+첫 실행부터 `--resume`을 포함하는 이유가 이것이다.
 
 | 환경 / 모델 | 재실행 시간 | 출처 |
 |---|---|---|
-| M3 Pro / SmolLM2-135M | **0.64초** | 이 문서 작성 중 직접 실행 |
+| M3 Pro / SmolLM2-135M (`--hf`) | **1.10초** | 이 문서 작성 중 직접 실행 (2026-08-25) |
+| M3 Pro / SmolLM2-135M (`--model`) | 0.64초 | 이 문서 작성 중 직접 실행 (2026-07-30) |
 | M3 Pro / SmolLM2-135M | 0.75초 | `docs/RESULTS.md` Run 1 |
 | M3 Pro / Qwen3-4B | 0.88초 | `docs/RESULTS.md` Run 2 |
 | Tesla T4 / SmolLM2-135M | 1.45초 | `docs/RESULTS.md` Run 4 |
@@ -713,7 +874,7 @@ ERROR fituna: could not reach the HuggingFace dataset-viewer API: The read opera
   **다른 llama.cpp 빌드나 다른 코퍼스에서 잰 수치가 재사용되는 일이 없다.**
 - 콜드 상태에서 다시 재현하려면 작업 디렉토리를 지운다: `rm -rf ./out`.
 - 출력 GGUF 파일명에 들어가는 12자리 문자열
-  (`SmolLM2-135M-Instruct-83beb8b331ac-Q8_0.gguf`의 `83beb8b331ac`)은 위 모델
+  (`SmolLM2-135M-Instruct-14784d04f46c-Q8_0.gguf`의 `14784d04f46c`)은 위 모델
   지문의 앞부분이며 파일 수정시각을 포함한다. **검증 기기에서 이 값이 이 문서와
   달라지는 것은 정상이다.**
 - 기계 판독용 출력이 필요하면 `--json`을 붙인다: `fituna doctor --json`,
@@ -740,26 +901,27 @@ ERROR fituna: could not reach the HuggingFace dataset-viewer API: The read opera
 
 **단, `--resume`으로 캐시가 적중한 재실행에서는 1번과 2번의
 `evaluating quality`가 아예 나타나지 않는다** — 품질은 이미 측정돼 캐시에
-있으므로 다시 재지 않는다(4-7·5-2가 그 경우다). 캐시 적중 실행에서 이 두 항목이
+있으므로 다시 재지 않는다(4-7이 그 경우다). 캐시 적중 실행에서 이 두 항목이
 없는 것은 누락이 아니라 `--resume`이 동작한 증거다.
 
 ### 실측 기준값
 
 | 환경 | 명령 | 결과 | 콜드 탐색 | 출처 |
 |---|---|---|---|---|
-| Apple M3 Pro | SmolLM2-135M, 목표 240 tok/s | Q6_K, `ngl=30`, 249.50 tok/s, 손실 0.53% (코드 0) | 75.7초 | `docs/RESULTS.md` Run 1 |
+| Apple M3 Pro | SmolLM2-135M (`--hf`), 목표 240 tok/s | Q8_0, `ngl=24`, 247.23 tok/s, 손실 0.29% (코드 0) | 82.57초 | 이 문서 작성 중 직접 실행 (2026-08-25) |
+| Apple M3 Pro | SmolLM2-135M (`--model`), 목표 240 tok/s | Q6_K, `ngl=30`, 249.50 tok/s, 손실 0.53% (코드 0) | 75.7초 | `docs/RESULTS.md` Run 1 |
 | Apple M3 Pro | 위와 동일 명령 (2026-07-30 재실행) | Q8_0, `ngl=28`, 257.62 tok/s, 손실 0.29% (코드 0) | 82.8초 | 이 문서 작성 중 직접 실행 |
 | Apple M3 Pro | Qwen3-4B, 목표 30 tok/s | Q4_K_M, `ngl=33`, 30.81 tok/s, 손실 1.73% (코드 0) | 품질 5분 01초 + 속도 12분 53초 | `docs/RESULTS.md` Run 2 |
 | NVIDIA Tesla T4 (Colab) | SmolLM2-135M, 목표 240 tok/s | **BEST EFFORT** Q6_K 205.50 tok/s, 손실 0.83% (**코드 3**) | 61초 | `docs/RESULTS.md` Run 4 |
 
-위 표의 1행과 2행은 **같은 기기에서 같은 명령을 다른 시점에 돌린 결과인데 승자
-quant가 다르다.** 벤치마크 수치가 발열·부하 상태에 민감하기 때문이며, 이는 숨겨진
-결함이 아니라 측정 도구의 본질적 성질로서
+위 표의 1~3행은 **같은 기기에서 사실상 같은 조건을 다른 시점에 돌린 결과인데
+승자 quant나 절대 수치가 조금씩 다르다.** 벤치마크 수치가 발열·부하 상태에
+민감하기 때문이며, 이는 숨겨진 결함이 아니라 측정 도구의 본질적 성질로서
 [런간 편차 절](docs/RESULTS.md#run-to-run-variance-measured-not-hidden)에 실측
 데이터와 함께 문서화되어 있다. 목표치와 몇 tok/s 이내로 근접한 판정은 marginal로
 보고 기기가 평상 온도일 때 재실행하는 것을 권장한다.
 
-4행은 **같은 명령이 다른 하드웨어에서는 목표 미달로 정직하게 보고되는** 사례다
+5행은 **같은 명령이 다른 하드웨어에서는 목표 미달로 정직하게 보고되는** 사례다
 (5장 참고).
 
 전체 로그·타이밍·편차 분석: **[docs/RESULTS.md](docs/RESULTS.md)**

@@ -78,13 +78,14 @@ fituna run --hf bartowski/SmolLM2-135M-Instruct-GGUF \
   --max-quality-loss 5 \
   --ctx 2048 \
   --quality-corpus wiki.txt \
-  --out ./out
+  --out ./out --resume
 ```
 
 위 명령을 그대로 실행하면 **58초** 만에 `MEETS TARGET —
 Q8_0 @ ngl=24, 249.16 tok/s, 손실 0.29%`라는 판정과 함께, 복사해서 바로
-쓸 수 있는 `llama-server` 명령이 출력됩니다.(M3 PRO 기준) 추가적으로, 같은 명령을 `--resume`으로
-다시 돌리면 캐시에서 **0.8초** 만에 같은 답이 나옵니다.
+쓸 수 있는 `llama-server` 명령이 출력됩니다.(M3 PRO 기준) `--resume`은 처음
+실행할 때부터 붙여야 캐시가 채워집니다 — 그 상태로 동일 명령을 한 번 더
+실행하면 캐시에서 **0.8초** 만에 같은 답이 나옵니다.
 
 ## 실측 결과
 

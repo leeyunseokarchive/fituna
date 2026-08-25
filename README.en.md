@@ -74,13 +74,15 @@ fituna run --hf bartowski/SmolLM2-135M-Instruct-GGUF \
   --max-quality-loss 5 \
   --ctx 2048 \
   --quality-corpus wiki.txt \
-  --out ./out
+  --out ./out --resume
 ```
 
 Run exactly this on an M3 Pro and **58 seconds** later you get the verdict
 `MEETS TARGET — Q8_0 @ ngl=24, 249.16 tok/s, 0.29% loss`, along with a
-`llama-server` command you can copy and run as-is. Run the same command
-again with `--resume` and the cache returns the same answer in **0.8 s**.
+`llama-server` command you can copy and run as-is. `--resume` has to be
+present on this first run too, so it populates the cache — with that, running
+the exact same command again returns the same answer from the cache in
+**0.8 s**.
 
 ## Measured results
 
