@@ -206,6 +206,9 @@ pip install -e fituna
 - 런타임 의존성이 0개(표준 라이브러리만 사용)라 설치는 수 초면 끝난다.
 - 시스템 `python3`가 3.11 미만이면(예: macOS 기본 python3는 3.9.6) 3.11 이상
   인터프리터로 가상환경을 만들어야 한다. 위처럼 `python3.13 -m venv .venv`.
+  `python3.13: command not found`가 나오면 설치돼 있지 않은 것이다 —
+  `brew install python@3.13` 한 줄로 받을 수 있고, 이미 있는 다른 3.11+
+  버전(`python3.12` 등)을 써도 된다.
 - **가상환경 없이 시스템 `python3`에 그대로 `pip install`하면 최신 Homebrew·
   Debian/Ubuntu 파이썬에서 `error: externally-managed-environment`로 실패한다**
   (PEP 668 — 직접 재현 확인, 6장 참고). 위 가상환경 절차가 이를 피하는 방법이다.

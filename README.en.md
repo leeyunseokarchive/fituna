@@ -64,10 +64,10 @@ The fastest way to see it work for yourself: a full pipeline run
 finishes in about a minute on an M-series Mac:
 
 ```bash
-python3.11 -m venv .venv
+brew install llama.cpp python@3.13
+python3.13 -m venv .venv
 source .venv/bin/activate
-python -m pip install fituna
-brew install llama.cpp
+pip install fituna
 fituna fetch-corpus --lang en --out wiki.txt
 fituna run --hf bartowski/SmolLM2-135M-Instruct-GGUF \
   --target-tps 240 \
@@ -159,13 +159,15 @@ See how it works in detail: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 ## Install
 
 ```bash
-python3.11 -m venv .venv
+python3.13 -m venv .venv
 source .venv/bin/activate
-python -m pip install fituna
+pip install fituna
 ```
 
-Python 3.11+ is required. Replace `python3.11` in the first command with your
-installed Python version. Zero runtime dependencies. You also need llama.cpp:
+Python 3.11+ is required. Any installed 3.11+ interpreter works — swap the
+first line accordingly (e.g. `python3.12`). The macOS system `python3` (3.9.6)
+is too old; if you have no 3.11+ at all, `brew install python@3.13`. Zero
+runtime dependencies. You also need llama.cpp:
 
 ```bash
 brew install llama.cpp        # macOS/Linux Homebrew

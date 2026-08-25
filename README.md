@@ -68,10 +68,10 @@ FiTuna는 수십 가지 조합을 감으로 반복 실행하는 대신, 내 기�
 남짓에 끝납니다:
 
 ```bash
-python3.11 -m venv .venv
+brew install llama.cpp python@3.13
+python3.13 -m venv .venv
 source .venv/bin/activate
-python -m pip install fituna
-brew install llama.cpp
+pip install fituna
 fituna fetch-corpus --lang en --out wiki.txt
 fituna run --hf bartowski/SmolLM2-135M-Instruct-GGUF \
   --target-tps 240 \
@@ -165,13 +165,15 @@ FiTuna는 두 단계로 작동합니다.
 ## 설치
 
 ```bash
-python3.11 -m venv .venv
+python3.13 -m venv .venv
 source .venv/bin/activate
-python -m pip install fituna
+pip install fituna
 ```
 
-Python 3.11+가 필요합니다. 설치한 Python 버전에 맞게 첫 줄의 `python3.11`을
-바꾸세요. 런타임 의존성은 없습니다. 엔진인 llama.cpp도 필요합니다:
+Python 3.11+가 필요합니다. 이미 설치된 3.11+ 인터프리터가 있다면 첫 줄을
+그 버전으로 바꿔도 됩니다(예: `python3.12`). macOS 기본 `python3`(3.9.6)로는
+동작하지 않으며, 3.11+가 하나도 없다면 `brew install python@3.13`으로
+받으세요. 런타임 의존성은 없습니다. 엔진인 llama.cpp도 필요합니다:
 
 ```bash
 brew install llama.cpp        # macOS/Linux Homebrew
