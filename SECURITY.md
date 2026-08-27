@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-FiTuna is pre-1.0. Only the latest release (`0.1.0`) and `main` are supported;
+FiTuna is pre-1.0. Only the latest release (`0.2.0`) and `main` are supported;
 fixes land on `main` and ship in the next release.
 
 ## Reporting a vulnerability

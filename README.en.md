@@ -324,21 +324,19 @@ serving the model stays llama.cpp's job
 ([rationale](docs/ARCHITECTURE.md#why-this-shape)). Current limitations:
 
 - **Results are valid only on the machine that ran them** — FiTuna never extrapolates another machine's numbers from a spec sheet. Need a config for a different machine? Run FiTuna there (it's a cross-platform CLI). Machines disagreeing is exactly why measurement beats estimation — [same model, opposite verdicts on M3 Pro vs T4](docs/RESULTS.md#run-4--nvidia-tesla-t4-linux-google-colab)
-- **Single GPU only** — no `--tensor-split` ([#11](https://github.com/leeyunseokarchive/fituna/issues/11), multi-GPU hardware welcome)
+- **Single GPU only** — no `--tensor-split`
 - **No Windows AMD auto-detection** — pass `--gpu amd --vram-mb <N>`
 - **Quality = perplexity on the corpus you choose** — a proxy; measure on text resembling your workload
-- **Verdicts depend on `--ppl-chunks`** — re-measure candidates close to your budget ([#8](https://github.com/leeyunseokarchive/fituna/issues/8), [measured effect](docs/RESULTS.md#how-big-is-a-perplexity-gap-the-error-bar-we-had-been-discarding))
+- **Verdicts depend on `--ppl-chunks`** — re-measure candidates close to your budget ([measured effect](docs/RESULTS.md#how-big-is-a-perplexity-gap-the-error-bar-we-had-been-discarding))
 - **Benchmarks are thermally sensitive** — verdicts within a few tok/s of target are marginal ([variance analysis](docs/RESULTS.md#run-to-run-variance-measured-not-hidden))
-- **Real-hardware E2E covers macOS · Linux** — Windows is unit-tested and CI-run ([#12](https://github.com/leeyunseokarchive/fituna/issues/12))
+- **Real-hardware E2E covers macOS · Linux** — Windows is unit-tested and CI-run
 
 ## Contributing
 
 The codebase is small, dependency-free and contract-first — start at
-[fituna/config.py](fituna/config.py). 256 unit tests and a 3-OS × 2-Python CI
-matrix guard it. Roadmap:
-[v0.3.0 milestone](https://github.com/leeyunseokarchive/fituna/milestone/1) ·
-[good first issue #10](https://github.com/leeyunseokarchive/fituna/issues/10) ·
-[CONTRIBUTING.md](CONTRIBUTING.md) · [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
+[fituna/config.py](fituna/config.py). The full unit suite and a 3-OS ×
+2-Python CI matrix guard it. See [CONTRIBUTING.md](CONTRIBUTING.md) and
+[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ## License
 

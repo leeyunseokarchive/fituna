@@ -347,9 +347,8 @@ no doctor equivalent of exit code 3 — `NoFeasibleConfigError` is a
   `num_gpu`/`num_ctx` into a Modelfile — both Ollama and LM Studio apply a
   fixed per-model preset otherwise, [the exact
   gap](https://github.com/ollama/ollama/issues/14674) the README cites. Two
-  extensions that stay inside this boundary rather than crossing it are
-  tracked in [#19](https://github.com/leeyunseokarchive/fituna/issues/19):
-  running the winning command directly (`--launch`), and an LM Studio preset
-  export. The MCP server already covers the agent-facing version — an agent
+  extensions that could stay inside this boundary rather than crossing it are
+  running the winning command directly (`--launch`) and exporting an LM Studio
+  preset. Neither is part of the current release. The MCP server already covers the agent-facing version — an agent
   reads `fituna_recommend`'s answer and decides what to do with it, no human
   copying a command required.
