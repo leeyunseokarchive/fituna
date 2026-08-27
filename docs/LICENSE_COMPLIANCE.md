@@ -34,8 +34,8 @@ session 임시 디렉터리를 쓴 일회용 virtualenv 경로를 그대로 실�
 
 ### 1.1 빌드
 
-Build tooling is installed into a throwaway virtualenv **outside the
-repository**, so it never becomes a dependency of anything:
+빌드 도구는 **저장소 밖의** 일회용 virtualenv에 설치하므로 어떤 배포물의
+의존성도 되지 않습니다.
 
 ```
 $ python3.13 -m venv /tmp/buildenv
@@ -45,17 +45,17 @@ $ /tmp/buildenv/bin/python -m build
 Successfully built fituna-0.1.0.tar.gz and fituna-0.1.0-py3-none-any.whl
 ```
 
-`build` 1.5.0 provisions `setuptools>=77` in its own isolated environment,
-exactly as `pyproject.toml` `[build-system]` declares. Neither `build` nor
-`setuptools` appears in the installed package — §1.6 proves that by
-installing the wheel into an empty environment and listing what arrived.
+`build` 1.5.0은 `pyproject.toml`의 `[build-system]` 선언 그대로 자체 격리
+환경에 `setuptools>=77`을 준비합니다. 설치한 package에는 `build`와 `setuptools`
+어느 것도 들어가지 않습니다. §1.6에서 wheel을 빈 환경에 설치한 뒤 들어온 항목을
+나열해 이를 증명합니다.
 
-The elided `...` is setuptools' own build log. There is no
-`SetuptoolsDeprecationWarning` about a license declaration to elide any more:
-`pyproject.toml` now declares the PEP 639 `license = "MIT"` expression
-directly (raised from `setuptools>=68` for this), so the deprecated
-`license = { text = "MIT" }` form the warning used to fire on is gone. §6
-records the trade this made, not a pending warning.
+생략한 `...`는 setuptools 자체 build log입니다. 이제 license 선언에 관한
+`SetuptoolsDeprecationWarning`은 없습니다. `pyproject.toml`이 PEP 639 표현식
+`license = "MIT"`를 직접 선언하도록 바꾸고 이를 위해 `setuptools>=68`에서
+`setuptools>=77`로 올렸으므로, 경고를 내던 deprecated 형식
+`license = { text = "MIT" }`는 사라졌습니다. §6은 미해결 경고가 아니라 이 변경의
+trade-off를 기록합니다.
 
 ### 1.2 sdist 전체 목록
 
@@ -137,17 +137,17 @@ fituna/report.py
 fituna/search.py
 ```
 
-**25 files. 18 of them are FiTuna `.py` source, one is the empty PEP 561
-`py.typed` marker, and six are build-generated metadata (one of which is
-FiTuna's own MIT `LICENSE`, which the wheel format places under
-`.dist-info/licenses/`).** No vendored directory, no bundled binary, no
-third-party `.py`, no copied license file belonging to anyone else.
+**총 25개 파일입니다. FiTuna `.py` source 18개, 빈 PEP 561 `py.typed` marker
+1개, build가 생성한 metadata 6개입니다. 이 중 하나는 wheel 형식이
+`.dist-info/licenses/` 아래에 둔 FiTuna 자체 MIT `LICENSE`입니다.** vendor
+directory, bundle한 binary, 제3자 `.py`, 다른 주체의 복사된 license 파일은
+없습니다.
 
 ### 1.4 두 산출물에 제3자 코드가 없다는 증명
 
-A listing shows names. This shows *provenance*: every non-generated file in
-both artifacts is **byte-for-byte identical to a file tracked in this
-repository's git index**, so nothing was injected during the build.
+목록은 이름만 보여 줍니다. 아래 검사는 *출처*를 확인합니다. 두 산출물에서 자동
+생성되지 않은 모든 파일은 **이 저장소의 git index가 추적하는 파일과 byte 단위로
+동일**하므로 build 중 삽입된 항목이 없습니다.
 
 ```
 $ python3.13 - <<'PY'
@@ -174,7 +174,7 @@ sdist: 27 byte-identical to tracked repo files, 8 build-generated metadata, 0 un
 wheel: 18 byte-identical to tracked repo files, 6 build-generated metadata, 0 unaccounted for
 ```
 
-**0 unaccounted for, in both artifacts.**
+**두 산출물 모두 출처 불명 파일이 0개입니다.**
 
 ### 1.5 빌드한 wheel에서 다시 읽은 의존성 선언
 
@@ -190,19 +190,19 @@ Provides-Extra: dev
 Requires-Dist: pytest; extra == "dev"
 ```
 
-The original `grep` pattern here matched `^License:`; under `setuptools>=77`
-and the PEP 639 `license = "MIT"` expression the wheel emits
-`License-Expression: MIT` (Metadata-Version 2.4) instead of a bare `License:`
-line, so the pattern above adds `License-Expression` to keep the block
-reproducible. §6 records what this change costs.
+원래 `grep` pattern은 `^License:`를 찾았습니다. `setuptools>=77`과 PEP 639
+`license = "MIT"` 표현식을 사용하면 wheel이 단순한 `License:` 줄 대신
+`License-Expression: MIT`(Metadata-Version 2.4)를 내보냅니다. 위 block을 재현할
+수 있도록 pattern에 `License-Expression`을 추가했습니다. 이 변경의 비용은 §6에
+기록했습니다.
 
-The only `Requires-Dist` line is gated on the `dev` extra. There is no
-unconditional runtime requirement.
+유일한 `Requires-Dist` 줄은 `dev` extra에만 적용됩니다. 조건 없는 runtime
+요구사항은 없습니다.
 
 ### 1.6 빈 환경에 설치
 
-The decisive test — `pip` resolves the real dependency graph, and nothing
-comes with it:
+결정적인 검사입니다. `pip`가 실제 dependency graph를 해석하며 추가로 설치되는
+항목이 없습니다.
 
 ```
 $ python3.13 -m venv /tmp/runtimeenv
@@ -218,10 +218,9 @@ $ /tmp/runtimeenv/bin/python -m pip list --format=json
 [{"name": "fituna", "version": "0.1.0"}, {"name": "pip", "version": "25.2"}]
 ```
 
-`Installing collected packages: fituna` — one package, no transitive
-closure. The environment after the install is the environment before it plus
-`fituna`. `pip` itself is the venv's own bootstrap, not something FiTuna
-pulled in.
+`Installing collected packages: fituna`처럼 package 하나만 설치되고 transitive
+dependency는 없습니다. 설치 후 환경은 설치 전 환경에 `fituna`만 더해진 상태입니다.
+`pip` 자체는 venv의 bootstrap이며 FiTuna가 끌어온 항목이 아닙니다.
 
 ---
 
@@ -238,113 +237,99 @@ license이며 아래 모든 라이선스와 호환됩니다.
 
 ### 2.1 llama.cpp — MIT, subprocess만 사용
 
-`fituna/quantize.py`, `bench.py`, `quality.py`, `model_info.py` invoke
-`llama-quantize`, `llama-bench`, `llama-perplexity` and
-`convert_hf_to_gguf.py` through `subprocess.run()` with an argv list, and
-read back stdout/stderr and the exit code. Nothing else crosses the
-boundary.
+`fituna/quantize.py`, `bench.py`, `quality.py`, `model_info.py`는 argv 목록을
+전달하는 `subprocess.run()`으로 `llama-quantize`, `llama-bench`,
+`llama-perplexity`, `convert_hf_to_gguf.py`를 실행하고 stdout·stderr·종료 코드를
+읽습니다. 이 경계를 넘는 것은 없습니다.
 
-- **No linking.** No llama.cpp header is `#include`d, no `libllama` is
-  loaded via `ctypes` or a compiled extension, no static or dynamic link
-  step exists — FiTuna has no compiled component at all (the wheel in §1.3
-  is `py3-none-any`, i.e. pure Python, no ABI tag).
-- **No import.** The AST scan in §3.4 finds zero non-stdlib imports.
-- **No vendoring, no redistribution.** §1.4 proves it: no file in either
-  artifact came from anywhere but this repository's git index. The user
-  installs llama.cpp themselves; `fituna/binaries.py:locate_binaries()`
-  discovers it on `PATH` or under `--llama-bin-dir`, and raises
-  `BinaryNotFoundError` pointing at upstream's build instructions when it
-  is absent.
+- **link하지 않음.** llama.cpp header를 `#include`하지 않고, `ctypes`나 compile
+  extension으로 `libllama`를 load하지 않으며, static·dynamic link step도 없습니다.
+  FiTuna에는 compile 구성요소 자체가 없습니다. §1.3의 wheel은 ABI tag가 없는 pure
+  Python인 `py3-none-any`입니다.
+- **import하지 않음.** §3.4의 AST scan에서 표준 라이브러리 외 import는 0개입니다.
+- **vendor 방식 포함·재배포 없음.** §1.4에서 두 산출물의 모든 파일이 이 저장소 git
+  index에서 왔음을 증명합니다. 사용자가 llama.cpp를 직접 설치하면
+  `fituna/binaries.py:locate_binaries()`가 `PATH` 또는 `--llama-bin-dir`에서 찾습니다.
+  없으면 upstream build 안내를 가리키는 `BinaryNotFoundError`를 발생시킵니다.
 
-**And the question is moot anyway: llama.cpp is MIT.** Even under the
-closest possible coupling — statically linking it into a single binary — MIT
-and MIT do not conflict; the combined work would simply carry both notices.
-The subprocess boundary is an architectural choice
-(`docs/OPEN_SOURCE_USAGE.md` §1 records why), not a license workaround. The
-one obligation that does apply — MIT's notice-preservation condition — is
-discharged by `THIRD_PARTY_NOTICES.md` §1, which reproduces llama.cpp's full
-MIT text even though no llama.cpp byte is present here.
+**llama.cpp 자체도 MIT이므로 어느 경우에도 충돌하지 않습니다.** 가장 밀접하게
+결합해 하나의 binary에 static link하더라도 MIT끼리는 충돌하지 않고 두 고지만
+보존하면 됩니다. subprocess 경계는 license 우회가 아니라 architecture 선택이며
+그 이유는 `docs/OPEN_SOURCE_USAGE.md` §1에 기록했습니다. 실제로 적용되는 유일한
+의무인 MIT 고지 보존은 `THIRD_PARTY_NOTICES.md` §1에서 이행합니다. llama.cpp
+byte가 저장소에 없어도 MIT 전문을 수록했습니다.
 
-The same reasoning covers **GGUF/ggml** (MIT): `fituna/model_info.py` is an
-independent reader written against the published specification using the
-stdlib `struct` module. Conformance to a documented file format is not
-derivation, and the format's own repository is MIT regardless.
+같은 근거가 MIT인 **GGUF/ggml**에도 적용됩니다. `fituna/model_info.py`는 공개
+사양에 따라 표준 라이브러리 `struct`로 작성한 독립 reader입니다. 문서화된 파일
+형식을 준수하는 것은 파생이 아니며, 형식 저장소 자체도 MIT입니다.
 
 ### 2.2 평가 corpus — CC BY-SA 3.0 / GFDL, 저장소 미포함
 
-`fituna/corpus.py` defines two presets (`Salesforce/wikitext` for English,
-`wikimedia/wikipedia` `20231101.ko` for Korean). Both are CC BY-SA 3.0,
-dual-licensed GFDL — copyleft-style share-alike licenses, so this is the
-counterparty that deserves the most care.
+`fituna/corpus.py`는 영어용 `Salesforce/wikitext`와 한국어용
+`wikimedia/wikipedia` `20231101.ko` preset 두 개를 정의합니다. 둘 다 CC BY-SA
+3.0이며 GFDL과 이중 라이선스된 동일조건 계열이라 가장 주의해서 검토해야 합니다.
 
-Three facts remove the conflict:
+다음 세 사실 때문에 충돌하지 않습니다.
 
-1. **No corpus text is in the repository.** `.gitignore` excludes `*.txt`
-   (with explicit negations for ordinary repo text files, so the rule cannot
-   silently swallow a legitimate one) and the corpus temp file pattern
-   `.*.tmp`. The §1.4 audit independently confirms no corpus file is in
-   either artifact.
-2. **FiTuna does not distribute it.** `fituna fetch-corpus` downloads to a
-   path *the user chooses* (`--out`). The bytes travel from HuggingFace to
-   the user; FiTuna is the transport, not the redistributor.
-3. **The notice is given at fetch time.** `fituna/cli.py:320`
-   (`_cmd_fetch_corpus`) prints the source URL and the license notice to
-   stdout on every successful fetch, so a user who *does* go on to
-   redistribute the text has been told the terms. When
-   `--dataset/--config/--split` override a preset, the same code path prints
-   a generic "check this dataset's own license" message instead — asserting
-   CC BY-SA over a dataset we have not checked would be an unverified claim.
+1. **저장소에 말뭉치 text가 없습니다.** `.gitignore`는 `*.txt`와 말뭉치 임시 파일
+   pattern `.*.tmp`를 제외합니다. 일반 저장소 text 파일은 명시적으로 다시 포함해
+   정상 파일이 조용히 누락되지 않게 했습니다. §1.4 검사에서도 두 산출물에 말뭉치
+   파일이 없음을 독립적으로 확인합니다.
+2. **FiTuna가 배포하지 않습니다.** `fituna fetch-corpus`는 *사용자가 선택한*
+   `--out` 경로에 내려받습니다. byte는 HuggingFace에서 사용자에게 이동하며 FiTuna는
+   전송 수단이지 재배포자가 아닙니다.
+3. **내려받을 때 고지합니다.** `fituna/cli.py:320`의 `_cmd_fetch_corpus`는 성공할
+   때마다 source URL과 license 고지를 stdout에 출력합니다. text를 재배포하려는
+   사용자도 조건을 확인할 수 있습니다. `--dataset/--config/--split`으로 preset을
+   바꾸면 같은 코드 경로가 "check this dataset's own license"라는 일반 안내를
+   출력합니다. 확인하지 않은 데이터셋에 CC BY-SA라고 단정하지 않기 위해서입니다.
 
-Share-alike attaches to the corpus text. It does not reach FiTuna's source
-code, because FiTuna's source code is not a derivative or adaptation of the
-corpus — it is a program that passes a file path to another program.
+동일조건은 말뭉치 text에 적용됩니다. FiTuna source는 말뭉치의 파생물이나 각색물이
+아니라 다른 프로그램에 파일 경로를 전달하는 프로그램이므로 source code에는
+영향을 주지 않습니다.
 
 ### 2.3 모델 weight — Apache-2.0 / MIT, 재배포하지 않음
 
-`--model` is a path to a file the user already has. FiTuna does not bundle,
-train, fine-tune, distil or merge weights; `llama-quantize` changes numeric
-precision inside llama.cpp's own process. §1.4 confirms no `.gguf` is in
-either artifact, and `.gitignore` excludes `*.gguf` and `*.gguf.tmp`.
+`--model`은 사용자가 이미 가진 파일의 경로입니다. FiTuna는 weight를 bundle,
+train, fine-tune, distil, merge하지 않습니다. `llama-quantize`가 llama.cpp 자체
+process 안에서 수치 정밀도만 바꿉니다. §1.4에서 두 산출물에 `.gguf`가 없음을
+확인했고 `.gitignore`도 `*.gguf`와 `*.gguf.tmp`를 제외합니다.
 
-The three models used for this project's own published measurements
-(`docs/RESULTS.md`) are SmolLM2-135M-Instruct and Qwen3-4B-Instruct-2507
-(both Apache-2.0) and Midm-2.0-Mini-Instruct (MIT), verified per
-`docs/OPEN_SOURCE_USAGE.md` §3–4. Both Apache-2.0 and MIT are permissive and
-compatible with MIT in the direction that matters here (that material
-combined into an MIT-licensed project); no combination occurs in any case.
-`docs/AI_MODEL_USAGE.md` carries the per-model disclosure template and the
-same three models.
+프로젝트 공개 측정(`docs/RESULTS.md`)에 사용한 세 모델은 Apache-2.0인
+SmolLM2-135M-Instruct·Qwen3-4B-Instruct-2507과 MIT인
+Midm-2.0-Mini-Instruct입니다. 확인 근거는 `docs/OPEN_SOURCE_USAGE.md` §3~4에
+있습니다. Apache-2.0과 MIT 모두 허용적이며 MIT와 호환됩니다. 애초에 material을
+결합하지도 않습니다. `docs/AI_MODEL_USAGE.md`에는 모델별 공개 template과 같은 세
+모델을 기록했습니다.
 
-The model choice was itself made on license grounds: Qwen2.5-3B-Instruct was
-dropped from the results because its license is `qwen-research`, a
-research-use custom license rather than an OSI-approved one
-(`docs/OPEN_SOURCE_USAGE.md` §3–4 records the verification). No gated or
-bespoke-licensed model appears in the reproduction path.
+모델 선택 자체에도 라이선스를 고려했습니다. Qwen2.5-3B-Instruct의
+`qwen-research`는 OSI 승인 라이선스가 아닌 연구용 custom license라 결과에서
+제외했습니다(`docs/OPEN_SOURCE_USAGE.md` §3~4에 확인 근거 기록). 재현 경로에는
+접근 제한 모델이나 bespoke license 모델이 없습니다.
 
 ### 2.4 GPL / AGPL / LGPL — 직간접적으로 사용하지 않음
 
-**주장.** No GPL-family code is imported, linked, vendored or
-distributed by FiTuna.
+**주장.** FiTuna는 GPL 계열 코드를 import, link, vendor 방식으로 포함하거나
+배포하지 않습니다.
 
-**확인 방법** — four independent checks, each reproducible:
+**확인 방법.** 각각 재현 가능한 독립 검사 네 가지를 수행했습니다.
 
-| Method | What it covers | Result |
+| 검사 | 확인 범위 | 결과 |
 |---|---|---|
-| Installed-environment scan (§3.2) | Every distribution resolvable in a clean install | Only `fituna`, MIT. With `[dev]`: MIT, BSD-2-Clause, Apache-2.0 OR BSD-2-Clause. No GPL-family license |
-| Distribution provenance audit (§1.4) | Every file in the sdist and wheel | 0 files of non-repository origin |
-| AST import scan (§3.4) | Every top-level import in `fituna/*.py` | 0 non-stdlib imports |
-| Repository text scan (§3.3) | Every git-tracked file | 0 copyleft matches in any code, config, notebook or CI file; the only matches are the three license-documentation files that discuss the topic on purpose |
+| 설치 환경 scan(§3.2) | 빈 환경 설치로 해석되는 모든 distribution | MIT인 `fituna`만 존재. `[dev]` 포함 시 MIT, BSD-2-Clause, Apache-2.0 OR BSD-2-Clause이며 GPL 계열 없음 |
+| 배포물 출처 검사(§1.4) | sdist·wheel의 모든 파일 | 저장소 외부에서 온 파일 0개 |
+| AST import scan(§3.4) | `fituna/*.py`의 모든 최상위 import | 표준 라이브러리 외 import 0개 |
+| 저장소 text scan(§3.3) | git이 추적하는 모든 파일 | code·config·notebook·CI에서 copyleft 일치 0개. 의도적으로 주제를 설명하는 license 문서 세 개만 일치 |
 
 **프로젝트 주변의 유일한 GPL 구성요소.**
-`git` is GPL-2.0 and is invoked by `notebooks/colab_nvidia_verification.ipynb`
-(cell 2, `git clone --depth 1` of llama.cpp; cell 3's
-`pip install git+https://...`). This is a **development/verification-time
-tool executed as a separate process inside a Colab runtime**. It is not
-imported, not linked, not distributed, and not present in either artifact in
-§1.
+`git`은 GPL-2.0이며 `notebooks/colab_nvidia_verification.ipynb`가 호출합니다.
+2번 cell에서 `git clone --depth 1`로 llama.cpp를 받고, 3번 cell의
+`pip install git+https://...`에서도 실행합니다. 이는 **Colab runtime 안에서 별도
+process로 실행하는 개발·검증 시점 도구**입니다. import·link·배포하지 않으며 §1의
+어느 산출물에도 없습니다.
 
-Invoking a GPL program as a separate process does not make the caller a
-derivative work of it. The FSF's own GPL FAQ states the criterion
+GPL 프로그램을 별도 process로 호출한다고 호출자가 그 파생물이 되지는 않습니다.
+FSF의 GPL FAQ는 다음 기준을 제시합니다
 (`https://www.gnu.org/licenses/gpl-faq.html`, HTTP 200, fetched
 2026-07-30):
 
@@ -355,31 +340,26 @@ derivative work of it. The FSF's own GPL FAQ states the criterion
 > internal data structures, that too could be a basis to consider the two
 > parts as combined into a larger program.
 
-The FAQ's own qualifier is exactly the question worth answering here, not
-one to quote around: what crosses the `git` boundary is an argv list in, and
-stdout/stderr/exit-code out — no complex internal data structure, no shared
-memory, no callback. Command-line arguments and stdout are exactly and only
-what crosses this
-boundary — the same boundary described for llama.cpp in §2.1 — and FiTuna's
-relationship with `git` is more distant still: the notebook, not the
-package, runs it. This is stated rather than omitted because the
-alternative — a scanner finding "GPL-2.0" in `docs/OPEN_SOURCE_USAGE.md` §13
-while our own compliance document stays silent about it — is worse.
+FAQ의 단서를 피하지 않고 실제 경계를 확인했습니다. `git`에는 argv 목록이 들어가고
+stdout·stderr·종료 코드만 나오며, 복잡한 내부 data structure·shared memory·callback은
+없습니다. command-line 인수와 stdout만 경계를 넘는다는 점에서 §2.1의 llama.cpp와
+같고, package가 아닌 notebook이 실행하므로 FiTuna와 `git`의 관계는 더 멉니다.
+`docs/OPEN_SOURCE_USAGE.md` §13에서 scanner가 "GPL-2.0"을 찾을 수 있는데 준수
+문서가 이를 침묵하는 편이 더 부정확하므로 명시했습니다.
 
-**이 방법의 한계**, stated plainly rather than glossed:
+**이 방법의 한계**도 분명히 밝힙니다.
 
-- These checks prove that no third-party *file* or *package* enters FiTuna.
-  They do **not** prove that no third-party *snippet* was ever pasted into a
-  FiTuna source file without a header. Detecting that requires license-text
-  and code-similarity matching (ScanCode, FOSSology, Black Duck); see §3.1
-  for why that class of tool was not run here and what stands in its place.
-- The text scan is keyword-based. A copyleft file carrying no recognisable
-  license string would not be found by it. The provenance audit in §1.4 is
-  the check that does not depend on strings: it is a hash comparison.
-- `pip-licenses` reports what each package's own metadata declares. A
-  package that misdeclares its license would be reported wrongly. For this
-  project the entire runtime list is one package — FiTuna's own — so there
-  is nothing to misdeclare.
+- 이 검사들은 제3자 *파일*이나 *package*가 FiTuna에 들어오지 않음을 증명하지만,
+  header 없이 제3자 *snippet*을 source에 붙인 적이 전혀 없음을 증명하지는 못합니다.
+  이를 찾으려면 ScanCode, FOSSology, Black Duck 같은 license text·code similarity
+  matching이 필요합니다. 해당 도구를 실행하지 않은 이유와 대체 검사는 §3.1에
+  설명합니다.
+- text scan은 keyword 기반이므로 알아볼 수 있는 license 문자열이 없는 copyleft
+  파일은 찾지 못합니다. §1.4의 출처 검사는 문자열이 아닌 hash 비교이므로 이 한계에
+  의존하지 않습니다.
+- `pip-licenses`는 각 package가 metadata에 선언한 내용을 보고합니다. package가
+  license를 잘못 선언하면 결과도 잘못됩니다. 다만 이 프로젝트의 runtime 목록은
+  FiTuna 자체 package 하나뿐이므로 잘못 선언할 제3자 항목이 없습니다.
 
 ### 2.5 충돌 검토표
 
@@ -387,34 +367,33 @@ FiTuna와 관계된 모든 라이선스와 검토 결과입니다.
 
 | 구성요소 | 라이선스 | 결합 방식 | MIT와 충돌 여부 |
 |---|---|---|---|
-| CPython standard library | PSF-2.0 | **imported** | No — permissive, no copyleft |
-| llama.cpp, ggml/GGUF | MIT | subprocess / file format | No — same license; no linkage in any case |
-| Model weights (SmolLM2, Qwen3) | Apache-2.0 | user-supplied file | No — permissive; never redistributed |
-| Model weights (Midm-2.0-Mini) | MIT | user-supplied file | No — same license; never redistributed |
-| WikiText-2, Korean Wikipedia | CC BY-SA 3.0 / GFDL | fetched file | No — share-alike attaches to the text, which is neither in the repo nor in the distribution; notice printed at fetch |
-| HF dataset-viewer (server) | Apache-2.0 | HTTP client | No — no code of it is used |
-| Model Context Protocol | Apache-2.0 / MIT, in transition | protocol, own implementation | No — no SDK, no schema library, no spec-repo code |
-| setuptools | MIT | build time only | No — isolated build env, not installed |
-| pytest | MIT | dev extra only | No — not installed by `pip install fituna` |
-| `rocm-smi`, `sysctl` | MIT, BSD-3-Clause | optional subprocess | No — permissive; invoked, never redistributed |
-| `git` (notebook only) | GPL-2.0 | subprocess, dev/notebook | No — see §2.4 |
-| CMake (notebook only) | BSD-3-Clause | subprocess, dev/notebook | No — permissive; builds llama.cpp inside Colab, never installed |
-| `pip` (notebook only) | MIT | subprocess, dev/notebook | No — permissive; installs FiTuna and `huggingface_hub` inside Colab |
-| `huggingface_hub` (notebook only) | Apache-2.0 | `pip install`-ed, dev/notebook | No — permissive; downloads the demo GGUF, not a FiTuna dependency |
-| Jupyter notebook format (`nbformat`) | BSD-3-Clause | file format, dev/notebook | No — permissive; the `.ipynb` file itself conforms to the format |
-| `actions/checkout`, `actions/setup-python` | MIT | CI action, dev only | No — permissive; runs in GitHub Actions, never shipped |
+| CPython 표준 라이브러리 | PSF-2.0 | **import** | 없음 — 허용적이며 copyleft 없음 |
+| llama.cpp, ggml/GGUF | MIT | subprocess / 파일 형식 | 없음 — 같은 라이선스이며 link하지 않음 |
+| 모델 weight(SmolLM2, Qwen3) | Apache-2.0 | 사용자 제공 파일 | 없음 — 허용적이며 재배포하지 않음 |
+| 모델 weight(Midm-2.0-Mini) | MIT | 사용자 제공 파일 | 없음 — 같은 라이선스이며 재배포하지 않음 |
+| WikiText-2, 한국어 Wikipedia | CC BY-SA 3.0 / GFDL | 내려받은 파일 | 없음 — 동일조건은 저장소·배포물에 없는 text에 적용되며 내려받을 때 고지 |
+| HF dataset-viewer(server) | Apache-2.0 | HTTP client | 없음 — 해당 코드를 사용하지 않음 |
+| Model Context Protocol | Apache-2.0 / MIT, 전환 중 | 자체 protocol 구현 | 없음 — SDK·schema library·사양 저장소 코드 미사용 |
+| setuptools | MIT | build 시점만 | 없음 — 격리된 build 환경에서만 사용하고 설치하지 않음 |
+| pytest | MIT | 개발 extra만 | 없음 — `pip install fituna`로 설치되지 않음 |
+| `rocm-smi`, `sysctl` | MIT, BSD-3-Clause | 선택적 subprocess | 없음 — 허용적이며 호출만 하고 재배포하지 않음 |
+| `git`(notebook 전용) | GPL-2.0 | subprocess, 개발/notebook | 없음 — §2.4 참조 |
+| CMake(notebook 전용) | BSD-3-Clause | subprocess, 개발/notebook | 없음 — 허용적이며 Colab 안에서 llama.cpp만 build |
+| `pip`(notebook 전용) | MIT | subprocess, 개발/notebook | 없음 — 허용적이며 Colab 안에서 FiTuna와 `huggingface_hub` 설치 |
+| `huggingface_hub`(notebook 전용) | Apache-2.0 | `pip install`, 개발/notebook | 없음 — 허용적이며 시연용 GGUF를 내려받을 뿐 FiTuna 의존성이 아님 |
+| Jupyter notebook 형식(`nbformat`) | BSD-3-Clause | 파일 형식, 개발/notebook | 없음 — 허용적이며 `.ipynb` 파일이 형식을 따름 |
+| `actions/checkout`, `actions/setup-python` | MIT | CI action, 개발 전용 | 없음 — 허용적이며 GitHub Actions에서만 실행, 배포하지 않음 |
 
-Non-open-source components FiTuna invokes but never redistributes
-(`nvidia-smi`, `system_profiler`, the CUDA toolkit, and the hosted GitHub
-Actions and Google Colab services) are enumerated in
-`docs/OPEN_SOURCE_USAGE.md` and are not claimed as open source anywhere.
+FiTuna가 호출하지만 재배포하지 않는 비오픈소스 구성요소인 `nvidia-smi`,
+`system_profiler`, CUDA toolkit, 호스팅 GitHub Actions·Google Colab service도
+`docs/OPEN_SOURCE_USAGE.md`에 나열했으며 어느 곳에서도 open source라고 주장하지
+않습니다.
 
-**Result: no license pair in this project is in conflict, so no resolution
-measure is required.** The design decisions that produce that result — the
-subprocess boundary, the zero-dependency rule, fetching rather than shipping
-data — were made for engineering reasons and are recorded as such in
-`docs/ARCHITECTURE.md` and `docs/OPEN_SOURCE_USAGE.md`; the clean license
-position is their consequence.
+**결론: 프로젝트의 어떤 라이선스 조합도 충돌하지 않으므로 별도 해결 조치가
+필요하지 않습니다.** subprocess 경계, 의존성 0개 규칙, data를 포함하지 않고
+내려받는 방식은 engineering 이유로 선택했으며 `docs/ARCHITECTURE.md`와
+`docs/OPEN_SOURCE_USAGE.md`에 근거를 기록했습니다. 라이선스 충돌이 없는 것은 이
+설계의 결과입니다.
 
 ---
 
@@ -422,42 +401,37 @@ position is their consequence.
 
 ### 3.1 이 컴퓨터에서 사용할 수 있었던 도구
 
-Checked with `command -v` before anything was installed:
+어떤 도구도 설치하기 전에 `command -v`로 확인했습니다.
 
-| Tool | Present? | Used |
+| 도구 | 설치 여부 | 사용 여부 |
 |---|---|---|
-| `pip-licenses` | no → installed into `/tmp/buildenv` | **yes** (§3.2) |
-| `reuse` | no → installed into `/tmp/buildenv` | **yes** (§3.5) |
-| `python3.13 -m pip list` | yes | **yes** (§1.6) |
-| `git grep` | yes | **yes** (§3.3) |
-| Python `ast` (stdlib) | yes | **yes** (§3.4) |
-| `pipdeptree` | no | not needed — the dependency graph is a single node (§1.6) |
-| `scancode` | no | **not run** — see below |
-| `syft`, `trivy`, `osv-scanner`, `cyclonedx-py`, `licensecheck`, `askalono` | no | not run |
+| `pip-licenses` | 없음 → `/tmp/buildenv`에 설치 | **사용**(§3.2) |
+| `reuse` | 없음 → `/tmp/buildenv`에 설치 | **사용**(§3.5) |
+| `python3.13 -m pip list` | 있음 | **사용**(§1.6) |
+| `git grep` | 있음 | **사용**(§3.3) |
+| Python `ast`(표준 라이브러리) | 있음 | **사용**(§3.4) |
+| `pipdeptree` | 없음 | 불필요 — dependency graph가 node 하나(§1.6) |
+| `scancode` | 없음 | **실행하지 않음** — 아래 참조 |
+| `syft`, `trivy`, `osv-scanner`, `cyclonedx-py`, `licensecheck`, `askalono` | 없음 | 실행하지 않음 |
 
-**Why ScanCode was not run.** `scancode-toolkit` ships a license-text index
-of several hundred megabytes and would take longer to install and index than
-this repository has files. For a codebase of 57 tracked files, 18 of which
-are the shipped source, that is disproportionate. What was run instead —
-`reuse` (SPDX tag extraction), `pip-licenses` (package metadata), `git grep`
-(license-string presence), an AST import scan, and the hash-based
-provenance audit of §1.4 — covers *declared* licensing completely and
-*distribution provenance* completely.
+**ScanCode를 실행하지 않은 이유.** `scancode-toolkit`은 수백 MB의 license text
+index를 포함하며 설치·index 시간이 이 저장소의 파일 수에 비해 큽니다. 추적 파일
+57개, 실제 배포 source 18개인 codebase에는 과도하다고 판단했습니다. 대신 실행한
+`reuse`(SPDX tag 추출), `pip-licenses`(package metadata), `git grep`(license 문자열
+존재), AST import scan, §1.4의 hash 기반 출처 검사는 *선언된* 라이선스와 *배포물
+출처*를 모두 확인합니다.
 
-**What it does not cover, stated so the gap is not overstated away:** none
-of the tools run here performs license-text similarity matching or code
-clone detection. If a reviewer needs assurance against an undeclared pasted
-snippet, ScanCode or an equivalent is the right instrument, and the
-reproduction commands in §5 are structured so that adding it is a single
-extra step. The evidence this document *does* provide against that risk is
-structural rather than statistical: FiTuna imports nothing, links nothing,
-and ships nothing it did not author (§1.4).
+**검사하지 못한 범위도 명시합니다.** 여기서 실행한 도구는 license text similarity
+matching이나 code clone 감지를 하지 않습니다. 미고지 snippet 복사 여부까지 보증해야
+한다면 ScanCode 또는 동등한 도구가 적절합니다. §5의 재현 명령에는 이를 한 단계로
+추가할 수 있습니다. 이 문서가 해당 위험에 대해 제공하는 근거는 통계가 아니라
+구조입니다. FiTuna는 외부 code를 import·link하지 않으며 직접 작성하지 않은 파일을
+배포하지 않습니다(§1.4).
 
 ### 3.2 설치 환경 라이선스 scan — `pip-licenses`
 
-`pip-licenses` is run **from the build venv against the clean runtime venv**
-via `--python`, so the scanner's own dependencies never enter the
-environment being measured.
+`pip-licenses`는 `--python`을 사용해 **build venv에서 실행하되 빈 runtime venv를
+대상으로** 검사합니다. scanner 자체 의존성이 측정 환경에 들어가지 않습니다.
 
 ```
 $ /tmp/buildenv/bin/pip-licenses --python /tmp/runtimeenv/bin/python \
@@ -468,14 +442,13 @@ $ /tmp/buildenv/bin/pip-licenses --python /tmp/runtimeenv/bin/python \
 |--------|---------|---------|---------------------|---------------------------------------------|
 | fituna | 0.1.0   | MIT     | FiTuna contributors | https://github.com/leeyunseokarchive/fituna |
 
-**One row.** That is the complete license inventory of an installed FiTuna.
-It reads `MIT`, not `MIT License` — `pip-licenses` derives the name from the
-`License :: OSI Approved :: ...` classifier when one is present, and FiTuna's
-wheel carries none (§6 explains why); with only `License-Expression: MIT` to
-go on, `pip-licenses` reports the bare SPDX identifier instead.
+**한 행이 설치된 FiTuna의 전체 라이선스 목록입니다.** 결과는 `MIT License`가
+아니라 `MIT`입니다. `pip-licenses`는 `License :: OSI Approved :: ...` classifier가
+있으면 여기서 이름을 얻지만 FiTuna wheel에는 없습니다(이유는 §6). 따라서
+`License-Expression: MIT`만 보고 SPDX 식별자 그대로 출력합니다.
 
-With the development extra installed (`fituna[dev]`), for completeness —
-none of this ships:
+완전성을 위해 개발 extra(`fituna[dev]`)를 설치한 결과도 확인했습니다. 아래 항목은
+배포물에 들어가지 않습니다.
 
 ```
 $ /tmp/runtimeenv/bin/python -m pip install 'dist/fituna-0.1.0-py3-none-any.whl[dev]'
@@ -491,10 +464,9 @@ $ /tmp/buildenv/bin/pip-licenses --python /tmp/runtimeenv/bin/python --from=mixe
 | pluggy    | 1.6.0   | MIT License                |
 | pytest    | 9.1.1   | MIT                        |
 
-All permissive; no copyleft license appears even in the development
-environment. (`Pygments`, `iniconfig`, `packaging` and `pluggy` are pytest's
-own transitive dependencies, resolved by pip — FiTuna declares only
-`pytest`.)
+모두 허용적이며 개발 환경에도 copyleft 라이선스가 없습니다. `Pygments`,
+`iniconfig`, `packaging`, `pluggy`는 pip가 해석한 pytest 자체의 transitive
+dependency이며 FiTuna는 `pytest`만 선언합니다.
 
 ### 3.3 저장소 전체 copyleft·독점 문구 scan — `git grep`
 
@@ -505,12 +477,11 @@ docs/LICENSE_COMPLIANCE.md:25
 docs/OPEN_SOURCE_USAGE.md:13
 ```
 
-Three files match, and all three match **because they are the documents
-that discuss third-party licensing on purpose** — `THIRD_PARTY_NOTICES.md`'s
-proprietary-utility table, `docs/OPEN_SOURCE_USAGE.md`'s §13 `git` GPL-2.0
-entry and §14 proprietary-tool table, and this file, which names the
-copyleft licenses in order to rule them out (§2.4). Restricting the same
-scan to everything that is code, configuration or executable content:
+세 파일이 일치하며 모두 **제3자 라이선스를 의도적으로 설명하는 문서이기 때문에**
+일치합니다. `THIRD_PARTY_NOTICES.md`의 독점 utility 표,
+`docs/OPEN_SOURCE_USAGE.md` §13의 `git` GPL-2.0 항목과 §14 독점 도구 표, 그리고
+copyleft 라이선스를 배제하기 위해 이름을 기록한 이 문서(§2.4)입니다. 같은 검사를
+code·configuration·실행 가능 content로 제한하면 다음과 같습니다.
 
 ```
 $ git grep -n -i -E 'GPL|AGPL|LGPL|copyleft|CDDL|EPL-|MPL-|SSPL|Commons Clause|proprietary|All Rights Reserved' \
@@ -518,17 +489,17 @@ $ git grep -n -i -E 'GPL|AGPL|LGPL|copyleft|CDDL|EPL-|MPL-|SSPL|Commons Clause|p
 (no matches)
 ```
 
-**Zero matches across the package, the test suite, the build configuration,
-the notebook, the examples and the CI workflow.**
+**package, test suite, build configuration, notebook, example, CI workflow
+전체에서 일치 항목은 0개입니다.**
 
-Method and limits: this is a case-insensitive fixed-keyword scan over
-git-tracked content. It establishes the *absence of license strings*, not
-the absence of unlabelled copied code — see §3.1.
+방법과 한계: git이 추적하는 content에 대한 대소문자 무시 고정 keyword scan입니다.
+*license 문자열이 없음*을 확인할 뿐 표시 없는 복사 code가 없음을 증명하지는
+않습니다. §3.1을 참조하십시오.
 
 ### 3.4 Import graph scan — 표준 라이브러리 `ast`
 
-The zero-dependency claim, re-derived from the syntax tree rather than
-trusted from `pyproject.toml`:
+`pyproject.toml` 선언을 그대로 신뢰하지 않고 syntax tree에서 의존성 0개 주장을
+다시 확인합니다.
 
 ```
 $ python3.13 - <<'PY'
@@ -552,14 +523,14 @@ first-party : ['fituna']
 THIRD-PARTY : NONE
 ```
 
-`THIRD-PARTY : NONE`. The 29 stdlib modules (30 counting `__future__`,
-which is a compiler directive rather than a runtime import) are exactly rows
-2–30 of `docs/SBOM.md`, checked name by name — the SBOM and this scan agree.
+`THIRD-PARTY : NONE`입니다. 표준 라이브러리 module은 29개이며 runtime import가
+아닌 compiler directive `__future__`까지 세면 30개입니다. 이름별로 확인한 결과
+`docs/SBOM.md` 2~30행과 정확히 일치하므로 SBOM과 scan 결과가 같습니다.
 
 ### 3.5 SPDX 준수 scan — `reuse` 6.2.0
 
-`reuse` is the FSFE's SPDX/REUSE tool; it reads `SPDX-License-Identifier`
-tags out of every git-tracked file and reports what it finds.
+`reuse`는 FSFE의 SPDX/REUSE 도구입니다. git이 추적하는 모든 파일에서
+`SPDX-License-Identifier` tag를 읽고 결과를 보고합니다.
 
 ```
 $ /tmp/buildenv/bin/reuse lint
@@ -579,49 +550,42 @@ $ /tmp/buildenv/bin/reuse lint
 Unfortunately, your project is not compliant with version 3.3 of the REUSE Specification :-(
 ```
 
-Read that output precisely, because three of its lines need explaining and
-one of them is a real finding:
+출력은 정확히 읽어야 합니다. 세 줄에는 설명이 필요하고, 그중 하나는 실제 발견
+사항입니다.
 
-- **`Bad licenses: 0`, `Deprecated licenses: 0`, `Used licenses: MIT`** —
-  the substantive result. Every license identifier `reuse` found in this
-  repository is `MIT`, none is deprecated, and none is on its bad list.
-- **`Missing licenses: MIT`** — this is *not* "MIT is missing from the
-  files". It means the REUSE 3.3 specification wants a `LICENSES/MIT.txt`
-  directory alongside the tags, and FiTuna keeps its license in the
-  conventional root `LICENSE` file instead. Full REUSE compliance would also
-  require an `SPDX-FileCopyrightText` line in all 54 files including the
-  documentation. That is a stricter standard than the one being verified
-  here, and the project deliberately does not adopt it; the `:-(` line is a
-  statement about REUSE 3.3, not about license validity.
-- **`Invalid SPDX License Expressions: 2`** — both are false positives from
-  *this documentation set*: `docs/OPEN_SOURCE_USAGE.md` and `docs/SBOM.md`
-  quote the string `SPDX-License-Identifier: BSD-3-Clause` inside prose
-  (when explaining how macOS `sysctl`'s license was determined), and
-  `reuse`'s line parser reads the trailing Korean prose as part of the
-  expression. No source file is affected. This document would have added
-  four more such false positives — it quotes the tag repeatedly — which is
-  why an HTML-comment ignore-block marker pair (the remedy `reuse`'s own
-  recommendation names) brackets this file, first line and last. Without
-  them, publishing the scan would change the scan. Those two markers are the
-  only place their exact spelling appears in this file, deliberately: naming
-  the closing token anywhere in the prose would end the ignore block right
-  there and re-expose everything below it.
-- **`Files with copyright information: 6 / 54`** — not a compliance signal.
-  `reuse` counts any file in which it finds a copyright notice, and the six
-  are the root `LICENSE`, `THIRD_PARTY_NOTICES.md` and the four documents
-  that *quote* someone else's notice while recording where a license was
-  read from (`README.md`, `docs/ARCHITECTURE.md`,
-  `docs/OPEN_SOURCE_USAGE.md`, `docs/RESULTS.md`). FiTuna's `.py` files carry
-  `SPDX-License-Identifier` but deliberately no `SPDX-FileCopyrightText`
-  line — see the `Missing licenses` bullet above and §6.
-- **`Files with license information: 27 / 54`** — all 27 `.py` files that
-  carry the tag (§4) are counted. That includes `fituna/config.py`, which
-  needs an explanation because `reuse` cannot read its own header: `reuse`
-  sniffs the encoding of only the first 2048 bytes of a file
-  (`HEURISTICS_CHUNK_SIZE`), and in `config.py` byte 2048 falls in the middle
-  of a multi-byte UTF-8 Korean comment. `charset-normalizer` cannot decode
-  the truncated chunk, `reuse` concludes the file is binary, and skips
-  reading it without an error. Verified directly:
+- **`Bad licenses: 0`, `Deprecated licenses: 0`, `Used licenses: MIT`.** 핵심
+  결과입니다. `reuse`가 저장소에서 찾은 모든 license 식별자는 `MIT`이며 deprecated
+  또는 bad 목록에 든 항목이 없습니다.
+- **`Missing licenses: MIT`.** "파일에 MIT가 없다"는 뜻이 아닙니다. REUSE 3.3
+  사양은 tag와 함께 `LICENSES/MIT.txt` directory를 요구하지만 FiTuna는 관례적인
+  root `LICENSE` 파일을 사용한다는 뜻입니다. REUSE 완전 준수에는 문서를 포함한
+  54개 파일 모두에 `SPDX-FileCopyrightText` 줄도 필요합니다. 이번 검증보다 엄격한
+  표준이라 프로젝트는 의도적으로 채택하지 않았습니다. `:-(` 줄은 license 유효성이
+  아니라 REUSE 3.3 준수 여부에 관한 것입니다.
+- **`Invalid SPDX License Expressions: 2`.** 두 개 모두 *문서에서 생긴 false
+  positive*입니다. `docs/OPEN_SOURCE_USAGE.md`와 `docs/SBOM.md`가 macOS `sysctl`
+  라이선스 확인 방법을 설명하며 `SPDX-License-Identifier: BSD-3-Clause` 문자열을
+  본문에 인용했고, `reuse` line parser가 뒤의 한국어 설명까지 expression으로
+  읽었습니다. source 파일에는 영향이 없습니다. 이 문서도 tag를 여러 번 인용하므로
+  그대로 두면 false positive 네 개를 더 만듭니다. 그래서 `reuse`가 권장하는
+  HTML comment ignore block marker 쌍으로 문서의 첫 줄과 마지막 줄을 감쌌습니다.
+  marker가 없으면 scan 결과를 공개하는 행위 자체가 scan 결과를 바꿉니다. 닫는
+  token을 본문에 쓰면 그 지점에서 block이 끝나 아래 내용이 다시 노출되므로, 두
+  marker의 정확한 철자는 해당 위치에만 의도적으로 둡니다.
+- **`Files with copyright information: 6 / 54`.** 준수 여부를 뜻하는 수치가
+  아닙니다. `reuse`는 copyright 고지를 찾은 모든 파일을 세며, 여섯 파일은 root
+  `LICENSE`, `THIRD_PARTY_NOTICES.md`, 그리고 license를 확인한 위치를 기록하면서
+  다른 주체의 고지를 *인용한* 문서 네 개(`README.md`, `docs/ARCHITECTURE.md`,
+  `docs/OPEN_SOURCE_USAGE.md`, `docs/RESULTS.md`)입니다. FiTuna `.py`에는
+  `SPDX-License-Identifier`가 있지만 `SPDX-FileCopyrightText`는 의도적으로 없습니다.
+  위 `Missing licenses` 설명과 §6을 참조하십시오.
+- **`Files with license information: 27 / 54`.** tag가 있는 `.py` 파일 27개(§4)를
+  모두 셉니다. 여기에는 `reuse`가 파일 자체 header를 읽지 못하는
+  `fituna/config.py`도 포함되므로 설명이 필요합니다. `reuse`는 파일의 처음 2048
+  byte(`HEURISTICS_CHUNK_SIZE`)만 보고 encoding을 추정하는데, `config.py`의 2048번째
+  byte는 multi-byte UTF-8 한국어 주석 중간에 있습니다. `charset-normalizer`가 잘린
+  chunk를 decode하지 못하면 `reuse`는 binary 파일로 판단하고 오류 없이 읽기를
+  건너뜁니다. 다음과 같이 직접 확인했습니다.
 
   ```
   $ /tmp/buildenv/bin/python -c "
@@ -637,43 +601,39 @@ one of them is a real finding:
   whole file  -> utf_8
   ```
 
-  The tag *is* present in the file — `head -1 fituna/config.py` prints
-  `# SPDX-License-Identifier: MIT`, and §4's independent check confirms 27 of
-  27 — but since `reuse` cannot see it directly, `REUSE.toml` supplies the
-  same `MIT` identifier as a file-level annotation instead. This is REUSE's
-  own documented mechanism for exactly this situation, and it does not
-  depend on where in the file the annotation would otherwise sit: `reuse`
-  reads `REUSE.toml` before it ever tries to sniff `config.py`'s encoding, so
-  the 2048-byte heuristic never gets a chance to misfire. `reuse` also
-  excludes two further files from its 54: `LICENSE` itself (it is the
-  license) and the empty `fituna/py.typed` marker — plus `REUSE.toml` itself,
-  which is its own configuration, not a file needing an annotation;
-  54 + 3 = 57 = `git ls-files | wc -l`. The upstream mitigation for the
-  underlying heuristic — installing `libmagic` so `reuse` uses `python-magic`
-  instead of `charset-normalizer` for encoding detection — is a system
-  package and was not installed here; `REUSE.toml` fixes the same symptom
-  without it. A reviewer's own SCA tool may or may not share this quirk — it
-  is recorded so that a single "unknown license" file in someone else's
-  report has a documented cause, even where that reviewer's tool has no
-  `REUSE.toml`-equivalent remedy.
+  tag 자체는 파일에 있습니다. `head -1 fituna/config.py`는
+  `# SPDX-License-Identifier: MIT`를 출력하고 §4의 독립 검사도 27개 중 27개를
+  확인합니다. 다만 `reuse`가 직접 읽지 못하므로 `REUSE.toml`이 동일한 `MIT`
+  식별자를 file-level annotation으로 제공합니다. 이는 이 상황에 대해 REUSE가
+  문서화한 mechanism이며 파일 내 annotation 위치에 의존하지 않습니다. `reuse`가
+  `config.py` encoding을 추정하기 전에 `REUSE.toml`을 읽으므로 2048 byte heuristic이
+  잘못 작동할 기회가 없습니다.
 
-`reuse` itself is GPL-3.0-licensed. It was installed into a throwaway venv
-outside the repository, invoked as a separate process, and is not a
-dependency of anything in this project — the same arm's-length relationship
-described in §2.4.
+  `reuse`는 54개 집계에서 `LICENSE` 자체와 빈 `fituna/py.typed` marker도 제외합니다.
+  자체 configuration이라 annotation 대상이 아닌 `REUSE.toml`도 제외하므로
+  54 + 3 = 57 = `git ls-files | wc -l`입니다. 근본 heuristic의 upstream 완화책은
+  `libmagic`을 설치해 encoding 감지에 `charset-normalizer` 대신 `python-magic`을
+  쓰게 하는 것이지만 system package라 설치하지 않았습니다. `REUSE.toml`로 같은
+  문제를 해결했습니다. 심사위원의 SCA 도구는 같은 특성이 있을 수도, 없을 수도
+  있습니다. 다른 보고서에 "unknown license" 파일 하나가 나타나더라도 원인을
+  확인할 수 있도록 기록했습니다.
+
+`reuse` 자체는 GPL-3.0입니다. 저장소 밖 일회용 venv에 설치해 별도 process로
+실행했으며 이 프로젝트 어떤 항목의 의존성도 아닙니다. §2.4와 같은 독립된
+관계입니다.
 
 ---
 
 ## 4. 소스의 SPDX 식별자
 
-**Status before this change: no `.py` file carried an SPDX identifier.**
-Verified by `grep -rn "SPDX" fituna/ tests/` returning nothing.
+**변경 전에는 어떤 `.py` 파일에도 SPDX 식별자가 없었습니다.**
+`grep -rn "SPDX" fituna/ tests/`가 아무것도 반환하지 않음을 확인했습니다.
 
-**Action taken: `# SPDX-License-Identifier: MIT` was added as line 1 of all
-27 Python files** — 18 in the `fituna/` package and 9 in `tests/`. No file
-in this repository has a shebang, so line 1 is correct everywhere; the tag
-sits above the module docstring, which leaves `__doc__` untouched (a comment
-is not a string literal). Verified:
+**조치: Python 파일 27개 모두의 첫 줄에
+`# SPDX-License-Identifier: MIT`를 추가했습니다.** `fituna/` package 18개와
+`tests/` 9개입니다. 저장소에 shebang이 있는 파일이 없으므로 모두 첫 줄이 맞습니다.
+tag는 module docstring 위에 있으며 comment는 문자열 literal이 아니므로 `__doc__`을
+바꾸지 않습니다. 다음과 같이 확인했습니다.
 
 ```
 $ ok=0; for f in fituna/*.py tests/*.py; do
@@ -682,7 +642,7 @@ $ ok=0; for f in fituna/*.py tests/*.py; do
 line-1 SPDX tag present: 27/27
 ```
 
-And in the built wheel, so the tag reaches whoever installs the package:
+build한 wheel에서도 확인해 package 설치자에게 tag가 전달됨을 검증했습니다.
 
 ```
 $ for f in $(unzip -Z1 dist/fituna-0.1.0-py3-none-any.whl | grep '\.py$'); do
@@ -707,32 +667,28 @@ fituna/report.py         # SPDX-License-Identifier: MIT
 fituna/search.py         # SPDX-License-Identifier: MIT
 ```
 
-중요한 이유: without the tag, a scanner classifies each file as *unknown
-license* and reports it as an unresolved item even though the repository has
-a perfectly good root `LICENSE`. With it, every source file self-identifies —
-26 directly via this header, and `fituna/config.py` via the `REUSE.toml`
-annotation described in §3.5, because `reuse` cannot read its own header —
-and this project's own SCA scan (§3.5) has nothing left to flag under "no
-copyright and licensing information."
+중요한 이유: tag가 없으면 root `LICENSE`가 있어도 scanner는 각 파일을 *unknown
+license*로 분류해 미해결 항목으로 보고합니다. 이제 source 파일마다 스스로 license를
+표시합니다. 26개는 header를 직접 읽고, `reuse`가 자체 header를 읽지 못하는
+`fituna/config.py`는 §3.5의 `REUSE.toml` annotation으로 식별합니다. 따라서
+프로젝트 SCA scan(§3.5)에 "no copyright and licensing information"으로 남는
+항목이 없습니다.
 
-**Regression 검사.** Adding a line to every file shifts every line number
-below it. Both consequences were checked and handled:
+**Regression 검사.** 모든 파일에 한 줄을 추가하면 아래 line number가 전부
+바뀝니다. 두 영향을 모두 확인하고 처리했습니다.
 
-- `python3.13 -m pytest -q` → **246 passed**, and all 17 module self-checks
-  listed in `.github/workflows/ci.yml` still exit 0.
-- Four documents cite source locations as `file.py:NNN`, not one:
-  `docs/OPEN_SOURCE_USAGE.md` (38 occurrences, 30 distinct `file:line`
-  references), plus one each in `SECURITY.md`, `docs/DEVELOPMENT.md` and
-  this file (§2.2). The original sweep covered only
-  `docs/OPEN_SOURCE_USAGE.md` and wrongly asserted it was the only such
-  file. All four have since been swept together and every citation
-  re-verified by reading the cited line in the current source. Five stale
-  occurrences were found and corrected: the three pointing at the CC BY-SA
-  notice in `_cmd_fetch_corpus` (one here, two in
-  `docs/OPEN_SOURCE_USAGE.md` — all three still named the last line of
-  `_cmd_doctor`), and two mutually inconsistent anchors for one `bench.py` self-check,
-  which now both name its `def _self_check()` line. The scope of a citation
-  sweep is the whole repository, not one document:
+- `python3.13 -m pytest -q` → **246 passed**, `.github/workflows/ci.yml`에
+  나열한 module self-check 17개도 모두 종료 코드 0을 유지했습니다.
+- source 위치를 `file.py:NNN`으로 인용한 문서는 하나가 아니라 네 개입니다.
+  `docs/OPEN_SOURCE_USAGE.md`에 38회(서로 다른 `file:line` 30개), `SECURITY.md`,
+  `docs/DEVELOPMENT.md`, 이 문서(§2.2)에 각 1회가 있습니다. 처음에는
+  `docs/OPEN_SOURCE_USAGE.md`만 검사하고 유일한 문서라고 잘못 적었습니다. 이후 네
+  문서를 함께 검사하고 현재 source의 해당 줄을 읽어 모든 인용을 다시 확인했습니다.
+  오래된 인용 다섯 개를 찾아 고쳤습니다. `_cmd_fetch_corpus`의 CC BY-SA 고지를
+  가리키면서 `_cmd_doctor` 마지막 줄을 적은 세 곳(이 문서 한 곳,
+  `docs/OPEN_SOURCE_USAGE.md` 두 곳), 그리고 하나의 `bench.py` self-check를 서로 다른
+  위치로 적은 두 곳입니다. 이제 둘 다 `def _self_check()` 줄을 가리킵니다. 인용
+  검사의 범위는 문서 하나가 아니라 저장소 전체입니다.
 
   ```
   $ grep -rn --include="*.md" -E "[a-z_]+[.]py:[0-9]+" .
@@ -742,15 +698,15 @@ below it. Both consequences were checked and handled:
 
 ## 5. 문서의 모든 주장을 재현하는 방법
 
-From a clean checkout, on any platform with Python 3.11+ and git. Nothing
-here installs anything into the project.
+Python 3.11+와 git이 있는 어느 platform에서든 빈 checkout부터 재현할 수 있습니다.
+아래 명령은 프로젝트 환경에 아무것도 설치하지 않습니다.
 
 ```bash
-# --- 0. tooling, in throwaway venvs outside the repo -------------------
+# --- 0. 저장소 밖 일회용 venv에 도구 설치 ------------------------------
 python3 -m venv /tmp/buildenv
 /tmp/buildenv/bin/pip install build pip-licenses 'reuse[charset-normalizer]'
 
-# --- 1. what ships (§1) ------------------------------------------------
+# --- 1. 배포물 구성 확인(§1) --------------------------------------------
 rm -rf build dist fituna.egg-info
 /tmp/buildenv/bin/python -m build
 tar -tzf dist/fituna-0.1.0.tar.gz | sort
@@ -758,34 +714,34 @@ unzip -Z1 dist/fituna-0.1.0-py3-none-any.whl | sort
 unzip -p dist/fituna-0.1.0-py3-none-any.whl fituna-0.1.0.dist-info/METADATA \
   | grep -E '^(Name|Version|Requires-Python|License-Expression|License-File|Provides-Extra|Requires-Dist):'
 
-# --- 2. zero runtime dependencies, resolved by pip (§1.6) --------------
+# --- 2. pip로 runtime 의존성 0개 확인(§1.6) -----------------------------
 python3 -m venv /tmp/runtimeenv
-/tmp/runtimeenv/bin/python -m pip list --format=json          # baseline
+/tmp/runtimeenv/bin/python -m pip list --format=json          # 기준 상태
 /tmp/runtimeenv/bin/python -m pip install dist/fituna-0.1.0-py3-none-any.whl
-/tmp/runtimeenv/bin/python -m pip list --format=json          # + fituna, nothing else
+/tmp/runtimeenv/bin/python -m pip list --format=json          # fituna 외 추가 없음
 
-# --- 3. license inventory of the installed package (§3.2) --------------
+# --- 3. 설치 package의 license 목록(§3.2) ------------------------------
 /tmp/buildenv/bin/pip-licenses --python /tmp/runtimeenv/bin/python \
   --from=mixed --with-authors --with-urls --format=markdown
 
-# --- 4. no copyleft / proprietary strings in code (§3.3) ---------------
+# --- 4. code에 copyleft·독점 문구가 없는지 확인(§3.3) -------------------
 git grep -c -i -E 'GPL|AGPL|LGPL|copyleft|CDDL|EPL-|MPL-|SSPL|Commons Clause|proprietary|All Rights Reserved' -- .
 git grep -n -i -E 'GPL|AGPL|LGPL|copyleft|CDDL|EPL-|MPL-|SSPL|Commons Clause|proprietary|All Rights Reserved' \
   -- fituna tests pyproject.toml notebooks examples .github
 
-# --- 5. SPDX tags (§3.5, §4) -------------------------------------------
+# --- 5. SPDX tag 확인(§3.5, §4) ----------------------------------------
 /tmp/buildenv/bin/reuse lint
 for f in fituna/*.py tests/*.py; do head -1 "$f"; done | sort | uniq -c
 
-# --- 6. no third-party imports (§3.4) ----------------------------------
-#      (the AST snippet in §3.4, pasted verbatim)
+# --- 6. 제3자 import가 없는지 확인(§3.4) -------------------------------
+#      (§3.4의 AST snippet을 그대로 실행)
 
-# --- 7. nothing in the artifacts came from outside the repo (§1.4) -----
-#      (the provenance snippet in §1.4, pasted verbatim)
+# --- 7. 산출물에 저장소 외부 파일이 없는지 확인(§1.4) -------------------
+#      (§1.4의 출처 확인 snippet을 그대로 실행)
 
-# --- 8. nothing broke (same two steps CI runs) --------------------------
+# --- 8. 회귀 검사(CI와 같은 두 단계) -----------------------------------
 /tmp/runtimeenv/bin/python -m pip install pytest
-/tmp/runtimeenv/bin/python -m pytest -q            # expect: 0 failed (246 passed at the time of writing)
+/tmp/runtimeenv/bin/python -m pytest -q            # 기대값: 0 failed(작성 당시 246 passed)
 for m in __init__ errors config cache search model_info quantize quality \
          bench hardware binaries report; do /tmp/runtimeenv/bin/python -m fituna.$m || break; done
 for m in corpus doctor quickstart cli mcp_server; do /tmp/runtimeenv/bin/python -m fituna.$m --selfcheck || break; done

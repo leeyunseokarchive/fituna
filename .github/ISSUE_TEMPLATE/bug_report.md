@@ -1,23 +1,24 @@
 ---
-name: Bug report
-about: Something broke
+name: 버그 신고
+about: 예상과 다르게 동작하거나 오류가 발생했습니다
 labels: bug
 ---
 
-**Command run**
+**실행한 명령**
 
 ```
 fituna run ...
 ```
 
-**Environment**
-- OS / hardware (`fituna detect-hw` output):
-- llama.cpp build (`fituna list-binaries` output):
-- Python version:
+**실행 환경**
 
-**What happened / error output**
+- OS / hardware (`fituna detect-hw` 출력):
+- llama.cpp build (`fituna list-binaries` 출력):
+- Python 버전:
+
+**발생한 현상 / 오류 출력**
 
 ```
 ```
 
-**What you expected**
+**기대한 동작**

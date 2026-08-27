@@ -123,7 +123,7 @@ Windows를 넣었습니다. 첫 실제 Windows CI 실행은 Windows 경로의 `\
 gate입니다. Package는 `py.typed`를 포함하고 type annotation을 사용하지만 현재
 이를 검사하는 단계는 없습니다 **(계획)**.
 
-## 5. Branch → pull request → review → merge
+## 5. 브랜치 → pull request → 검토 → 병합
 
 작업은 `main`이 아니라 topic branch(`feat/…`, `fix/…`, `docs/…`,
 `chore/…`)에서 진행합니다. 각 branch는 pull request가 되고 `main`은 merge

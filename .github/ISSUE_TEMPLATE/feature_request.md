@@ -1,11 +1,11 @@
 ---
-name: Feature request
-about: Suggest an improvement
+name: 기능 제안
+about: 개선할 기능을 제안합니다
 labels: enhancement
 ---
 
-**Problem this solves**
+**해결하려는 문제**
 
-**Proposed behavior**
+**제안하는 동작**
 
-**Alternatives considered**
+**검토한 대안**
