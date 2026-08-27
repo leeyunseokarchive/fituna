@@ -39,3 +39,6 @@ htmlcov/
 
 # Agent scratch workspace (task briefs, reports, backups)
 .superpowers/
+
+# AI planning scratch (never commit)
+docs/superpowers/
