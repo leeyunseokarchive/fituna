@@ -1,50 +1,52 @@
-# Open-source software FiTuna adopts
+# FiTuna의 오픈소스SW 활용
 
-## Read this before the dependency list
+> 심사·검토 시에는 [부문별 국문 요약](#국문-요약--부문별-오픈소스sw-활용)에서
+> 전체 구성과 라이선스 의무를 먼저 확인할 수 있습니다. 아래 상세 근거에서는
+> 프로젝트명, API 응답, 라이선스 표기와 검증 문구를 원문 그대로 보존합니다.
 
-FiTuna's headline is **zero runtime dependencies** (`pyproject.toml`:
-`dependencies = []`). Read alone, that line invites exactly the wrong
-conclusion — that this project uses no open-source software.
+## 의존성 목록을 읽기 전에
 
-It uses a great deal of it. FiTuna performs no tensor math, no
-quantization, no inference and no perplexity computation of its own: every
-number it reports is produced by **llama.cpp**, running as a separate
-process, on a **GGUF** file, using **open-weight models**, evaluated
-against **openly-licensed corpora**, reachable by agents over an **open
-protocol**, tested on **open CI**. What FiTuna contributes is the search,
-the parsing, the caching and the honesty about what was measured.
+FiTuna의 핵심 특징은 **런타임 의존성 0개**입니다(`pyproject.toml`:
+`dependencies = []`). 이 문장만 보면 오픈소스SW를 전혀 사용하지 않는다고
+오해하기 쉽습니다.
 
-The precise claim is therefore: **FiTuna vendors nothing and links nothing;
-it depends on a lot.** "Zero dependencies" is a statement about the Python
-import graph and the installed wheel, not about the software stack. This
-document is the stack.
+실제로는 많은 오픈소스SW를 활용합니다. FiTuna는 tensor 연산, 양자화, 추론,
+perplexity 계산을 직접 하지 않습니다. 보고하는 모든 수치는 별도 process로 실행한
+**llama.cpp**가 **GGUF** 파일과 **open-weight 모델**을 처리하고 **공개
+라이선스 corpus**로 평가해 만든 결과입니다. Agent와는 **공개 protocol**로
+연결하며 **공개 CI**에서 검사합니다. FiTuna가 더하는 가치는 탐색, 출력 해석,
+cache, 그리고 무엇을 측정했는지 숨기지 않는 데 있습니다.
 
-Every license below was checked against a primary source on **2026-07-30**
-(the project's own `LICENSE`/`License.txt` file, or the HuggingFace API's
-`cardData.license` for models and datasets). The exact source and what it
-returned is stated per item. Nothing here is quoted from memory; anything
-that could not be verified is marked **unverified** and named as such.
+정확한 표현은 이렇습니다. **FiTuna는 아무것도 vendor 방식으로 포함하거나 link하지
+않지만 많은 도구에 의존합니다.** "의존성 0개"는 전체 software stack이 아니라
+Python import graph와 설치 wheel에 관한 설명입니다. 이 문서는 그 stack을
+정리합니다.
 
-## The coupling column is the important one
+아래 라이선스는 모두 **2026-07-30**에 1차 출처에서 확인했습니다. 각 프로젝트의
+`LICENSE`·`License.txt` 원문 또는 모델·데이터셋에 대한 HuggingFace API의
+`cardData.license` 값입니다. 항목마다 정확한 출처와 반환값을 적었으며 기억에
+의존해 쓰지 않았습니다. 확인하지 못한 내용은 **미확인**이라고 명시합니다.
 
-License consequences follow from *how* code is combined, not from whether
-it was used. FiTuna uses five distinct coupling modes, and only one of them
-is the mode that propagates license terms into this repository:
+## 결합 방식이 중요한 이유
 
-| Mode | Meaning | Consequence for FiTuna |
+라이선스 영향은 사용 여부보다 코드를 *어떻게* 결합했는지에 따라 달라집니다.
+FiTuna는 다섯 가지 결합 방식을 사용하며, 그중 하나만 이 저장소 배포물에
+라이선스 조건을 전달할 수 있습니다.
+
+| 방식 | 의미 | FiTuna에 미치는 영향 |
 |---|---|---|
-| **imported** | Runs inside the FiTuna Python process | The only mode that could impose terms on FiTuna's own distribution |
-| **subprocess** | Separate OS process; FiTuna passes argv and parses stdout | No linkage. Nothing distributed. User installs it themselves |
-| **file format** | Data read/written per a public specification | No linkage. Format conformance is not derivation |
-| **network / IPC protocol** | Spoken to over HTTP or stdio | No linkage. FiTuna implements the client/server itself |
-| **dev / CI only** | Never present in the installed package | No effect on downstream users |
+| **import** | FiTuna Python process 안에서 실행 | FiTuna 자체 배포물에 조건을 부과할 수 있는 유일한 방식 |
+| **subprocess** | 별도 OS process에 argv를 전달하고 stdout 해석 | Link 없음, 배포 없음, 사용자가 직접 설치 |
+| **파일 형식** | 공개 specification에 따라 data 읽기·쓰기 | Link 없음, 형식 준수는 파생 저작물이 아님 |
+| **network / IPC protocol** | HTTP 또는 stdio로 통신 | Link 없음, FiTuna가 client/server를 직접 구현 |
+| **개발 / CI 전용** | 설치 package에 들어가지 않음 | downstream 사용자에게 영향 없음 |
 
-Only one entry in this document is **imported**: the CPython standard
-library. That is what "zero runtime dependencies" actually means.
+이 문서에서 **import**하는 항목은 CPython 표준 라이브러리 하나뿐입니다. 이것이
+"런타임 의존성 0개"의 정확한 뜻입니다.
 
-## Master table
+## 전체 목록
 
-| # | Area | Open-source software | License (verified) | Coupling | Where in this repo |
+| # | 부문 | 오픈소스SW | 라이선스(확인함) | 결합 방식 | 저장소 내 위치 |
 |---|---|---|---|---|---|
 | 1 | Inference / quantization engine | llama.cpp (`llama-quantize`, `llama-bench`, `llama-perplexity`, `convert_hf_to_gguf.py`) | MIT | subprocess (`llama-cli`/`llama-server`: emitted in the result commands, never run) | `quantize.py`, `bench.py`, `quality.py`, `model_info.py`, `binaries.py`, `report.py` |
 | 2 | Model file format | GGUF (ggml) | MIT (spec repo) | file format | `model_info.py:201` `read_model_info()` |
@@ -72,12 +74,12 @@ never redistributed like the others.
 
 ---
 
-## 1. Inference and quantization engine — llama.cpp
+## 1. 추론·양자화 엔진 — llama.cpp
 
-**What it is.** The C/C++ LLM inference stack this entire project exists to
+**무엇인가.** The C/C++ LLM inference stack this entire project exists to
 tune. FiTuna implements none of it.
 
-**Where it is used.** Four llama.cpp artifacts are executed, one wrapper
+**사용 위치.** Four llama.cpp artifacts are executed, one wrapper
 each (the first three are compiled binaries; the fourth is a Python script
 run through `sys.executable`):
 
@@ -105,14 +107,14 @@ Discovery and version handling live in `fituna/binaries.py`:
 `BinaryNotFoundError` pointing at upstream's build instructions rather than
 failing obscurely.
 
-**License and how it was determined.** MIT. Fetched
+**라이선스와 확인 방법.** MIT. Fetched
 `https://raw.githubusercontent.com/ggml-org/llama.cpp/master/LICENSE` on
 2026-07-30; its first lines read `MIT License` /
 `Copyright (c) 2023-2026 The ggml authors`. The full text is reproduced in
 `THIRD_PARTY_NOTICES.md` §1 to satisfy MIT's notice-preservation condition,
 even though no llama.cpp byte is present in this repository.
 
-**Coupling.** Subprocess, in every case. `subprocess.run()` with an argv
+**결합 방식.** Subprocess, in every case. `subprocess.run()` with an argv
 list; FiTuna reads stdout/stderr and the exit code and nothing else. No
 llama.cpp header, source file, shared library or binary is compiled
 against, linked, vendored, packaged or redistributed. The user installs
@@ -122,7 +124,7 @@ Colab notebook) work unchanged. Because there is no linkage, MIT's only operativ
 condition on FiTuna is notice preservation, which `THIRD_PARTY_NOTICES.md`
 discharges.
 
-**Why this is the right choice.** llama.cpp is the de-facto portable local
+**이 선택이 적절한 이유.** llama.cpp is the de-facto portable local
 inference runtime (Metal, CUDA, ROCm, CPU from one codebase), so tuning
 *it* is what makes FiTuna's answer usable on the machine the user has.
 Deliberate design consequences of the subprocess boundary:
@@ -139,7 +141,7 @@ Deliberate design consequences of the subprocess boundary:
   `report.py:28` accepts `main` as well as `llama-cli`, upstream's older
   binary name.
 
-**Alternative considered.** Binding to `libllama` (ctypes or a compiled
+**검토한 대안.** Binding to `libllama` (ctypes or a compiled
 extension) instead of shelling out. Rejected: it would make FiTuna's
 install depend on the user's llama.cpp ABI version, turn every upstream API
 change into a build break, and require shipping or matching a compiled
@@ -147,12 +149,12 @@ artifact — while the subprocess boundary already gives everything the
 search needs, since `llama-bench` is precisely the tool whose numbers we
 want to report.
 
-## 2. Model file format — GGUF
+## 2. 모델 파일 형식 — GGUF
 
-**What it is.** The single-file model container format used by llama.cpp,
+**무엇인가.** The single-file model container format used by llama.cpp,
 specified in the ggml repository.
 
-**Where it is used.** `fituna/model_info.py:201` `read_model_info()` opens
+**사용 위치.** `fituna/model_info.py:201` `read_model_info()` opens
 the file and parses the GGUF header directly with the stdlib `struct`
 module: magic, version, tensor/KV counts, the metadata KV table
 (`general.architecture`, `<arch>.block_count`, `general.file_type`) and the
@@ -162,22 +164,22 @@ parameter count. `n_layers` from that parse is the upper bound of the
 `is_already_quantized()` (`model_info.py:269`), which warns when the user
 hands FiTuna an already-quantized file as a "baseline."
 
-**License and how it was determined.** The specification document lives at
+**라이선스와 확인 방법.** The specification document lives at
 `https://github.com/ggml-org/ggml/blob/master/docs/gguf.md` (HTTP 200 on
 2026-07-30). Its repository's `LICENSE`, fetched from
 `https://raw.githubusercontent.com/ggml-org/ggml/master/LICENSE`, reads
 `MIT License` / `Copyright (c) 2023-2026 The ggml authors` — the same text
 as llama.cpp.
 
-**Coupling.** File format only. No ggml code is imported, linked or copied;
+**결합 방식.** File format only. No ggml code is imported, linked or copied;
 `model_info.py` is an independent reader written against the published
 spec. Reading a documented file format creates no derivative work.
 
-**Why this is the right choice.** GGUF is what `llama-quantize` emits and
+**이 선택이 적절한 이유.** GGUF is what `llama-quantize` emits and
 `llama-bench` consumes, so there is no alternative container in this
 pipeline.
 
-**Alternative considered.** Asking a llama.cpp binary to dump metadata, or
+**검토한 대안.** Asking a llama.cpp binary to dump metadata, or
 depending on the `gguf` PyPI package. The first is rejected for the reason
 recorded in `model_info.py`'s own module docstring: no llama.cpp binary
 exposes a "dump metadata as JSON" contract stable across versions. The
@@ -189,7 +191,7 @@ fields are bounded against the real file size before allocation
 (`_read_exact()`, `_read_value()`), because a GGUF is whatever the user
 downloaded.
 
-## 3–4. Open-weight models
+## 3~4. Open-weight 모델
 
 FiTuna bundles no weights and pins no model. `--model` is whatever the user
 already has on disk. The three models below are the ones the project's own
@@ -202,7 +204,7 @@ open-source artifacts*, not as dependencies.
 | Qwen3-4B-Instruct-2507 | `docs/RESULTS.md` Runs 2 and 3 | Apache-2.0 | `https://huggingface.co/api/models/Qwen/Qwen3-4B-Instruct-2507` → `cardData.license: apache-2.0`; the GGUF used, `unsloth/Qwen3-4B-Instruct-2507-GGUF`, likewise reports `apache-2.0` |
 | Midm-2.0-Mini-Instruct (KT Corporation) | `docs/RESULTS.md` Run 5 | MIT | `https://huggingface.co/api/models/K-intelligence/Midm-2.0-Mini-Instruct` → `cardData.license: mit` (re-verified 2026-07-30); the GGUF actually downloaded is `mykor/Midm-2.0-Mini-Instruct-gguf`, which reports `cardData.license: mit` and `base_model: K-intelligence/Midm-2.0-Mini-Instruct` by the same query. Both repositories carry a verbatim MIT `LICENSE.txt` ("Copyright (c) 2025 KT Corporation") and neither is gated — see `docs/RESULTS.md` Run 5 |
 
-**Coupling.** File format, user-supplied. The weights are read by the
+**결합 방식.** File format, user-supplied. The weights are read by the
 llama.cpp subprocesses, never by FiTuna, and are never committed, packaged
 or redistributed. FiTuna does not train, fine-tune, distil or merge
 anything; `llama-quantize` changes numeric precision inside llama.cpp's own
@@ -230,7 +232,7 @@ reason no gated model is used in the reproduction path — for contrast,
 `meta-llama/Meta-Llama-3-8B-Instruct` reports `license: llama3`, a
 community license with its own conditions.
 
-## 5–6. Evaluation corpora
+## 5~6. 평가 corpus
 
 **What they are.** The plain-text corpora `llama-perplexity` runs over to
 produce the quality number the search gates on.
@@ -245,7 +247,7 @@ produce the quality number the search gates on.
 `fituna fetch-corpus` writes the text to the user's `--out` path; from then
 on `fituna/quality.py:56` passes that path to `llama-perplexity -f`.
 
-**License and how it was determined.** Both are **CC BY-SA 3.0, also
+**라이선스와 확인 방법.** Both are **CC BY-SA 3.0, also
 dual-licensed GFDL** — attribution and share-alike apply. Determined by
 querying each dataset's own metadata on 2026-07-30:
 `https://huggingface.co/api/datasets/Salesforce/wikitext` and
@@ -254,7 +256,7 @@ querying each dataset's own metadata on 2026-07-30:
 same provenance in a comment, and each preset's `license_note` carries the
 attribution text.
 
-**Coupling.** File format, fetched on demand. No corpus text is committed
+**결합 방식.** File format, fetched on demand. No corpus text is committed
 to this repository; `.gitignore` keeps `*.txt` outputs out. Because the
 corpus is downloaded to a path of the user's choosing and never
 redistributed by FiTuna, CC BY-SA's share-alike condition is not triggered
@@ -272,19 +274,19 @@ corpus *alone* flipped feasibility. A quality gate is only as meaningful as
 its corpus, so the corpus is a first-class, documented, openly-licensed
 input — not a hidden constant.
 
-**Alternative considered.** The conventional `pip install datasets` +
+**검토한 대안.** The conventional `pip install datasets` +
 snippet, which was in fact what the README documented before `corpus.py`
 existed. Rejected as recorded in `corpus.py`'s module docstring: `datasets`
 pulls in pyarrow/pandas — hundreds of megabytes — to download a text file,
 which contradicts the zero-dependency guarantee. Replaced by ~40 lines of
 stdlib `urllib` against the public REST API.
 
-## 7. Data-access API — HuggingFace dataset-viewer
+## 7. 데이터 접근 API — HuggingFace dataset-viewer
 
-**What it is.** HuggingFace's public REST service that serves dataset rows
+**무엇인가.** HuggingFace's public REST service that serves dataset rows
 as JSON without authentication.
 
-**Where it is used.** `fituna/corpus.py:51`
+**사용 위치.** `fituna/corpus.py:51`
 `API_BASE = "https://datasets-server.huggingface.co/rows"`, called from
 `_fetch_page()` via `urllib.request.urlopen`. `fetch_corpus()` paginates
 with `offset`/`length` (the server caps `length` at 100), validates that
@@ -295,7 +297,7 @@ verified by hand against the live API on 2026-07-30 and documented in the
 module docstring, including the observed 422 cap and the "offset past the
 end returns 200 with an empty `rows` list" behaviour.
 
-**License and how it was determined.** The service's server implementation
+**라이선스와 확인 방법.** The service's server implementation
 is open source: `https://api.github.com/repos/huggingface/dataset-viewer/license`
 returns SPDX `Apache-2.0` (2026-07-30). **That license does not govern
 FiTuna's use of it** — FiTuna imports none of that code; it makes anonymous
@@ -305,9 +307,9 @@ service's own terms of use were not reviewed and are **unverified**; FiTuna
 uses only the documented public endpoint with default headers and no
 authentication.
 
-**Coupling.** Network protocol. HTTP client, stdlib only.
+**결합 방식.** Network protocol. HTTP client, stdlib only.
 
-**Why this is appropriate.** It removes the last "go and manually download
+**이 방식이 적절한 이유.** It removes the last "go and manually download
 this" step from the quickstart while keeping the dependency count at zero,
 and it fails loudly with actionable guidance (`_MANUAL_FALLBACK`) rather
 than retrying, so a judge on a restricted network gets a clear "download it
@@ -315,12 +317,12 @@ manually or point `--quality-corpus` at any UTF-8 text file" message
 instead of a hang. This is the project's only network dependency, and it is
 optional: `fituna run` never touches the network.
 
-## 8. Agent protocol — Model Context Protocol over JSON-RPC 2.0
+## 8. Agent protocol — JSON-RPC 2.0 기반 Model Context Protocol
 
-**What it is.** MCP is the open protocol for exposing tools to AI agents.
+**무엇인가.** MCP is the open protocol for exposing tools to AI agents.
 Its stdio transport is newline-delimited JSON-RPC 2.0.
 
-**Where it is used.** `fituna/mcp_server.py` is a complete server in 305
+**사용 위치.** `fituna/mcp_server.py` is a complete server in 305
 lines of stdlib: `serve()` runs the newline-delimited JSON-RPC loop over
 stdin/stdout; `_handle()` implements `initialize`, `tools/list`,
 `tools/call` and `ping`, returns `-32601` for unknown methods and `-32700`
@@ -329,7 +331,7 @@ for malformed JSON, and correctly returns *nothing* for notifications (no
 and exposes two tools, `fituna_detect_hardware` and `fituna_recommend`.
 Entry point `fituna-mcp` in `pyproject.toml`.
 
-**License and how it was determined.** The specification repository's
+**라이선스와 확인 방법.** The specification repository's
 `LICENSE`
 (`https://raw.githubusercontent.com/modelcontextprotocol/modelcontextprotocol/main/LICENSE`,
 fetched 2026-07-30) states that the project is **mid-transition from MIT to
@@ -351,7 +353,7 @@ JSON-RPC 2.0 itself is a published open specification at
 JSON-RPC Working Group"; it is a specification document rather than
 licensed software, and no software license is claimed for it here.
 
-**Coupling.** IPC protocol. FiTuna speaks MCP; it does not use any MCP
+**결합 방식.** IPC protocol. FiTuna speaks MCP; it does not use any MCP
 implementation. No SDK, no schema library, no code from the spec repo.
 
 **Alternative considered — and this is the clearest case in the document.**
@@ -366,11 +368,11 @@ fituna.mcp_server --selfcheck` drives a real `initialize` → `tools/list` →
 bad `tools/call` → notification → malformed-JSON sequence through `serve()`
 and asserts the responses, and CI runs it on every push.
 
-## 9. Language runtime — CPython standard library
+## 9. 언어 runtime — CPython 표준 라이브러리
 
-**What it is.** The one thing FiTuna actually imports.
+**무엇인가.** The one thing FiTuna actually imports.
 
-**Where it is used.** Everywhere; `pyproject.toml` declares
+**사용 위치.** Everywhere; `pyproject.toml` declares
 `requires-python = ">=3.11"` and `dependencies = []`. The load-bearing
 modules, per area: `subprocess` (every llama.cpp call), `struct` (GGUF
 header parsing), `sqlite3` (`cache.py`, the `--resume` result cache),
@@ -412,33 +414,33 @@ parses plain text via a regex, `_PPL_RE` (`quality.py:23`) — neither parses CS
 The complete, AST-verified list is `docs/SBOM.md` rows 2–27 (row 1 being the
 interpreter itself).
 
-**License and how it was determined.** PSF License Agreement Version 2
+**라이선스와 확인 방법.** PSF License Agreement Version 2
 (SPDX `PSF-2.0`). Fetched
 `https://raw.githubusercontent.com/python/cpython/main/LICENSE` on
 2026-07-30; the license section is headed
 `Python Software Foundation License Version 2`. It is permissive and
 imposes no copyleft on FiTuna.
 
-**Coupling.** Imported — the only such entry. The declared floor is
+**결합 방식.** Imported — the only such entry. The declared floor is
 `requires-python = ">=3.11"`, which carries **no declared upper bound**; CI
 proves the floor (3.11) and the newest release tested today (3.13) across
 three operating systems on every push — 3.13 is the newest version
 exercised, not a ceiling the project has declared.
 
-**Why this is appropriate.** The zero-dependency property is not asceticism
+**이 방식이 적절한 이유.** The zero-dependency property is not asceticism
 for its own sake: FiTuna's users are people already fighting a large,
 fragile local-LLM toolchain, and a tuner that adds its own dependency tree
 to that is a tuner they will not install. Everything a subprocess
 orchestrator needs — process control, sqlite, HTTP, binary struct parsing,
 JSON — is already in the stdlib.
 
-**Alternatives considered.** `psutil` for hardware detection, rejected in
+**검토한 대안.** `psutil` for hardware detection, rejected in
 favour of a ~20-line `ctypes` call to `GlobalMemoryStatusEx` on Windows and
 `/proc/meminfo`/`sysctl` elsewhere (`hardware.py:176`, with an in-code note
 that `psutil` is the upgrade path if per-NUMA precision is ever needed);
 `requests` for the corpus fetch, rejected in favour of `urllib.request`.
 
-## 10. Build backend — setuptools
+## 10. 빌드 backend — setuptools
 
 `pyproject.toml` `[build-system]` declares `requires = ["setuptools>=77"]`
 and `build-backend = "setuptools.build_meta"`. License: MIT, per
@@ -450,7 +452,7 @@ console scripts and needs nothing a modern setuptools does not already do.
 
 ## 11. CI — GitHub Actions
 
-**Where it is used.** `.github/workflows/ci.yml` runs on every push to
+**사용 위치.** `.github/workflows/ci.yml` runs on every push to
 `main` and every pull request, over a 3 OS × 2 Python matrix
 (ubuntu/macos/windows-latest × 3.11/3.13) with `fail-fast: false`. Two
 steps: `pytest -q`, then every module that ships a standalone self-check.
@@ -465,7 +467,7 @@ decoration. The 18th file, `fituna/__main__.py`, is the `python -m fituna`
 entry point (it just calls `cli.main()`); it has no self-check of its own,
 so excluding it from this list is correct, not an oversight.
 
-**License and how it was determined.** The two reusable actions consumed
+**라이선스와 확인 방법.** The two reusable actions consumed
 are open source and MIT: `https://api.github.com/repos/actions/checkout/license`
 and `.../actions/setup-python/license` both return SPDX `MIT`
 (2026-07-30). The runner itself (`actions/runner`) and the runner images
@@ -474,10 +476,10 @@ GitHub Actions service is a proprietary GitHub product** — FiTuna consumes
 it, does not redistribute it, and nothing about it is claimed as open
 source here.
 
-**Coupling.** Development/CI only; nothing from CI reaches the installed
+**결합 방식.** Development/CI only; nothing from CI reaches the installed
 package.
 
-**Why this is appropriate.** FiTuna's cross-platform claims are the ones
+**이 방식이 적절한 이유.** FiTuna's cross-platform claims are the ones
 most likely to be wrong (`shutil.which` semantics, `Path.replace` vs
 `rename` on Windows, subprocess text decoding under non-UTF-8 locales), and
 each of those has a matching defensive line in the source. A three-OS
@@ -488,17 +490,17 @@ runs — those are `docs/RESULTS.md` and the Colab notebook.
 
 ## 12. Test framework — pytest
 
-**Where it is used.** `tests/test_cache.py`, `test_config.py`,
+**사용 위치.** `tests/test_cache.py`, `test_config.py`,
 `test_corpus.py`, `test_doctor.py`, `test_hardware.py`, `test_search.py` —
 fixtures, `parametrize`, `raises`. Declared as
 `[project.optional-dependencies].dev = ["pytest"]` with
 `[tool.pytest.ini_options] testpaths = ["tests"]`.
 
-**License and how it was determined.** MIT, per
+**라이선스와 확인 방법.** MIT, per
 `https://api.github.com/repos/pytest-dev/pytest/license` → SPDX `MIT`
 (2026-07-30).
 
-**Coupling.** Dev only. `pip install fituna` does not install it; only
+**결합 방식.** Dev only. `pip install fituna` does not install it; only
 `pip install fituna[dev]` does. It is therefore not a dependency of the
 shipped software, which is why `docs/SBOM.md` marks it dev-only.
 
@@ -512,7 +514,7 @@ cache key matrices, search-algorithm scenarios, hardware-parsing variants.
 CI runs both. The stdlib layer is what lets a reviewer verify any single
 module without installing anything.
 
-## 13. Verification environment — Colab notebook
+## 13. 검증 환경 — Colab notebook
 
 `notebooks/colab_nvidia_verification.ipynb` reproduces the measured search
 on an NVIDIA T4 (Linux/CUDA), hardware the maintainer does not own; its
@@ -528,7 +530,7 @@ that path:
 | `huggingface_hub` | Cell 5 downloads the demo GGUF | Apache-2.0 | `https://api.github.com/repos/huggingface/huggingface_hub/license` → SPDX `Apache-2.0` (2026-07-30) |
 | llama.cpp | Cell 2 clones and builds it from source | MIT | §1 |
 
-**Coupling.** Notebook/dev only. `huggingface_hub` is `pip install`-ed
+**결합 방식.** Notebook/dev only. `huggingface_hub` is `pip install`-ed
 *inside the notebook* to fetch a file; it is not a FiTuna dependency and
 appears nowhere in `pyproject.toml`. Google Colab is a proprietary hosted
 Google service used as an execution environment. The CUDA toolkit used to
@@ -538,7 +540,7 @@ image, and not redistributed. The notebook clones llama.cpp with
 claimed for Run 4; the macOS runs in `docs/RESULTS.md` state their build
 (Homebrew 9960) because that one was recorded.
 
-## 14. Hardware detection utilities
+## 14. 하드웨어 감지 도구
 
 `fituna/hardware.py:detect_hardware()` shells out to whatever is present
 and falls back to a CPU-only profile via `platform` when nothing is. Two
@@ -581,27 +583,27 @@ search proceeds (skipping the `-ngl` binary search, per
 
 ---
 
-## License obligations FiTuna actually carries
+## FiTuna가 실제로 지는 라이선스 의무
 
 Because nothing is vendored and only the PSF-licensed stdlib is imported,
 the obligation set is small and fully discharged in-repo:
 
-| Obligation | Source | Discharged by |
+| 의무 | 출처 | 준수 방법 |
 |---|---|---|
 | Preserve the MIT notice | llama.cpp, ggml | `THIRD_PARTY_NOTICES.md` §1 reproduces the full MIT text |
 | Attribution + share-alike | CC BY-SA 3.0 corpora | `fituna fetch-corpus` prints the notice and source URL on every fetch (`cli.py:320`); no corpus text is committed |
-| Model license compliance | User's chosen weights | Weights are never redistributed; `docs/AI_MODEL_USAGE.md` carries the disclosure template, and every model in the published results is Apache-2.0 |
+| 모델 라이선스 준수 | 사용자가 선택한 weight | Weight를 재배포하지 않음. `docs/AI_MODEL_USAGE.md`에 공개 template 제공. 공개 결과의 모델은 Apache-2.0 또는 MIT |
 | FiTuna's own terms | MIT (`LICENSE`) | Permissive; imposes nothing on users |
 
 No copyleft software is linked into FiTuna. The CC BY-SA share-alike
 condition attaches to corpus *text*, which FiTuna transports to a
 user-chosen path and never republishes.
 
-## What this project gives back upstream
+## Upstream에 환원하는 것
 
 Stated as of 2026-07-30, without inflation:
 
-**What exists.**
+**현재 공개한 것.**
 
 - **Published cross-platform measurements of the llama.cpp toolchain** that
   are not otherwise available in one place: `docs/RESULTS.md` records five
@@ -624,25 +626,22 @@ Stated as of 2026-07-30, without inflation:
   thermal-throttle outlier and the direct `llama-bench` repeats that
   identified it as an outlier.
 
-**What does not exist yet, and is not claimed.** No patch, pull request or
+**아직 없으며 있다고 주장하지 않는 것.** No patch, pull request or
 issue of this project's has been merged into llama.cpp, ggml, the Model
 Context Protocol, or any dataset or model repository. FiTuna is a consumer
 of those projects that publishes measurements about them; it is not, today,
 a contributor to their code. The honest summary is: **published measured
 data and a reproducible notebook, and nothing merged upstream yet.**
 
-## Related documents
+## 관련 문서
 
-- `docs/LICENSE_COMPLIANCE.md` — the compliance argument built on this
-  document: what the built sdist/wheel actually contain, why no license
-  pair conflicts, and the license scans that were executed, with their real
-  output and reproduction commands
-- `docs/SBOM.md` — the numbered SBOM (stdlib modules + external executables)
-- `THIRD_PARTY_NOTICES.md` — required license notices, incl. llama.cpp's
-  full MIT text
-- `docs/AI_MODEL_USAGE.md` — per-model AI usage disclosure
-- `docs/ARCHITECTURE.md` — where the subprocess boundaries sit and why
-- `LICENSE` — FiTuna's own MIT license
+- `docs/LICENSE_COMPLIANCE.md` — 실제 sdist·wheel 구성, 라이선스 비충돌 근거,
+  실행한 scan의 실제 출력과 재현 명령
+- `docs/SBOM.md` — 번호를 붙인 SBOM(표준 라이브러리 모듈 + 외부 실행 파일)
+- `THIRD_PARTY_NOTICES.md` — llama.cpp MIT 전문을 포함한 필수 라이선스 고지
+- `docs/AI_MODEL_USAGE.md` — 모델별 AI 활용 공개
+- `docs/ARCHITECTURE.md` — subprocess 경계와 설계 이유
+- `LICENSE` — FiTuna 자체 MIT license
 
 ---
 
@@ -690,8 +689,8 @@ Colab(각 사 호스팅 서비스)도 호출·이용하지만, 모두 재배포�
 수록, (2) 코퍼스 CC BY-SA 저작자표시·동일조건 — `fituna fetch-corpus` 실행
 시마다 출처·라이선스 고지를 표준출력에 인쇄하고 코퍼스 원문은 저장소에 넣지
 않음, (3) 사용자가 선택한 모델의 라이선스 준수 — 가중치를 재배포하지 않고
-`docs/AI_MODEL_USAGE.md`에 고지 템플릿을 제공하며 시연에 사용한 모델은 모두
-Apache-2.0, (4) FiTuna 자체 라이선스(MIT) 준수 — 사용자에게 아무 의무도
+`docs/AI_MODEL_USAGE.md`에 고지 템플릿을 제공하며 시연에 사용한 모델은
+Apache-2.0 또는 MIT, (4) FiTuna 자체 라이선스(MIT) 준수 — 사용자에게 아무 의무도
 부과하지 않는 permissive 라이선스. 링크된 카피레프트 소프트웨어는 없다 —
 §13의 `git`(GPL-2.0)은 검증 노트북 안에서만 호출되는 개발/노트북 한정
 도구이며 FiTuna 배포물에는 링크되지 않는다.

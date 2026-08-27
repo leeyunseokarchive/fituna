@@ -1,226 +1,201 @@
-# Changelog
+# 변경 이력
 
-All notable changes to this project are documented in this file.
+프로젝트의 주요 변경 사항을 이 문서에 기록합니다.
 
-The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+형식은 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)를 따르며,
+버전은 [유의적 버전](https://semver.org/spec/v2.0.0.html)에 맞춰 관리합니다.
 
-## [Unreleased]
+## [미출시]
 
 ## [0.2.0] — 2026-08-24
 
-### Added
+### 추가
 
-- **Published to PyPI** — `pip install fituna` now works; git checkout is
-  only needed for development. First published version: 0.2.0. (A 0.1.0
-  upload made the same day contains a pre-0.2.0 snapshot and predates the
-  `--hf` flag; use 0.2.0.)
+- **PyPI 배포** — 이제 `pip install fituna`로 설치할 수 있으며 git checkout은
+  개발할 때만 필요합니다. 최초 정식 배포 버전은 0.2.0입니다. 같은 날 올라간
+  0.1.0은 0.2.0 이전 snapshot으로 `--hf` flag가 없으므로 0.2.0을 사용하세요.
 
-- **`fituna run --hf repo[:filename]`** — non-interactive HuggingFace
-  download on the script path. With a bare repo it queries the HF API,
-  picks the single F16/BF16 `.gguf` (refusing to guess when there are zero
-  or several — the error lists the repo's `.gguf` files to pick from), and
-  prints the model's license when the API reports one, flagging when it
-  doesn't. With `repo:filename` it downloads exactly that file, no listing
-  call. Files land in `--out` and are reused on later runs. Uses the same
-  atomic temp-file download as the wizard, whose progress line is now
-  language-neutral because both surfaces share it.
+- **`fituna run --hf repo[:filename]`** — script 경로에서 대화 없이
+  HuggingFace 모델을 다운로드합니다. 저장소 이름만 주면 HF API를 조회해 유일한
+  F16/BF16 `.gguf`를 고릅니다. 파일이 없거나 여러 개면 추측하지 않고 선택할 수
+  있는 `.gguf` 목록을 오류에 표시합니다. API에 모델 라이선스가 있으면 출력하고,
+  없으면 없다는 사실을 알립니다. `repo:filename` 형식은 목록을 조회하지 않고
+  지정한 파일만 받습니다. 파일은 `--out`에 저장해 다음 실행에서 재사용합니다.
+  마법사와 같은 atomic 임시 파일 다운로드를 공유하므로 진행 문구는 특정 언어에
+  의존하지 않도록 바꿨습니다.
 
-- **`fituna quickstart`** — an interactive six-step wizard (environment
-  check → targets → license requirements → model → quality corpus → confirm
-  and run). Every search parameter it assembles maps to a public `fituna
-  run` flag — proven by an argv-equality test — while model download (the
-  curated shortlist) and the HuggingFace search are wizard-only
-  conveniences with no `run` equivalent. It prints the fully assembled
-  `fituna run ...` command, then parses that same argv back through the CLI
-  parser and executes it in-process, so what is shown and what runs cannot
-  diverge. Requires a TTY (exit 1 otherwise, pointing at `fituna run`).
-  It refuses to predict throughput and says so on screen. Memory fit is
-  arithmetic only — published file size vs detected VRAM/RAM, with the
-  assumed 20 % margin stated as an assumption. A curated model whose F16
-  file exceeds that budget stays listed and selectable, flagged rather than
-  hidden — the file that actually runs is the quantized one. Each curated
-  model carries the license badge it earned: "license text verified" where a
-  real `LICENSE` file was fetched and compared (Qwen3, Mi:dm), "metadata
-  only" where the upstream repository ships none (SmolLM2); every
-  HuggingFace search
-  result is labelled uploader-supplied metadata with the uploader's link,
-  and gated repositories are marked unusable. Past `docs/RESULTS.md`
-  measurements appear only as records of what was measured on named
-  hardware. The HuggingFace `/api/models` response shape was verified
-  against the live API before the parser was written.
+- **`fituna quickstart`** — 환경 점검 → 목표 → 라이선스 요구사항 → 모델 → 품질
+  corpus → 확인 및 실행의 6단계 대화형 마법사입니다. 조립하는 모든 탐색 매개변수는
+  공개 `fituna run` flag에 대응하며 argv 동등성 test로 이를 검증했습니다. 엄선
+  모델 다운로드와 HuggingFace 검색은 `run`에 없는 마법사 전용 편의 기능입니다.
+  완성한 `fituna run ...` 명령을 보여 준 뒤 같은 argv를 CLI parser로 다시
+  해석해 process 안에서 실행하므로 화면에 표시한 명령과 실제 실행이 달라질 수
+  없습니다. TTY가 없으면 `fituna run`을 안내하고 종료 코드 1로 끝납니다.
+  처리량을 예측하지 않으며 이 점을 화면에 명시합니다. 메모리 적합 여부는 공개된
+  파일 크기와 감지된 VRAM/RAM을 20% 여유분 가정으로 단순 계산합니다. F16 파일이
+  예산을 넘는 엄선 모델도 숨기지 않고 경고와 함께 선택할 수 있게 남깁니다. 실제
+  실행 파일은 양자화본이기 때문입니다. Qwen3·Mi:dm처럼 실제 `LICENSE` 파일을
+  받아 비교한 모델에는 "라이선스 원문 검증", upstream 저장소에 원문이 없는
+  SmolLM2에는 "metadata만 확인" 표시를 붙입니다. 모든 HuggingFace 검색 결과는
+  uploader가 제공한 metadata임을 uploader 링크와 함께 밝히며, gated 저장소는
+  사용할 수 없다고 표시합니다. `docs/RESULTS.md`의 과거 측정값은 명시된
+  하드웨어에서 측정한 기록으로만 보여 줍니다. Parser를 만들기 전에 실제
+  HuggingFace `/api/models` 응답 구조를 확인했습니다.
 
-- **`fituna help [topic]`** — a subcommand that prints the same help
-  argparse would print for a given command name (`fituna help run`), and the
-  top-level help with no topic. An unknown topic exits 2 with the list of
-  valid names, matching argparse's own exit code for a bad command.
+- **`fituna help [topic]`** — 지정한 명령 이름에 대해 argparse와 같은 도움말을
+  출력합니다(`fituna help run`). topic이 없으면 최상위 도움말을 보여 줍니다.
+  알 수 없는 topic은 유효한 이름 목록과 함께 종료 코드 2로 끝나며, 잘못된
+  명령에 대한 argparse의 종료 코드와 같습니다.
 
-- **Artifact-centric result exits.** The quantized `.gguf` the search
-  already produced is now the headline of the result (path + size), followed
-  by the three ways to use it, in order: a `llama-server` command (the
-  OpenAI-compatible local API), Ollama, and `llama-cli` — demoted to what it
-  actually is, an interactive check. `report.build_server_command()` resolves
-  `llama-server` exactly the way `llama-cli` is resolved: **located, never
-  executed**, falling back to the bare name (and saying so) when it isn't
-  installed.
-- **`fituna run --export-ollama`** writes an Ollama `Modelfile`
-  (`FROM ./<gguf>` + the measured `num_gpu`/`num_ctx`) next to the `.gguf`,
-  atomically. The `FROM` path is relative so the `--out` directory stays
-  relocatable. PARAMETER names verified against Ollama's documentation on
-  2026-08-02, not written from memory.
-- **`run --json` gains `llama_server_command` and `modelfile_path`**
-  (the latter `null` unless `--export-ollama` was passed). Additive only —
-  every existing field keeps its name and shape.
+- **산출물 중심 결과 출력** — 탐색이 이미 만든 양자화 `.gguf`의 경로와 크기를
+  결과의 첫 항목으로 보여 줍니다. 이어서 `llama-server` 명령(OpenAI 호환 로컬
+  API), Ollama, 대화형 점검 도구인 `llama-cli` 순서로 사용법을 안내합니다.
+  `report.build_server_command()`는 `llama-cli`와 같은 방식으로
+  `llama-server`의 **위치만 찾고 실행하지 않습니다.** 설치되어 있지 않으면
+  명령 이름만 사용하며 그 사실을 알립니다.
+- **`fituna run --export-ollama`** — `.gguf` 옆에 Ollama `Modelfile`
+  (`FROM ./<gguf>` + 실측 `num_gpu`/`num_ctx`)을 atomic 방식으로 씁니다.
+  `FROM`은 상대경로라 `--out` 디렉터리를 옮길 수 있습니다. PARAMETER 이름은
+  기억에 의존하지 않고 2026-08-02에 Ollama 문서에서 확인했습니다.
+- **`run --json`에 `llama_server_command`와 `modelfile_path` 추가** —
+  `--export-ollama`를 주지 않으면 후자는 `null`입니다. 기존 필드의 이름과 구조는
+  모두 유지한 하위 호환 추가입니다.
 
 ## [0.1.0] — 2026-07-30
 
-Initial public release: everything below is the work recorded in this
-repository's history up to this point. FiTuna is not published to PyPI yet —
-install from source (`pip install -e .`).
+첫 공개 릴리스입니다. 아래 내용은 이 시점까지 저장소 이력에 기록된 작업입니다.
+아직 PyPI에 배포하지 않았으므로 소스에서 설치해야 합니다(`pip install -e .`).
 
-Entries under **Fixed** that say "found on real hardware" were not caught by
-the test suite. The suite mocks the subprocess layer by design (it must run
-with no llama.cpp and no network), so those bugs surfaced only when the tool
-was run against real llama.cpp binaries and real models. See
-[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for why that validation step is
-separate from CI.
+**수정** 항목 중 "실제 하드웨어에서 발견"이라고 표시한 문제는 test suite가
+잡아내지 못했습니다. Test suite는 llama.cpp와 network 없이 실행되도록
+subprocess 계층을 의도적으로 모의 처리하므로, 실제 llama.cpp 바이너리와 모델로
+실행했을 때만 이 버그들이 드러났습니다. 이 검증 단계를 CI와 분리한 이유는
+[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)에 설명합니다.
 
-### Added
+### 추가
 
-- **Two-stage measured search** (`fituna run`): quantize every candidate and
-  measure its perplexity loss against the F16 baseline, drop the ones over
-  the quality budget, then walk the survivors in *measured* quality order,
-  benchmarking each at full offload and binary-searching the minimal `-ngl`
-  for the first quant that meets the throughput target.
-- **CLI** with `run`, `detect-hw`, `list-binaries` subcommands, human and
-  `--json` output, and a distinct exit code per failure class (0 success,
-  1 general error, 2 missing binary, 3 no feasible config). Exit code 2 is
-  shared with argparse's own usage-error exit code — a required flag missing
-  or an unrecognized flag also exits 2, distinguishable from a missing binary
-  by whether stderr's first line starts with `usage:` (see
-  `docs/ARCHITECTURE.md`'s exit-code table).
-- **Hardware auto-detection** — NVIDIA (`nvidia-smi`), AMD (`rocm-smi`),
-  Apple Silicon unified memory (`system_profiler`), plus `--gpu`/`--vram-mb`
-  manual override.
-- **llama.cpp binary discovery** (`--llama-bin-dir` or `PATH`) with
-  capability and build-version introspection.
-- **GGUF header parsing** via stdlib `struct` (layer count, file type), and
-  HF-directory conversion through `convert_hf_to_gguf.py` when available.
-- **`llama-quantize` wrapper** — idempotent, atomic (temp file + rename), with
-  the model fingerprint folded into the output filename.
-- **`llama-perplexity` wrapper** with a `--ppl-chunks` bound on how much of
-  the corpus is evaluated (default 32).
-- **`llama-bench` wrapper** with timeout handling and `-d/--n-depth`-based
-  context emulation.
-- **sqlite3 result cache** keyed by model fingerprint × hardware profile ×
-  llama.cpp build version, driving `--resume`.
-- **Report layer** — human-readable and JSON result rendering plus a
-  ready-to-run `llama-cli` command line.
-- **`fituna doctor`** — up-front environment self-diagnosis (Python version,
-  required/advisory binaries, llama.cpp version, hardware detection, output
-  directory writability, free disk space) as PASS/WARN/FAIL rows with a
-  one-line remedy each, human and `--json`.
-- **`fituna fetch-corpus`** — downloads a quality corpus from HuggingFace's
-  public dataset-viewer REST API using stdlib `urllib` only (no `datasets`,
-  no pyarrow/pandas). English (wikitext-2-raw) and Korean (Korean Wikipedia)
-  presets, `--dataset/--config/--split` override, atomic writes, and a
-  CC BY-SA attribution notice printed on success.
-- **`--quality-corpus`** (with `--wikitext` kept as an alias) so the quality
-  gate can be measured on text resembling the actual workload.
-- **MCP server** (`fituna-mcp`) — newline-delimited JSON-RPC 2.0 over stdio,
-  implemented against the protocol directly so the zero-dependency guarantee
-  holds; exposes `fituna_detect_hardware` and `fituna_recommend`.
-- **Per-module runnable self-checks** (`python -m fituna.<module>`), executed
-  in CI alongside the test suite.
-- **152 unit tests** over a mocked subprocess/network layer, and a
-  3-OS × 2-Python (Ubuntu/macOS/Windows × 3.11/3.13) CI matrix.
-- **Warning when `--model` is already a quantized GGUF** (double-quantization
-  and a skewed baseline).
-- **Documentation** — architecture, measured results (Runs 1–5 including
-  run-to-run variance and a thermal-throttle outlier), use cases, a Korean
-  reproduction guide for judges (`REVIEWERS.md`), AI-assisted-development
-  disclosure, open-source usage spec, license-compliance record, SBOM,
-  third-party notices, SPDX headers on every Python file, and `REUSE.toml`.
-- **Colab notebook** for one-click NVIDIA/Linux reproduction on the free
-  T4 tier.
-- **Community files** — `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`,
-  `REVIEWERS.md`, issue and pull-request templates.
+- **2단계 실측 탐색**(`fituna run`) — 모든 후보를 양자화하고 F16 기준 대비
+  perplexity 손실을 측정합니다. 품질 예산을 넘는 후보는 제외한 뒤, 통과한 후보를
+  *실측* 품질 순으로 순회합니다. 각 후보를 full offload로 벤치마크하고 처리량
+  목표를 만족한 첫 quant에서 최소 `-ngl`을 이진탐색합니다.
+- **CLI** — `run`, `detect-hw`, `list-binaries` 하위 명령, 일반·`--json`
+  출력, 실패 종류별 종료 코드(0 성공, 1 일반 오류, 2 바이너리 없음, 3 가능한
+  설정 없음)를 제공합니다. 종료 코드 2는 argparse의 사용법 오류와 공유합니다.
+  필수 flag가 없거나 알 수 없는 flag도 2이며, stderr 첫 줄이 `usage:`로
+  시작하는지 보고 바이너리 누락과 구분할 수 있습니다
+  (`docs/ARCHITECTURE.md`의 종료 코드 표 참조).
+- **하드웨어 자동 감지** — NVIDIA(`nvidia-smi`), AMD(`rocm-smi`), Apple
+  Silicon 통합 메모리(`system_profiler`)를 감지하며 `--gpu`·`--vram-mb`로
+  직접 지정할 수도 있습니다.
+- **llama.cpp 바이너리 탐색** — `--llama-bin-dir` 또는 `PATH`에서 찾아 기능과
+  빌드 버전을 확인합니다.
+- **GGUF header 해석** — 표준 라이브러리 `struct`로 layer 수와 파일 형식을
+  읽고, 사용할 수 있으면 `convert_hf_to_gguf.py`로 HF 디렉터리를 변환합니다.
+- **`llama-quantize` wrapper** — 멱등이며 임시 파일을 rename하는 atomic
+  방식으로 동작하고 출력 파일명에 모델 fingerprint를 넣습니다.
+- **`llama-perplexity` wrapper** — corpus 평가량을 제한하는 `--ppl-chunks`
+  옵션을 제공합니다(기본값 32).
+- **`llama-bench` wrapper** — timeout을 처리하고 `-d/--n-depth`로 context를
+  모사합니다.
+- **sqlite3 결과 cache** — 모델 fingerprint × 하드웨어 profile × llama.cpp
+  빌드 버전을 key로 사용하며 `--resume`을 지원합니다.
+- **보고 계층** — 사람이 읽는 결과와 JSON 결과, 바로 실행할 수 있는
+  `llama-cli` 명령을 만듭니다.
+- **`fituna doctor`** — Python 버전, 필수·권장 바이너리, llama.cpp 버전,
+  하드웨어 감지, 출력 디렉터리 쓰기 권한, 남은 디스크 공간을 먼저 진단합니다.
+  각 항목은 해결 방법 한 줄과 함께 PASS/WARN/FAIL로 표시하며 일반·`--json`
+  출력을 지원합니다.
+- **`fituna fetch-corpus`** — 표준 라이브러리 `urllib`만 사용해 HuggingFace
+  공개 dataset-viewer REST API에서 품질 corpus를 받습니다(`datasets`,
+  pyarrow, pandas 미사용). 영어(wikitext-2-raw)·한국어(한국어 Wikipedia)
+  프리셋과 `--dataset/--config/--split` 재정의, atomic 쓰기를 지원하고 성공 시
+  CC BY-SA 저작자 표시를 출력합니다.
+- **`--quality-corpus`** — `--wikitext`를 alias로 유지하면서 실제 작업과 닮은
+  텍스트로 품질 gate를 측정할 수 있게 했습니다.
+- **MCP server**(`fituna-mcp`) — 의존성 0개 보장을 지키려고 protocol을 직접
+  구현한 stdio 기반 줄 단위 JSON-RPC 2.0 server입니다.
+  `fituna_detect_hardware`와 `fituna_recommend`를 제공합니다.
+- **모듈별 자체 점검** — `python -m fituna.<module>`로 실행할 수 있으며 CI가
+  test suite와 함께 실행합니다.
+- **단위 테스트 152개와 CI matrix** — subprocess·network 계층을 모의 처리하고
+  3개 OS × Python 2개 버전(Ubuntu/macOS/Windows × 3.11/3.13)에서 실행합니다.
+- **이미 양자화된 GGUF를 `--model`로 지정할 때 경고** — 이중 양자화와 잘못된
+  기준값 사용을 막습니다.
+- **문서** — 아키텍처, 실행 간 변동성과 발열 저하 이상치를 포함한 Run 1~5 실측
+  결과, 사용 사례, 심사위원용 한국어 재현 가이드(`REVIEWERS.md`), AI 활용 개발
+  공개, 오픈소스 활용 명세, 라이선스 준수 기록, SBOM, 제3자 고지, 모든 Python
+  파일의 SPDX header와 `REUSE.toml`을 추가했습니다.
+- **Colab notebook** — 무료 T4 환경에서 NVIDIA/Linux 결과를 한 번에 재현합니다.
+- **커뮤니티 파일** — `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`,
+  `REVIEWERS.md`, 이슈와 pull request template을 추가했습니다.
 
-### Fixed
+### 수정
 
-- **A single `llama-bench` timeout aborted the whole search.** Found on real
-  hardware: the minimal-`ngl` binary search benches `ngl=0`, which a 4B model
-  cannot finish CPU-only inside the 300 s timeout, and the resulting error
-  killed a search after 20+ minutes of completed work. A config too slow to
-  finish one bench *is* the answer for that config, so the timeout is now
-  caught, recorded as a 0 tok/s below-target result, and cached so `--resume`
-  never pays it twice.
-- **llama.cpp version detection silently failed on current builds.** Found on
-  real hardware: `llama-bench` rejects `--version` and prints no build banner,
-  so detection always returned `None` and the version-keyed cache hashed
-  every result under `"unknown"` — defeating the guarantee that `--resume`
-  never serves numbers measured under a different backend build.
-  `llama-perplexity` is now probed as well, and the bare `llama.cpp <build>`
-  banner form is accepted.
-- **The quality cache was not keyed by corpus.** Found on real hardware while
-  setting up the English-vs-Korean comparison: perplexity is a property of
-  (model, quant, corpus), but the key was (model, quant, chunk count), so
-  switching `--quality-corpus` under `--resume` served the previous corpus's
-  measurements as the new corpus's results. The corpus fingerprint joined the
-  key; pre-upgrade cache files have their quality table dropped and remeasured
-  rather than migrated.
-- **`llama-bench` has no `-c/--ctx-size` flag.** Found on real hardware: the
-  assumed argument is a hard parse error on current builds. Context is now
-  mapped to `-d/--n-depth` so the timed generation phase runs with the KV
-  cache filled to approximately the requested context.
-- **Perplexity evaluation ran over the entire test set.** `llama-perplexity`
-  was invoked with no chunk limit, making a four-candidate search take 3 h 44 m
-  on real hardware. `--ppl-chunks` (default 32) brings the same search to
-  roughly 12 minutes.
-- **`--resume` could serve a perplexity result computed at a different chunk
-  count** — `ppl_chunks` joined the quality cache key.
-- **Two FiTuna processes sharing an `--out` directory could write the same
-  quantize temp file.** A PID suffix was added, and temp-file cleanup widened
-  to a glob so stale files from earlier crashed runs are swept.
-- **Two different models could collide on one quantize output path** (every
-  HF-directory input converts to the same conventional base filename). The
-  model fingerprint is now part of the output filename.
-- **A crashed `llama-quantize` could leave a truncated file that looked
-  cached.** Quantization writes to a temp path and renames atomically.
-- **A present-but-unexecutable `llama-quantize`/`llama-perplexity` binary
-  (e.g. wrong permissions) crashed with a raw `PermissionError` traceback**
-  instead of the same `FiTunaError` reporting a missing binary gets.
-  `quantize.py`/`quality.py` now catch `OSError` generally, not just
-  `FileNotFoundError`, and distinguish "it's there but broken" from "go
-  install it" in the message.
-- **A corrupt or non-sqlite file at the cache path** raised a raw
-  `sqlite3.DatabaseError` traceback; it now becomes a `FiTunaError` with
-  concrete recovery guidance. A malformed `--ctx` value was fixed the same
-  way.
-- **A best-effort fallback could report `ngl=n_layers` for a CPU-only bench.**
-  The result is relabelled `ngl=0` before it is recorded.
-- **Both Windows CI jobs failed on the first real Windows run** — a Windows
-  path in a `pytest.raises` match pattern contains `\U`, an invalid regex
-  escape. The pattern is now `re.escape`d.
-- **`fituna doctor` could raise out of its own diagnostic loop.** Every check
-  is individually guarded so a failure in one produces a FAIL row for itself
-  rather than crashing the tool.
+- **`llama-bench` timeout 하나가 전체 탐색을 중단하던 문제** — 실제
+  하드웨어에서 발견했습니다. 최소 `ngl` 이진탐색은 `ngl=0`도 측정하는데, 4B
+  모델의 CPU 전용 실행은 300초 안에 끝나지 않아 이미 20분 넘게 수행한 탐색까지
+  오류로 종료됐습니다. 한 번의 bench도 마치지 못할 만큼 느리다는 사실 자체가
+  해당 설정의 결과이므로, 이제 timeout을 잡아 목표 미달 0 tok/s로 기록하고
+  cache에 넣어 `--resume`에서 다시 기다리지 않습니다.
+- **최신 빌드에서 llama.cpp 버전 감지가 조용히 실패하던 문제** — 실제
+  하드웨어에서 발견했습니다. `llama-bench`가 `--version`을 거부하고 빌드
+  banner도 출력하지 않아 감지 결과가 항상 `None`이었고, 버전별 cache의 모든
+  결과가 `"unknown"` 아래 저장됐습니다. 이 때문에 다른 backend 빌드의 측정값을
+  `--resume`이 내주지 않는다는 보장이 무너졌습니다. 이제
+  `llama-perplexity`도 확인하고 단순한 `llama.cpp <build>` banner 형식도
+  허용합니다.
+- **품질 cache key에 corpus가 없던 문제** — 영어·한국어 비교를 준비하다 실제
+  하드웨어에서 발견했습니다. Perplexity는 (model, quant, corpus)의 속성인데
+  key가 (model, quant, chunk count)여서, `--resume` 상태에서
+  `--quality-corpus`를 바꾸면 이전 corpus의 값이 새 결과로 나왔습니다. Corpus
+  fingerprint를 key에 추가했습니다. Upgrade 전 cache는 migration하지 않고 품질
+  table을 지운 뒤 다시 측정합니다.
+- **`llama-bench`에 `-c/--ctx-size` flag가 없던 문제** — 실제 하드웨어에서
+  발견했습니다. 가정했던 인자는 최신 빌드에서 parse 오류를 냈습니다. 이제
+  context를 `-d/--n-depth`로 매핑해 시간 측정 구간에서 KV cache가 요청한
+  context와 비슷하게 차도록 합니다.
+- **Perplexity가 test set 전체를 평가하던 문제** — chunk 제한 없이
+  `llama-perplexity`를 실행해 실제 하드웨어에서 후보 4개 탐색에 3시간 44분이
+  걸렸습니다. `--ppl-chunks`(기본값 32)를 추가해 같은 탐색을 약 12분으로
+  줄였습니다.
+- **`--resume`이 다른 chunk 수로 계산한 perplexity를 반환할 수 있던 문제** —
+  `ppl_chunks`를 품질 cache key에 추가했습니다.
+- **같은 `--out`을 쓰는 FiTuna process 둘이 동일한 양자화 임시 파일에 쓸 수
+  있던 문제** — PID suffix를 추가하고 임시 파일 정리를 glob으로 넓혀 이전
+  비정상 종료가 남긴 파일까지 치웁니다.
+- **서로 다른 모델이 한 양자화 출력 경로에서 충돌할 수 있던 문제** — 모든 HF
+  디렉터리 입력이 관례상 같은 기반 파일명으로 변환됐습니다. 이제 출력 파일명에
+  모델 fingerprint를 넣습니다.
+- **비정상 종료한 `llama-quantize`가 잘린 파일을 남겨 cache처럼 보이던 문제** —
+  임시 경로에 쓴 뒤 atomic rename합니다.
+- **파일은 있지만 실행할 수 없는 `llama-quantize`·`llama-perplexity`가 원시
+  `PermissionError` traceback으로 종료되던 문제** — `quantize.py`와
+  `quality.py`가 `FileNotFoundError`뿐 아니라 `OSError`를 처리하고, 메시지에서
+  "설치되지 않음"과 "파일은 있지만 손상됨"을 구분합니다.
+- **cache 경로의 손상됐거나 sqlite가 아닌 파일이 원시
+  `sqlite3.DatabaseError` traceback을 내던 문제** — 구체적인 복구 안내를 담은
+  `FiTunaError`로 바꿨습니다. 잘못된 `--ctx` 값도 같은 방식으로 고쳤습니다.
+- **최선 결과 fallback이 CPU 전용 bench를 `ngl=n_layers`로 보고할 수 있던
+  문제** — 기록하기 전에 `ngl=0`으로 바로잡습니다.
+- **첫 실제 Windows 실행에서 CI 두 job이 모두 실패한 문제** —
+  `pytest.raises` match pattern에 들어간 Windows 경로의 `\U`가 잘못된 정규식
+  escape였습니다. 이제 pattern에 `re.escape`를 적용합니다.
+- **`fituna doctor`의 진단 loop 자체가 예외로 끝날 수 있던 문제** — 각 점검을
+  따로 보호해 한 항목의 실패가 도구 전체를 종료하지 않고 해당 FAIL 행만 만듭니다.
 
-### Changed
+### 변경
 
-- **Retracted the Run 5 corpus-reorder finding.** A published measurement —
-  that the Korean corpus reorders the mid-table quants — did not survive
-  re-checking: the two runs were nested rather than independent, and the
-  Korean margin changes sign nine times across the per-chunk trace. The
-  finding was withdrawn and both margins are now stated with their error
-  bars. The verdict flips in Runs 3 and 4 are *not* retracted, but are
-  qualified inline. See
-  [docs/RESULTS.md](docs/RESULTS.md#how-big-is-a-perplexity-gap-the-error-bar-we-had-been-discarding).
-- **Corrected a false model-license claim** in the AI-usage documentation and
-  reconciled the open-source-usage documents with the repository as it
-  actually is; corrected stale figures in the license-compliance record.
-- `--wikitext` was renamed to `--quality-corpus`; the old name remains an
-  alias, so this is not a breaking change.
+- **Run 5의 corpus 순위 변경 결론 철회** — 한국어 corpus가 중간 quant의 순서를
+  바꾼다는 공개 측정 결론은 재검토를 통과하지 못했습니다. 두 실행이 독립적이지
+  않고 중첩됐으며, chunk별 추적에서 한국어 margin의 부호가 아홉 번 바뀌었습니다.
+  해당 결론을 철회하고 두 margin 모두 오차 범위와 함께 제시합니다. Run 3과 4의
+  판정 역전은 철회하지 않았지만 본문에 조건을 명시했습니다. 자세한 내용은
+  [docs/RESULTS.md](docs/RESULTS.md#how-big-is-a-perplexity-gap-the-error-bar-we-had-been-discarding)를
+  참고하세요.
+- **AI 활용 문서의 잘못된 모델 라이선스 주장 수정** — 오픈소스 활용 문서를 실제
+  저장소 상태와 맞추고 라이선스 준수 기록의 오래된 수치도 고쳤습니다.
+- `--wikitext`를 `--quality-corpus`로 바꿨습니다. 이전 이름을 alias로
+  유지하므로 호환성을 깨는 변경은 아닙니다.
 
 [0.2.0]: https://github.com/leeyunseokarchive/fituna/releases/tag/v0.2.0
 [0.1.0]: https://github.com/leeyunseokarchive/fituna/releases/tag/v0.1.0

@@ -940,9 +940,9 @@ ERROR fituna: could not reach the HuggingFace dataset-viewer API: The read opera
 | 문서 | 내용 |
 |---|---|
 | [README.md](README.md) | 프로젝트 개요, 기능, 설계 요약 (한국어 · [영어판](README.en.md)) |
-| [docs/RESULTS.md](docs/RESULTS.md) | 실측 결과 전문 — 5회 실기 측정, 타이밍, 편차 분석 (영어) |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 모듈 구조, 탐색 알고리즘, 오류·종료 코드 처리 (영어) |
-| [docs/USE_CASES.md](docs/USE_CASES.md) | 사용 시나리오 (영어) |
+| [docs/RESULTS.md](docs/RESULTS.md) | 실측 결과 전문 — 5회 실기 측정, 타이밍, 편차 분석 |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 모듈 구조, 탐색 알고리즘, 오류·종료 코드 처리 |
+| [docs/USE_CASES.md](docs/USE_CASES.md) | 사용 시나리오 |
 | [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md) | 3분 시연 영상 컷 단위 시나리오 (한국어) |
 | [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) · [docs/SBOM.md](docs/SBOM.md) | 제3자 구성요소 고지 및 SBOM |
 | [docs/AI_MODEL_USAGE.md](docs/AI_MODEL_USAGE.md) | AI 활용 개발 공개 |

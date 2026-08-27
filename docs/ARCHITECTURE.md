@@ -1,102 +1,100 @@
-# FiTuna Architecture
+# FiTuna 아키텍처
 
-## Summary
+## 개요
 
-FiTuna is a Python 3.11 CLI that orchestrates llama.cpp binaries as
-subprocesses to find the cheapest GGUF quantization + runtime config
-(`quant`, `-ngl`, `-c`) that meets a user-specified throughput target
-without exceeding a quality-loss budget. FiTuna performs no tensor math
-itself — all inference/quantization/perplexity computation happens inside
-the llama.cpp C++ binaries; FiTuna's job is orchestration, output parsing,
-search, and caching. It has zero runtime Python dependencies (stdlib only).
+FiTuna는 llama.cpp 바이너리를 subprocess로 조율하는 Python 3.11 CLI입니다.
+사용자가 정한 품질 손실 예산을 넘지 않으면서 처리량 목표를 만족하는 가장 가벼운
+GGUF 양자화·실행 설정(`quant`, `-ngl`, `-c`)을 찾습니다. FiTuna 자체는 tensor
+연산을 하지 않습니다. 추론, 양자화, perplexity 계산은 모두 llama.cpp C++
+바이너리가 맡고 FiTuna는 실행 조율, 출력 해석, 탐색, cache를 담당합니다. Python
+런타임 의존성은 0개이며 표준 라이브러리만 사용합니다.
 
-## Pipeline overview
+## Pipeline 개요
 
 ```mermaid
 flowchart LR
-    subgraph Input
-        A["model.gguf<br/>(or HF dir)"]
-        B["target tok/s<br/>quality budget"]
+    subgraph 입력
+        A["model.gguf<br/>(또는 HF 디렉터리)"]
+        B["목표 tok/s<br/>품질 예산"]
     end
 
-    A --> C[hardware.py<br/>GPU / VRAM / RAM<br/>auto-detect]
+    A --> C[hardware.py<br/>GPU / VRAM / RAM<br/>자동 감지]
     B --> D
 
-    subgraph "Stage 1 · Quality (all candidates)"
-        D[quantize.py<br/>llama-quantize] --> E[quality.py<br/>llama-perplexity<br/>loss vs F16 baseline]
-        E --> F{"loss ≤ budget?"}
-        F -- no --> X[dropped]
+    subgraph "1단계 · 품질(모든 후보)"
+        D[quantize.py<br/>llama-quantize] --> E[quality.py<br/>llama-perplexity<br/>F16 기준 대비 손실]
+        E --> F{"손실 ≤ 예산?"}
+        F -- 아니요 --> X[탈락]
     end
 
-    subgraph "Stage 2 · Speed (early-exit walk)"
-        F -- yes, sorted by<br/>measured quality --> G[bench.py<br/>llama-bench full-offload]
-        G -- misses target --> Y[skip quant]
-        G -- hits --> H["binary-search<br/>minimal -ngl"]
+    subgraph "2단계 · 속도(조기 종료 순회)"
+        F -- 예, 실측 품질순<br/>정렬 --> G[bench.py<br/>llama-bench full-offload]
+        G -- 목표 미달 --> Y[quant 건너뜀]
+        G -- 목표 달성 --> H["이진탐색<br/>최소 -ngl"]
     end
 
     C --> G
-    H --> I[["result:<br/>quant + ngl + ctx<br/>+ run command"]]
+    H --> I[["결과:<br/>quant + ngl + ctx<br/>+ 실행 명령"]]
     E & G <--> K[(cache.py<br/>sqlite3<br/>--resume)]
 ```
 
-**Stage 1** measures perplexity loss for *every* candidate — because Stage 2
-walks them in **measured** quality order, and you can't sort by a number you
-haven't measured. (In practice the conventional Q8_0-first ranking was wrong
-on both models we tested.) **Stage 2** early-exits hard: a quant whose
-full-offload bench misses the target is dropped without further benches, and
-the first quant that passes wins — lower-quality quants are never benchmarked.
+**1단계**는 *모든* 후보의 perplexity 손실을 측정합니다. 2단계가 후보를
+**실측** 품질 순서로 탐색하므로 측정하지 않은 값으로는 정렬할 수 없습니다. 실제로
+검사한 두 모델 모두 관례적인 Q8_0 우선 순위가 틀렸습니다. **2단계**는 적극적으로
+조기 종료합니다. Full offload bench에서 목표를 놓친 quant는 추가 측정 없이
+버리고, 처음 통과한 quant를 선택합니다. 이보다 품질이 낮은 quant는 측정하지
+않습니다.
 
-All subprocess results land in a sqlite3 cache keyed by model fingerprint,
-hardware profile, **and llama.cpp build version** — so `--resume` never
-serves numbers measured under a different backend build.
+모든 subprocess 결과는 모델 fingerprint, 하드웨어 profile, **llama.cpp 빌드
+버전**을 key로 삼은 sqlite3 cache에 저장합니다. 따라서 `--resume`은 다른
+backend 빌드에서 측정한 값을 반환하지 않습니다.
 
-## Repository layout
+## 저장소 구조
 
 ```
 fituna/
-├── cli.py         # argparse entry point, exit-code mapping (0/1/2/3)
-├── quickstart.py  # interactive wizard (fituna quickstart) over run's own flags
-├── config.py      # frozen-dataclass interface contract (single source of truth)
-├── hardware.py    # GPU/VRAM/CPU/RAM auto-detection + manual override
-├── binaries.py    # llama.cpp binary discovery + capability introspection
-├── doctor.py      # environment self-diagnosis (fituna doctor subcommand)
-├── corpus.py      # quality-corpus download (fituna fetch-corpus, stdlib urllib)
-├── errors.py      # re-export shim for the FiTunaError hierarchy (defined in config.py)
-├── mcp_server.py  # MCP stdio server (JSON-RPC 2.0, fituna-mcp entry point)
-├── model_info.py  # direct GGUF header parsing (struct), HF-dir conversion
-├── quantize.py    # llama-quantize wrapper (idempotent, atomic writes)
-├── quality.py     # llama-perplexity wrapper (quality-loss measurement)
-├── bench.py       # llama-bench wrapper (throughput measurement)
-├── search.py      # the two-stage search orchestrator
-├── cache.py       # sqlite3 result cache (--resume)
-└── report.py      # human/JSON result rendering + run-command builder
+├── cli.py         # argparse entry point, 종료 코드 매핑(0/1/2/3)
+├── quickstart.py  # run flag를 조립하는 대화형 마법사(fituna quickstart)
+├── config.py      # 불변 dataclass interface 계약(단일 기준 정보원)
+├── hardware.py    # GPU/VRAM/CPU/RAM 자동 감지 + 수동 재정의
+├── binaries.py    # llama.cpp 바이너리 탐색 + 기능 확인
+├── doctor.py      # 환경 자체 진단(fituna doctor 하위 명령)
+├── corpus.py      # 품질 corpus 다운로드(fituna fetch-corpus, stdlib urllib)
+├── errors.py      # config.py에 정의한 FiTunaError 계층의 재노출 shim
+├── mcp_server.py  # MCP stdio server(JSON-RPC 2.0, fituna-mcp entry point)
+├── model_info.py  # GGUF header 직접 해석(struct), HF 디렉터리 변환
+├── quantize.py    # llama-quantize wrapper(멱등, atomic 쓰기)
+├── quality.py     # llama-perplexity wrapper(품질 손실 측정)
+├── bench.py       # llama-bench wrapper(처리량 측정)
+├── search.py      # 2단계 탐색 orchestrator
+├── cache.py       # sqlite3 결과 cache(--resume)
+└── report.py      # 일반/JSON 결과 rendering + 실행 명령 생성
 ```
 
-## Module diagram
+## 모듈 관계도
 
 ```
                               ┌───────────┐
-                              │  cli.py   │  argparse entry point (run /
+                              │  cli.py   │  argparse entry point(run /
                               └─────┬─────┘  quickstart / detect-hw /
                                     │ list-binaries / doctor /
                                     │ fetch-corpus / help);
-                                    │ builds TargetSpec, dispatches
+                                    │ TargetSpec 생성·작업 분배
         ┌───────────────┬──────────┼───────────┬──────────────────┐
         ▼                ▼          ▼           ▼                  ▼
   hardware.py      binaries.py  model_info.py  quantize.py    report.py
-  detect GPU/      locate/      ensure base    llama-quantize  SearchResult
-  CPU/RAM, or       introspect  GGUF, read      wrapper,       -> run cmd,
-  parse manual      llama.cpp   ModelInfo       memoized on    JSON/human
-  override          binaries    (n_layers etc)  disk (idempot.) report
+  GPU/CPU/RAM      llama.cpp    기반 GGUF 보장, llama-quantize  SearchResult
+  감지 또는 수동    바이너리     ModelInfo 읽기  wrapper,       -> 실행 명령,
+  입력 해석         탐색·확인    (n_layers 등)   디스크 재사용   JSON/일반 보고
         │                │          │                │              ▲
         │                │          │                │              │
         └────────┬───────┴────┬─────┴──────┬─────────┘              │
                   ▼            ▼            ▼                        │
            ┌─────────────────────────────────────┐                  │
            │              search.py               │  orchestrator   │
-           │  quality-first filter (quality.py)   │──────────────────┘
-           │  + ngl binary search (bench.py)      │
-           │  + ctx grid-check (bench.py)         │
+           │  품질 우선 filter (quality.py)        │──────────────────┘
+           │  + ngl 이진탐색 (bench.py)            │
+           │  + ctx grid 검사 (bench.py)           │
            └───────────┬───────────────┬──────────┘
                         ▼               ▼
                   bench.py         quality.py
@@ -106,249 +104,227 @@ fituna/
                         └───────┬───────┘
                                 ▼
                           cache.py (sqlite3)
-                          memoizes BenchResult / QualityResult
-                          keyed on (model_fp, hw_fp, candidate)
+                          BenchResult / QualityResult 재사용
+                          key: (model_fp, hw_fp, candidate)
 
-           fituna/config.py — frozen dataclasses/Enum/exceptions used by
-           every module above (HardwareProfile, TargetSpec, BinaryPaths,
+           fituna/config.py — 위 모든 모듈이 쓰는 불변 dataclass/Enum/예외
+           (HardwareProfile, TargetSpec, BinaryPaths,
            ModelInfo, CandidateConfig, BenchResult, QualityResult,
            SearchResult, DoctorCheck, CorpusPreset, FiTunaError hierarchy).
-           No module defines its own cross-module type; everyone imports
-           from here.
+           다른 모듈은 모듈 간 type을 따로 정의하지 않고 여기서 import한다.
 ```
 
-Arrows show call direction, not import direction: `search.py` *calls*
-`quantize.py` / `bench.py` / `quality.py` / `cache.py`; those modules never
-call back into `search.py`. `cli.py` is the module that imports and calls the
-widest set of the others; below it, a module depends only on `config.py`
-(and, where noted, on `binaries.py`'s `BinaryPaths`). The two entry points
-*above* `cli.py` — `quickstart.py` and `mcp_server.py` — also reach across
-several modules each, but they reach through `cli.py` for anything that runs
-a search, so there is still exactly one implementation of the search path.
+화살표는 import가 아니라 호출 방향을 나타냅니다. `search.py`는 `quantize.py`,
+`bench.py`, `quality.py`, `cache.py`를 호출하지만 이 모듈들은 `search.py`를
+되부르지 않습니다. `cli.py`가 가장 많은 모듈을 import하고 호출합니다. 그 아래
+모듈은 `config.py`와 필요한 경우 `binaries.py`의 `BinaryPaths`에만 의존합니다.
+`cli.py` 위쪽의 entry point인 `quickstart.py`와 `mcp_server.py`도 여러 모듈에
+접근하지만 탐색을 실행할 때는 `cli.py`를 거치므로 탐색 경로 구현은 하나뿐입니다.
 
-`fituna/quickstart.py` sits *above* `cli.py` rather than beside it: the
-`fituna quickstart` wizard is an `input()`-based shell that collects answers,
-assembles a `fituna run ...` argv, prints it, then parses that same argv back
-through `cli._build_parser()` and calls `cli._cmd_run()` in-process. It
-orchestrates existing modules only — `doctor.run_checks()` for step 1,
-`hardware.detect_hardware()` for the memory-fit arithmetic,
-`corpus.fetch_corpus()` for step 5, `report.human_size()` for every file size
-— and duplicates none of their logic. Every *search parameter* it assembles
-maps to a public `run` flag: the self-check
-(`python -m fituna.quickstart --selfcheck`) asserts on the assembled argv, so
-a wizard-only search knob would fail it. That check covers the run-argv
-surface only — the wizard's own conveniences (curated-model download,
-HuggingFace search, corpus fetch) have no `run` equivalent and are outside
-what it asserts. It downloads models with stdlib
-`urllib` using the same temp-file + `os.replace` atomic pattern as
-`corpus.py`, and reads the HuggingFace `/api/models` search endpoint whose
-response shape is documented (and was verified live) in that module's
-docstring.
+`fituna/quickstart.py`는 `cli.py` 옆이 아니라 *위*에 있습니다. `fituna
+quickstart` 마법사는 `input()`으로 답을 모아 `fituna run ...` argv를 조립하고
+출력한 뒤, 같은 argv를 `cli._build_parser()`로 다시 해석해 process 안에서
+`cli._cmd_run()`을 호출합니다. 1단계는 `doctor.run_checks()`, 메모리 적합 계산은
+`hardware.detect_hardware()`, 5단계는 `corpus.fetch_corpus()`, 모든 파일 크기는
+`report.human_size()`처럼 기존 모듈만 조율하며 논리를 복제하지 않습니다. 조립한
+모든 *탐색 매개변수*는 공개 `run` flag에 대응합니다. 자체 점검(`python -m
+fituna.quickstart --selfcheck`)이 완성한 argv를 assertion으로 검사하므로 마법사
+전용 탐색 설정이 생기면 실패합니다. 이 검사는 run argv만 다루며, 엄선 모델
+다운로드·HuggingFace 검색·corpus 받기처럼 `run`에 대응 기능이 없는 마법사 전용
+편의 기능은 범위 밖입니다. 모델 다운로드는 `corpus.py`와 같은 임시 파일 +
+`os.replace` atomic pattern을 표준 라이브러리 `urllib`로 구현했습니다.
+HuggingFace `/api/models` 검색 endpoint의 응답 구조는 모듈 docstring에 기록했고
+실제 API로 확인했습니다.
 
-`fituna/mcp_server.py` is a second, thinner entry point alongside `cli.py`:
-a stdlib-only MCP stdio server (newline-delimited JSON-RPC 2.0, no SDK
-dependency — the same zero-runtime-dependency guarantee `cli.py` gets from
-the stdlib) exposing two tools, `fituna_detect_hardware` and
-`fituna_recommend`, so an AI agent can ask for a measured config
-recommendation the same way `cli.py run` produces one. It calls
-`binaries.py` / `hardware.py` / `model_info.py` / `search.py` / `report.py`
-/ `cache.py` directly rather than shelling out to `cli.py`, and always runs
-with an active `cache.ResultCache` so a repeat question about the same
-model/hardware answers in about a second.
+`fituna/mcp_server.py`는 `cli.py`와 나란히 둔 더 얇은 두 번째 entry point입니다.
+SDK 의존성 없이 표준 라이브러리만 사용하는 MCP stdio server로, 줄 단위 JSON-RPC
+2.0을 처리합니다. `fituna_detect_hardware`와 `fituna_recommend` 도구를 제공해
+AI agent가 `cli.py run`과 같은 방식으로 실측 설정을 요청할 수 있습니다.
+`cli.py`를 shell로 실행하지 않고 `binaries.py`, `hardware.py`, `model_info.py`,
+`search.py`, `report.py`, `cache.py`를 직접 호출합니다. 항상
+`cache.ResultCache`를 활성화하므로 같은 모델·하드웨어에 대한 반복 질문에는 약
+1초 안에 답합니다.
 
-## Runtime data flow (one `fituna run`)
+## 실행 중 데이터 흐름(`fituna run` 1회)
 
-1. `cli.py` parses argv into CLI args, then assembles a `TargetSpec`
-   (`--model`, `--target-tps`, `--max-quality-loss`, `--ctx` →
-   `ctx_candidates` with the first value as `.ctx`, `--quant` →
-   `quant_candidates` re-sorted to quality-descending order).
-2. `hardware.detect_hardware()` runs `nvidia-smi` / `rocm-smi` /
-   `system_profiler` / `platform` as available; `--gpu`/`--vram-mb` (if
-   given) are merged in via `parse_manual_hardware()`, user values winning.
-   Produces a `HardwareProfile`.
-3. `binaries.locate_binaries(bin_dir=...)` resolves `llama-quantize`,
-   `llama-bench`, `llama-perplexity` (and optionally `llama-imatrix`,
-   `convert_hf_to_gguf.py`) on `PATH` or under `--llama-bin-dir`, raising
-   `BinaryNotFoundError` with an install-guide message if any required one
-   is missing. `list_supported_quant_types()` parses `llama-quantize --help`
-   to filter `TargetSpec.quant_candidates` down to what the installed build
-   actually supports.
-4. `model_info.ensure_base_gguf()` converts an HF directory to
-   `work_dir/base-f16.gguf` via `binaries.convert_script` if `model_path`
-   isn't already a `.gguf` (raises `ModelConversionError` on failure), then
-   `read_model_info()` reads architecture/layer count/param count into a
-   `ModelInfo`. `n_layers` is the upper bound for the `-ngl` search.
-5. `search.search()` is the orchestrator (see algorithm below). It calls
-   `quantize.quantize()`, `bench.run_bench()`, and `quality.evaluate_quality()`
-   through `binaries.BinaryPaths`, memoizing every bench/quality call
-   through `cache.ResultCache` when `--resume` is passed. It returns a
-   `SearchResult` — either a real solution (`meets_target=True`) or a
-   best-effort one, or raises `NoFeasibleConfigError` if nothing came close.
-6. `report.py` turns the `SearchResult` into the three ways to consume the
-   GGUF the search already produced: `build_server_command()` (a
-   `llama-server` invocation, the OpenAI-compatible local API),
-   `export_ollama_modelfile()` (an Ollama `Modelfile` written atomically
-   next to the `.gguf` when `--export-ollama` is passed) and
-   `build_run_command()` (the `llama-cli` invocation, kept as the
-   interactive check). `to_human()` leads with the artifact path and size,
-   then lists those three in that order; `to_json()` adds
-   `llama_server_command` / `modelfile_path` beside the existing fields.
-   `cli.py` prints one or the other to stdout per `--json`. Both
-   `llama-cli` and `llama-server` are *located, never executed*.
+1. `cli.py`가 argv를 CLI 인자로 해석하고 `TargetSpec`을 조립합니다.
+   `--model`, `--target-tps`, `--max-quality-loss`, `--ctx`는 첫 값을
+   `.ctx`로 삼는 `ctx_candidates`, `--quant`는 품질 내림차순으로 다시 정렬한
+   `quant_candidates`가 됩니다.
+2. `hardware.detect_hardware()`가 사용할 수 있는 `nvidia-smi`, `rocm-smi`,
+   `system_profiler`, `platform`을 실행합니다. `--gpu`·`--vram-mb`를 주면
+   `parse_manual_hardware()`가 자동 감지 결과와 합치며 사용자 값이 우선합니다.
+   결과는 `HardwareProfile`입니다.
+3. `binaries.locate_binaries(bin_dir=...)`가 `PATH` 또는
+   `--llama-bin-dir`에서 `llama-quantize`, `llama-bench`,
+   `llama-perplexity`를 찾고 선택 항목인 `llama-imatrix`,
+   `convert_hf_to_gguf.py`도 확인합니다. 필수 도구가 없으면 설치 안내를 담은
+   `BinaryNotFoundError`를 발생시킵니다. `list_supported_quant_types()`는
+   `llama-quantize --help`를 해석해 `TargetSpec.quant_candidates`를 설치된
+   빌드가 실제로 지원하는 형식만 남기도록 줄입니다.
+4. `model_path`가 `.gguf`가 아니면 `model_info.ensure_base_gguf()`가
+   `binaries.convert_script`로 HF 디렉터리를 `work_dir/base-f16.gguf`로
+   변환합니다. 실패하면 `ModelConversionError`를 발생시킵니다. 이어서
+   `read_model_info()`가 architecture, layer 수, parameter 수를 읽어
+   `ModelInfo`를 만듭니다. `n_layers`는 `-ngl` 탐색의 상한입니다.
+5. `search.search()`가 아래 알고리즘을 조율합니다.
+   `binaries.BinaryPaths`를 통해 `quantize.quantize()`, `bench.run_bench()`,
+   `quality.evaluate_quality()`를 호출합니다. `--resume`을 주면 모든
+   bench·품질 호출을 `cache.ResultCache`에 저장합니다. 실제 해답
+   (`meets_target=True`) 또는 최선 결과인 `SearchResult`를 반환하며, 근접한
+   결과도 없으면 `NoFeasibleConfigError`를 발생시킵니다.
+6. `report.py`는 `SearchResult`를 이미 생성된 GGUF의 세 가지 사용법으로
+   바꿉니다. `build_server_command()`는 OpenAI 호환 로컬 API인
+   `llama-server` 명령, `export_ollama_modelfile()`은 `--export-ollama`를
+   줬을 때 `.gguf` 옆에 atomic 방식으로 쓰는 Ollama `Modelfile`,
+   `build_run_command()`는 대화형 점검용 `llama-cli` 명령을 만듭니다.
+   `to_human()`은 산출물 경로와 크기를 먼저 보여 주고 세 사용법을 이 순서로
+   나열합니다. `to_json()`은 기존 field 옆에 `llama_server_command`와
+   `modelfile_path`를 추가합니다. `cli.py`는 `--json`에 따라 둘 중 하나를
+   stdout에 출력합니다. `llama-cli`와 `llama-server`는 *위치만 찾고 실행하지
+   않습니다.*
 
-## Search algorithm flow (inside `search.search()`)
+## 탐색 알고리즘(`search.search()` 내부)
 
-Two-stage grid search bounded to `O(quant × log(n_layers))` bench calls.
-Key insight: perplexity depends only on `quant`, never on `ngl`/`ctx`, so
-quality and speed are decoupled — quality is computed once per quant,
-never re-measured while probing speed.
+Bench 호출 수를 `O(quant × log(n_layers))`로 제한한 2단계 grid 탐색입니다.
+Perplexity는 `ngl`이나 `ctx`가 아닌 `quant`에만 의존하므로 품질과 속도를 분리할
+수 있습니다. 품질은 quant마다 한 번만 계산하며 속도를 찾는 동안 다시 측정하지
+않습니다.
 
 ```
-Stage 1 — quality prefilter (one llama-perplexity call per quant)
-  baseline_ppl = compute_perplexity(base F16 GGUF)      [cached, computed once]
+1단계 — 품질 사전 filter(quant마다 llama-perplexity 한 번 호출)
+  baseline_ppl = compute_perplexity(base F16 GGUF)      [cache, 한 번만 계산]
   for quant in quant_candidates ∩ list_supported_quant_types():
       gguf = quantize(base_gguf, quant)
       q = evaluate_quality(quant, gguf, baseline_ppl, wikitext_path)
-      keep quant if q.quality_loss_pct <= max_quality_loss_pct
-  quality_filtered = kept quants, in original quality-descending order
-                      (Q8_0 → Q2_K), i.e. best quality first
+      q.quality_loss_pct <= max_quality_loss_pct이면 quant 유지
+  quality_filtered = 통과한 quant를 원래 품질 내림차순(Q8_0 → Q2_K),
+                      곧 최고 품질 우선으로 정렬
 
-Stage 2 — per quant, speed search (best quality first; first hit wins)
+2단계 — quant별 속도 탐색(최고 품질 우선, 첫 통과가 승자)
   for quant in quality_filtered:
-      gguf = quantize(base_gguf, quant)                  # idempotent, reused from Stage 1
+      gguf = quantize(base_gguf, quant)                  # 멱등, 1단계 결과 재사용
       top  = run_bench(gguf, ngl=n_layers, ctx=target.ctx)
       if top.gen_tok_per_sec < target_tps:
-          continue                        # early-exit B: skip to next (lower-quality) quant
+          continue                        # 조기 종료 B: 다음 저품질 quant로 이동
       if hw.gpu_vendor == NONE:
-          return result(quant, ngl=0, top)                # CPU-only hardware, no ngl search
+          return result(quant, ngl=0, top)                # CPU 전용, ngl 탐색 없음
       low = run_bench(gguf, ngl=0, ctx=target.ctx)
       if low.gen_tok_per_sec >= target_tps:
-          return result(quant, ngl=0, low)                 # early-exit C: GPU not even needed
-      # binary search minimal ngl in [0, n_layers] satisfying target_tps
-      # (assumes gen_tok_per_sec is non-decreasing in ngl; worst case falls
-      # back to `top`, which is already known to satisfy the target)
+          return result(quant, ngl=0, low)                 # 조기 종료 C: GPU 불필요
+      # target_tps를 만족하는 최소 ngl을 [0, n_layers]에서 이진탐색
+      # gen_tok_per_sec가 ngl에 따라 감소하지 않는다고 가정하며, 최악에는
+      # 이미 목표를 만족한다고 확인한 `top`으로 fallback
       lo, hi, best, calls = 0, n_layers, top, 0
       while lo < hi and calls < target.ngl_max_calls:
           mid = (lo + hi) // 2
           r = run_bench(gguf, ngl=mid, ctx=target.ctx); calls += 1
           if r.gen_tok_per_sec >= target_tps: best, hi = r, mid
           else:                                lo = mid + 1
-      # re-verify best.ngl against any remaining ctx_candidates
-      return result(quant, ngl=best.candidate.ngl, best)    # first quant to reach here wins
-  raise NoFeasibleConfigError(closest=fastest attempt seen)  # all quants failed early-exit B
+      # 남은 ctx_candidates에서 best.ngl 재검증
+      return result(quant, ngl=best.candidate.ngl, best)    # 여기 도달한 첫 quant 선택
+  raise NoFeasibleConfigError(closest=fastest attempt seen)  # 모든 quant가 조기 종료 B 실패
 ```
 
-Early-exit summary: **A** — quants failing the quality gate never reach a
-speed benchmark. **B** — a quant that misses the target even at full GPU
-offload is abandoned immediately (its lower-quality, usually-faster
-neighbor is tried next). **C** — a quant that hits the target at `ngl=0`
-skips the binary search entirely (minimal-resource config). Because quants
-are tried in quality-descending order and the loop returns on the first
-success, FiTuna always reports the *best-quality* feasible config, never a
-lower-quality one that happened to be probed later. If `max_bench_seconds`
-elapses mid-search, the best result found so far is returned with
-`meets_target=False` instead of raising.
+조기 종료는 세 곳에서 일어납니다. **A** — 품질 gate를 통과하지 못한 quant는
+속도 benchmark로 넘어가지 않습니다. **B** — full GPU offload에서도 목표를 놓친
+quant는 바로 버리고 보통 더 빠른 다음 저품질 후보를 시도합니다. **C** —
+`ngl=0`에서 목표를 달성하면 이진탐색을 생략하고 최소 자원 설정을 반환합니다.
+Quant를 품질 내림차순으로 시도해 첫 성공에서 반환하므로 FiTuna는 가능한 설정 중
+항상 *품질이 가장 좋은* 설정을 보고합니다. 나중에 측정했다는 이유로 저품질 후보를
+고르는 일은 없습니다. 탐색 중 `max_bench_seconds`가 지나면 예외 대신 그때까지
+찾은 최선 결과를 `meets_target=False`로 반환합니다.
 
-Upper bound on `llama-bench` calls: `N_quant_survived × (2 + ngl_max_calls +
-len(ctx_candidates))` — worst case 54 with the `TargetSpec` defaults in
-`fituna/config.py` (6 quants, `ngl_max_calls=6`, a single ctx candidate:
-6 × (2 + 6 + 1)); early exits typically end the search in well under 10.
+`llama-bench` 호출 상한은 `N_quant_survived × (2 + ngl_max_calls +
+len(ctx_candidates))`입니다. `fituna/config.py`의 `TargetSpec` 기본값에서는
+최악의 경우 54회입니다(quant 6개, `ngl_max_calls=6`, ctx 후보 1개: 6 ×
+(2 + 6 + 1)). 실제로는 조기 종료 덕분에 대개 10회 전에 끝납니다.
 
-## Filesystem artifacts
+## 파일시스템 산출물
 
-Every side effect happens under `--out` (`work_dir`) or via the llama.cpp
-binaries themselves; every other function is a pure transform over
-`config.py` dataclasses.
+모든 side effect는 `--out`(`work_dir`) 아래 또는 llama.cpp 바이너리에서만
+발생합니다. 나머지 함수는 `config.py` dataclass를 입력받아 값을 반환하는 순수
+변환입니다.
 
 ```
 <work_dir>/
-├── base-f16.gguf            # model_info.ensure_base_gguf() — only if input was an HF dir
-├── <model>-<fp12>-<quant>.gguf  # quantize.quantize() — one per quant tried, idempotent (reused if present)
-├── Modelfile                # report.export_ollama_modelfile() — only with --export-ollama; atomic (Modelfile.tmp + os.replace)
-└── .fituna_cache.sqlite3    # cache.ResultCache — bench_cache / quality_cache tables, only with --resume
+├── base-f16.gguf            # model_info.ensure_base_gguf() — HF 디렉터리 입력일 때만
+├── <model>-<fp12>-<quant>.gguf  # quantize.quantize() — 시도한 quant별 1개, 있으면 재사용
+├── Modelfile                # report.export_ollama_modelfile() — --export-ollama에서만, atomic
+└── .fituna_cache.sqlite3    # cache.ResultCache — bench_cache / quality_cache, --resume에서만
 ```
 
-`quantize()` and `ensure_base_gguf()` skip regenerating a file that already
-exists at its target path, so re-running `fituna run` against the same
-`--out` is cheap even without `--resume`. `model_info.model_fingerprint()`
-(a cheap `sha256(name:size:mtime)`, not a full-file hash) is the cache key
-component that identifies "this model," combined with a hardware
-fingerprint, so cache entries never leak across a different model or a
-different machine. The first 12 hex chars of that same fingerprint are also
-folded into the quantized `.gguf` filename itself (`<model>-<fp12>-<quant>.gguf`)
-— without it, two different models that both convert to the same
-conventional base filename (every HF-directory input becomes
-`base-f16.gguf`) would collide on the exact same output path in the same
-`--out` dir, silently serving one model's quantized file as a "cache hit"
-for a completely different model.
+`quantize()`와 `ensure_base_gguf()`는 목표 경로에 파일이 이미 있으면 다시 만들지
+않습니다. 같은 `--out`으로 `fituna run`을 다시 실행하면 `--resume`이 없어도
+비용이 적습니다. `model_info.model_fingerprint()`는 전체 파일 hash가 아닌 저렴한
+`sha256(name:size:mtime)`이며, "이 모델"을 식별하는 cache key 구성요소입니다.
+하드웨어 fingerprint와 함께 사용하므로 다른 모델이나 컴퓨터의 cache 항목이
+섞이지 않습니다. 같은 fingerprint의 앞 12자리 16진수는 양자화 `.gguf` 파일명
+`<model>-<fp12>-<quant>.gguf`에도 들어갑니다. 이 값이 없으면 서로 다른 두 모델이
+같은 관례적 기반 파일명으로 변환될 때 충돌합니다. 모든 HF 디렉터리 입력이
+`base-f16.gguf`가 되므로 같은 `--out`에서 한 모델의 양자화 파일을 전혀 다른
+모델의 "cache hit"로 조용히 내줄 수 있기 때문입니다.
 
-## Error handling & exit codes
+## 오류 처리와 종료 코드
 
-`cli.py` maps the `FiTunaError` hierarchy (defined once in `config.py`,
-re-exported from `errors.py`) to process exit codes:
+`cli.py`는 `config.py`에 한 번 정의하고 `errors.py`에서 다시 노출하는
+`FiTunaError` 계층을 process 종료 코드로 매핑합니다.
 
-| Exit code | Condition |
+| 종료 코드 | 조건 |
 |---|---|
-| 0 | success — `search()` returned a `SearchResult` with `meets_target=True` |
-| 1 | generic error — any other `FiTunaError`, or `meets_target=False` (best-effort result, no config met the target) |
-| 2 | `BinaryNotFoundError` — a required llama.cpp binary is missing; message includes an install pointer. **Also** argparse's own usage-error exit code — a missing required flag or an unrecognized flag exits 2 before `main()`'s `FiTunaError` mapping ever runs, since `parser.parse_args()` calls `sys.exit(2)` itself. Distinguish the two by stderr's first line: argparse's starts with `usage: ...`; `BinaryNotFoundError`'s is a `... ERROR fituna: ...` log line |
-| 3 | `NoFeasibleConfigError` — every quant candidate failed the quality gate or the full-offload speed check; `.closest` carries the nearest attempt for diagnostics |
+| 0 | 성공 — `search()`가 `meets_target=True`인 `SearchResult` 반환 |
+| 1 | 일반 오류 — 그 밖의 `FiTunaError` 또는 목표를 만족한 설정이 없어 최선 결과를 반환한 `meets_target=False` |
+| 2 | `BinaryNotFoundError` — 필수 llama.cpp 바이너리가 없으며 메시지에 설치 안내 포함. **동시에** argparse의 사용법 오류 코드이기도 함. `parser.parse_args()`가 직접 `sys.exit(2)`를 호출하므로 필수 flag 누락이나 알 수 없는 flag는 `main()`의 `FiTunaError` 매핑 전에 종료됨. stderr 첫 줄이 `usage: ...`이면 argparse, `... ERROR fituna: ...` log이면 `BinaryNotFoundError` |
+| 3 | `NoFeasibleConfigError` — 모든 quant 후보가 품질 gate 또는 full offload 속도 검사에서 탈락. 진단용 최인접 시도는 `.closest`에 저장 |
 
-`ModelConversionError` (HF→GGUF conversion subprocess failure) and a
-`FiTunaError` raised from a `llama-bench`/`llama-perplexity` timeout both
-fall through to exit code 1.
+HF→GGUF 변환 subprocess 실패인 `ModelConversionError`와
+`llama-bench`·`llama-perplexity` timeout에서 발생한 `FiTunaError`는 모두 종료
+코드 1입니다.
 
-`fituna doctor` does not go through this exception mapping at all —
-`_cmd_doctor` computes its exit code directly from the check results via
-`doctor.exit_code()`, bypassing `main()`'s `FiTunaError` handling entirely
-(there is nothing for it to catch). It reuses the same 0/1/2 values for a
-related but distinct condition: 0 if every check is PASS or WARN, 2 if any
-of the three required llama.cpp binaries FAILed (deliberately mirroring the
-`BinaryNotFoundError` → 2 convention above), 1 for any other FAIL. There is
-no doctor equivalent of exit code 3 — `NoFeasibleConfigError` is a
-`run`-only condition doctor never produces.
+`fituna doctor`는 이 예외 매핑을 거치지 않습니다. `_cmd_doctor`가
+`doctor.exit_code()`로 점검 결과에서 종료 코드를 직접 계산하므로 `main()`의
+`FiTunaError` 처리를 완전히 우회합니다. 잡을 예외도 없습니다. 관련은 있지만 다른
+조건에 같은 0·1·2를 재사용합니다. 모든 점검이 PASS 또는 WARN이면 0, 필수
+llama.cpp 바이너리 세 개 중 하나라도 FAIL이면 위 `BinaryNotFoundError` → 2
+관례에 맞춰 2, 그 밖의 FAIL은 1입니다. Doctor에는 종료 코드 3에 해당하는 값이
+없습니다. `NoFeasibleConfigError`는 `run`에서만 생기며 doctor는 만들지 않습니다.
 
-## Why this shape
+<a id="why-this-shape"></a>
 
-- **Single source of truth for types** (`fituna/config.py`): every
-  cross-module value is a `frozen` dataclass or `Enum` defined once, so
-  parallel implementation of modules can't drift on the interface.
-- **Pure functions, explicit side effects**: only `quantize.py` (writes a
-  `.gguf`), `model_info.py` (writes a converted base `.gguf`),
-  `cache.py` (writes to sqlite3), `corpus.py` (writes the downloaded
-  corpus), `report.py` (writes the Ollama `Modelfile` for `--export-ollama`)
-  and `quickstart.py` (writes downloaded `.gguf` files) touch the
-  filesystem; everything else returns values. The three that download do it
-  through the same temp-file + `os.replace` pattern, so an interrupted run
-  leaves no partial file.
-- **subprocess isolation**: every llama.cpp interaction goes through exactly
-  one wrapper function per binary (`quantize()`, `run_bench()`,
-  `compute_perplexity()`), so parsing logic for that binary's output lives
-  in exactly one place.
-- **Quality/speed decoupling**: because perplexity is independent of
-  `ngl`/`ctx`, `search.py` computes it once per quant instead of once per
-  candidate configuration, cutting benchmark calls from
-  `O(quant × ngl × ctx)` down to `O(quant × log(n_layers))`.
-- **Cache as an optimization, not a dependency**: every module that calls
-  `cache.py` degrades gracefully to "just run the subprocess" when
-  `cache is None` (`--resume` not passed) — the cache is never required for
-  correctness, only for avoiding redundant subprocess calls across runs.
-- **Recommend, don't serve** — the deliberate scope boundary. FiTuna's output
-  is the quantized `.gguf` plus `llama-server` / `llama-cli` commands the user
-  copies and runs (and, with `--export-ollama`, an Ollama `Modelfile` written
-  next to it); FiTuna never launches any of them and runs no inference server
-  of its own. That's a boundary, not an oversight. Actually serving inference
-  is llama.cpp's job (and Ollama's, and LM Studio's), and duplicating it would
-  compete with the exact tools the README contrasts FiTuna against, for no
-  differentiated value — FiTuna's only claim is that the *search* is measured,
-  not guessed. A server process also sits awkwardly next to a
-  zero-runtime-dependency design. The Ollama half of "what happens after the
-  recommendation" is shipped: `--export-ollama` writes the measured
-  `num_gpu`/`num_ctx` into a Modelfile — both Ollama and LM Studio apply a
-  fixed per-model preset otherwise, [the exact
-  gap](https://github.com/ollama/ollama/issues/14674) the README cites. Two
-  extensions that could stay inside this boundary rather than crossing it are
-  running the winning command directly (`--launch`) and exporting an LM Studio
-  preset. Neither is part of the current release. The MCP server already covers the agent-facing version — an agent
-  reads `fituna_recommend`'s answer and decides what to do with it, no human
-  copying a command required.
+## 이렇게 설계한 이유
+
+- **Type의 단일 기준 정보원**(`fituna/config.py`) — 모듈 사이를 오가는 모든
+  값은 한 번만 정의한 `frozen` dataclass 또는 `Enum`입니다. 모듈을 나눠 개발해도
+  interface가 어긋나지 않습니다.
+- **순수 함수와 명시적인 side effect** — 파일시스템을 건드리는 모듈은 `.gguf`를
+  쓰는 `quantize.py`, 변환한 기반 `.gguf`를 쓰는 `model_info.py`, sqlite3에
+  쓰는 `cache.py`, 받은 corpus를 쓰는 `corpus.py`, `--export-ollama`에서
+  Ollama `Modelfile`을 쓰는 `report.py`, 받은 `.gguf`를 쓰는 `quickstart.py`
+  뿐입니다. 나머지는 값을 반환합니다. 다운로드하는 세 경로는 모두 임시 파일 +
+  `os.replace` pattern을 사용해 실행이 중단돼도 불완전한 파일을 남기지 않습니다.
+- **Subprocess 격리** — llama.cpp 바이너리와의 모든 상호작용은 바이너리마다 하나의
+  wrapper 함수(`quantize()`, `run_bench()`, `compute_perplexity()`)를 거칩니다.
+  각 바이너리의 출력 해석 논리가 한곳에만 있습니다.
+- **품질과 속도 분리** — perplexity는 `ngl`·`ctx`와 무관하므로 `search.py`는
+  후보 설정마다가 아니라 quant마다 한 번 계산합니다. Benchmark 호출 수가
+  `O(quant × ngl × ctx)`에서 `O(quant × log(n_layers))`로 줄어듭니다.
+- **Cache는 의존성이 아니라 최적화** — `cache.py`를 호출하는 모든 모듈은
+  `cache is None`, 곧 `--resume`을 주지 않았을 때도 subprocess를 직접 실행하며
+  정상 동작합니다. Cache는 정확성에 필요하지 않고 실행 사이의 중복 호출만
+  줄입니다.
+- **추천하되 server를 운영하지 않음** — 의도한 범위 경계입니다. FiTuna는
+  양자화 `.gguf`와 사용자가 복사해 실행할 `llama-server`·`llama-cli` 명령을
+  출력합니다. `--export-ollama`를 주면 옆에 Ollama `Modelfile`도 씁니다.
+  이들을 실행하거나 자체 inference server를 띄우지는 않습니다. 누락이 아니라
+  경계입니다. 실제 inference 제공은 llama.cpp, Ollama, LM Studio의 역할이며 이를
+  복제해도 차별점 없이 README에서 비교 대상으로 삼은 도구와 경쟁하게 됩니다.
+  FiTuna가 내세우는 것은 *탐색*을 추측하지 않고 측정한다는 점뿐입니다. Server
+  process도 런타임 의존성 0개 설계와 어울리지 않습니다. 추천 이후 Ollama 경로는
+  이미 제공합니다. `--export-ollama`가 실측 `num_gpu`·`num_ctx`를 Modelfile에
+  기록합니다. 그렇지 않으면 Ollama와 LM Studio 모두 모델별 고정 preset을
+  적용하며, README가 인용한 [바로 그
+  차이](https://github.com/ollama/ollama/issues/14674)입니다. 이 경계를 넘지
+  않는 확장 후보로는 승리 명령 직접 실행(`--launch`)과 LM Studio preset
+  export가 있지만 현재 릴리스에는 없습니다. Agent용 경로는 MCP server가 이미
+  담당합니다. Agent가 `fituna_recommend` 응답을 읽고 후속 행동을 정하므로 사람이
+  명령을 복사할 필요가 없습니다.
