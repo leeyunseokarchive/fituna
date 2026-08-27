@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="620" viewBox="0 0 1200 620" role="img" aria-labelledby="title desc">
+  <title id="title">Same-hardware measurements of chatbot-proposed and FiTuna configurations</title>
+  <desc id="desc">On Qwen3-4B with an Apple M3 Pro, Claude reached 30.49 plus or minus 0.88 tokens per second and passed two of three runs, ChatGPT reached 28.92 plus or minus 1.37 and passed one of three, while FiTuna reached 32.68 plus or minus 1.71 and passed all three. All measured configurations stayed below five percent quality loss. Gemini did not provide a configuration.</desc>
+  <style>
+    text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #17202a; }
+    .title { font-size: 28px; font-weight: 700; }
+    .subtitle, .note, .axis { fill: #5f6b78; }
+    .subtitle { font-size: 15px; }
+    .panel-title { font-size: 18px; font-weight: 650; }
+    .value { font-size: 16px; font-weight: 700; }
+    .label { font-size: 14px; }
+    .note { font-size: 13px; }
+    .grid { stroke: #e5e8eb; stroke-width: 1; }
+    .axis-line { stroke: #aeb6bf; stroke-width: 1.5; }
+    .target { stroke: #17202a; stroke-width: 2; stroke-dasharray: 8 7; }
+    .error { stroke: #5f6b78; stroke-width: 2; }
+  </style>
+  <rect width="1200" height="620" fill="#ffffff" rx="14"/>
+
+  <text x="60" y="52" class="title">Same-hardware measurement of proposed configurations</text>
+  <text x="60" y="80" class="subtitle">Qwen3-4B · Apple M3 Pro 18 GB (14-core GPU) · llama.cpp b9960 · ctx 4096</text>
+
+  <text x="60" y="126" class="panel-title">Generation speed — higher is better</text>
+  <text x="650" y="126" class="panel-title">Quality loss — lower is better</text>
+
+  <line x1="80" y1="460" x2="570" y2="460" class="axis-line"/>
+  <line x1="80" y1="180" x2="80" y2="460" class="axis-line"/>
+  <line x1="670" y1="460" x2="1160" y2="460" class="axis-line"/>
+  <line x1="670" y1="180" x2="670" y2="460" class="axis-line"/>
+
+  <g class="axis" font-size="12">
+    <line x1="80" y1="382" x2="570" y2="382" class="grid"/><text x="68" y="386" text-anchor="end">10</text>
+    <line x1="80" y1="304" x2="570" y2="304" class="grid"/><text x="68" y="308" text-anchor="end">20</text>
+    <line x1="80" y1="227" x2="570" y2="227" class="target"/><text x="80" y="170">target: 30 tok/s</text>
+    <text x="68" y="464" text-anchor="end">0</text>
+
+    <line x1="670" y1="409" x2="1160" y2="409" class="grid"/><text x="658" y="413" text-anchor="end">1</text>
+    <line x1="670" y1="358" x2="1160" y2="358" class="grid"/><text x="658" y="362" text-anchor="end">2</text>
+    <line x1="670" y1="307" x2="1160" y2="307" class="grid"/><text x="658" y="311" text-anchor="end">3</text>
+    <line x1="670" y1="256" x2="1160" y2="256" class="grid"/><text x="658" y="260" text-anchor="end">4</text>
+    <line x1="670" y1="205" x2="1160" y2="205" class="target"/><text x="682" y="195">quality budget 5%</text>
+    <text x="658" y="464" text-anchor="end">0%</text>
+  </g>
+
+  <rect x="110" y="223" width="110" height="237" rx="3" fill="#b8bec5"/>
+  <rect x="270" y="235" width="110" height="225" rx="3" fill="#8f98a2"/>
+  <rect x="430" y="206" width="110" height="254" rx="3" fill="#2e74b5"/>
+
+  <g class="error">
+    <line x1="165" y1="216" x2="165" y2="230"/><line x1="155" y1="216" x2="175" y2="216"/><line x1="155" y1="230" x2="175" y2="230"/>
+    <line x1="325" y1="224" x2="325" y2="246"/><line x1="315" y1="224" x2="335" y2="224"/><line x1="315" y1="246" x2="335" y2="246"/>
+    <line x1="485" y1="193" x2="485" y2="219"/><line x1="475" y1="193" x2="495" y2="193"/><line x1="475" y1="219" x2="495" y2="219"/>
+  </g>
+
+  <text x="165" y="202" text-anchor="middle" class="value">30.49 ± 0.88</text>
+  <text x="325" y="210" text-anchor="middle" class="value">28.92 ± 1.37</text>
+  <text x="485" y="179" text-anchor="middle" class="value">32.68 ± 1.71</text>
+  <text x="165" y="442" text-anchor="middle" class="label">2/3 pass</text>
+  <text x="325" y="442" text-anchor="middle" class="label">1/3 pass</text>
+  <text x="485" y="442" text-anchor="middle" class="label" fill="#ffffff">3/3 pass</text>
+
+  <rect x="700" y="382" width="110" height="78" rx="3" fill="#b8bec5"/>
+  <rect x="860" y="371" width="110" height="89" rx="3" fill="#8f98a2"/>
+  <rect x="1020" y="371" width="110" height="89" rx="3" fill="#2e74b5"/>
+  <text x="755" y="368" text-anchor="middle" class="value">1.53%</text>
+  <text x="915" y="357" text-anchor="middle" class="value">1.75%</text>
+  <text x="1075" y="357" text-anchor="middle" class="value">1.75%</text>
+
+  <g class="label" text-anchor="middle">
+    <text x="165" y="486">Claude Opus 5</text><text x="165" y="506">Q5_K_M · ngl 36</text>
+    <text x="325" y="486">ChatGPT 5.6 Sol</text><text x="325" y="506">Q4_K_M · ngl 28</text>
+    <text x="485" y="486">FiTuna</text><text x="485" y="506">Q4_K_M · ngl 33</text>
+    <text x="755" y="486">Claude Opus 5</text><text x="755" y="506">Q5_K_M · ngl 36</text>
+    <text x="915" y="486">ChatGPT 5.6 Sol</text><text x="915" y="506">Q4_K_M · ngl 28</text>
+    <text x="1075" y="486">FiTuna</text><text x="1075" y="506">Q4_K_M · ngl 33</text>
+  </g>
+
+  <text x="60" y="558" class="note">Speed: mean ± between-run SD over 3 independent runs (5 internal repetitions each). Quality: WikiText-2, 32 chunks.</text>
+  <text x="60" y="582" class="note">Gemini 3.1 Pro did not provide a configuration, so no numeric result is plotted.</text>
+</svg>

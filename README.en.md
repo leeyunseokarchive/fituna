@@ -22,7 +22,7 @@ those numbers on your machine, proven by real benchmarks.
 [![Zero dependencies](https://img.shields.io/badge/runtime%20deps-0-brightgreen.svg)](docs/SBOM.md)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-**Korean reproduction guide for competition judges & verification agency → [REVIEWERS.md](REVIEWERS.md)**
+**[▶ Demo video](https://youtu.be/ejNnWFm9V6I) · [Korean reproduction guide for judges](REVIEWERS.md)**
 
 ![A real fituna run: 58 seconds on an Apple M3 Pro from download to a ready-to-run llama-server command](assets/demo.svg)
 
@@ -43,7 +43,7 @@ lightest config that still meets the target?** — and no tool answered them:
 | | ① Target speed | ② Quality loss | ③ Minimal config |
 |---|---|---|---|
 | VRAM calculators | Only "does it fit" | Not addressed | Not addressed |
-| Chatbot advice | Estimates — [wrong in all 3 measured trials](docs/CHATBOT_COMPARISON.md) | Generalities | "Offload everything" |
+| Chatbot advice | Can propose a config; no repeated-measurement guarantee | General trends | No minimal-pass guarantee |
 | NVIDIA AutoQuantize | No speed-target input | Addressed — but CUDA-only | CUDA-only |
 | **FiTuna** | **Measured verdict** | **Measured verdict** | **Binary-searched** |
 
@@ -61,7 +61,8 @@ answer wasn't a quant alone but **Q4_K_M plus the minimal offload
 
 The fastest way to see it work for yourself: a full pipeline run
 (download → quantize → quality-gate → benchmark) on a small 258 MB model
-finishes in about a minute on an M-series Mac:
+finishes in about a minute on an M-series Mac. See the full flow first in the
+[demo video](https://youtu.be/ejNnWFm9V6I):
 
 ```bash
 brew install llama.cpp python@3.13
@@ -122,11 +123,9 @@ How to read it: the first line is the verdict — `MEETS TARGET` means a
 configuration satisfying your target was found, followed by that
 configuration (quant × ngl × ctx) and the measured evidence (speed and
 quality loss). The quantized model on the `artifact:` line was already
-produced during the search, so copying any of commands 1)–3) puts it to work
-immediately. The whole run takes **about a minute** (58–83 s measured on an
-M3 Pro), and running the exact same command again answers from the cache in
-**under a second**. Absolute numbers and the winning quant can vary by
-machine and by run —
+produced during the search. Re-running the same command with `--resume`
+reuses its stored measurements. Absolute numbers and the winning quant can
+vary by machine and by run —
 [measured run-to-run variance](docs/RESULTS.md#run-to-run-variance-measured-not-hidden).
 
 ## Measured results
@@ -147,33 +146,31 @@ Apple M3 Pro, llama.cpp build 9960. Full logs and run-to-run variance:
 
 ## Couldn't you just ask a chatbot?
 
-Fair question — so we ran the experiment. We asked a chatbot (Claude, in
-fresh sessions with no knowledge of this project) the exact same three
-questions FiTuna's measured scenarios answer, recorded the full replies,
-and compared them against the measurements — **all three first-choice
-recommendations missed the target when measured**:
+We tested that question under the same conditions used in the result report.
+FiTuna and three chatbots were given Qwen3-4B, a 30 tok/s speed target, and a
+5% quality-loss budget. Each proposed configuration was then run three times
+on the same Apple M3 Pro.
 
-| Scenario · target | Chatbot's pick · prediction | Same config, measured | What measurement found |
-|---|---|---|---|
-| Qwen3-4B · 30 tok/s | Q5_K_M — "expect 35–45" | **29.59 — miss**¹ | Q4_K_M @ ngl=33 → 30.81 ✅ |
-| SmolLM2 · 240 tok/s | Q8_0 — "clears it easily" | **205.91 — miss** | Q6_K → 249.50 ✅ |
-| Midm (Korean) · 40 tok/s | Q6_K — "expect 50–70", "avoid Q4_K_M" | **38.96 — miss**¹ | **the Q4_K_M it said to avoid** @ ngl=48 → 44.62 ✅ |
+| Source | Proposed config | Measured generation speed¹ | Quality loss | Runs ≥30 tok/s |
+|---|---|---:|---:|---:|
+| **FiTuna** | **Q4_K_M, `ngl=33`** | **32.68 ± 1.71 tok/s** | **1.75%** | **3/3** |
+| Claude Opus 5 | Q5_K_M, `ngl=36` | 30.49 ± 0.88 tok/s | 1.53% | 2/3 |
+| ChatGPT 5.6 Sol | Q4_K_M, `ngl=28` | 28.92 ± 1.37 tok/s | 1.75% | 1/3 |
+| Gemini 3.1 Pro | No config (query unsupported) | — | — | Not measurable |
 
-¹ Marginal verdicts (within ~1 tok/s) — but a 30%+ error in the predicted
-speed is not a margin problem.
+¹ Mean ± between-run standard deviation over three independent runs, with
+five internal measurements per run. Quality is the perplexity increase from
+F16 on 32 WikiText-2 chunks.
 
-All three replies recommended `-ngl 99` (offload everything) — the concept
-of a *minimal* offload that still meets the target cannot exist without
-measurement — and all three honestly ended with "benchmark it yourself with
-`llama-bench`." **FiTuna is that benchmark.** Full transcripts, method, and
-limitations (including session-to-session variance of chatbot answers):
+![Repeated same-hardware measurements of chatbot-proposed and FiTuna configurations for the same Qwen3-4B target. Only FiTuna passed 30 tok/s in all three runs.](assets/chatbot-comparison.svg)
+
+All three configurations that could be measured stayed within the quality
+budget. Only FiTuna met the speed target on every run, while using three fewer
+GPU-offloaded layers than Claude's proposal. ChatGPT proposed the smallest
+offload but passed only once. This is not a general chatbot ranking; it shows
+that a minimal passing configuration for one machine needs repeated
+measurement. Full conditions, per-run values, and limitations:
 [docs/CHATBOT_COMPARISON.md](docs/CHATBOT_COMPARISON.md)
-
-The offload curve shows best what can't be known without measuring: one
-layer separates pass from fail, and offloading half the layers gives a
-quarter — not half — of the speed:
-
-![Measured generation speed of Midm-2.0-Mini Q4_K_M per GPU offload layer count — a single layer separates pass from fail](assets/ngl-curve.en.svg)
 
 ## How it works
 
