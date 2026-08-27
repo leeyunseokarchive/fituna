@@ -12,7 +12,12 @@
 ### 변경
 
 - **PyPI README 최신화** — 0.2.0 배포물에 박제된 옛 README를 최신 문서
-  (한국어 우선, 로고·데모 영상 추가)로 갱신하기 위한 재배포. 코드 변경 없음.
+  (한국어 우선, 로고·데모 영상 추가)로 갱신.
+- **`fituna-mcp` 요청 검증 강화 및 기본값 개선** — `out_dir` 기본값을
+  `./fituna-out`에서 `./out`으로 변경. `model_path`를 생략하면 `out_dir`에서
+  base-precision GGUF를 자동 탐색하고, `wikitext_path`도 기본값(`./wiki.txt`)을
+  쓰도록 선택 인자로 완화. 비정상 JSON-RPC 요청에 에러 응답을 반환하도록 검증
+  강화(`tools/call`의 `params`/`arguments`가 dict가 아니면 -32602 반환).
 
 ## [0.2.0] — 2026-08-24
 
