@@ -349,6 +349,22 @@ FiTuna는 **추천까지만** 합니다. 산출물은 탐색 중에 이미 만�
 - **벤치마크는 발열에 민감** — 목표와 몇 tok/s 차이의 판정은 경계선 ([변동성 분석](docs/RESULTS.md#run-to-run-variance-measured-not-hidden))
 - **실기 E2E는 macOS·Linux** — Windows는 단위테스트·CI까지
 
+## 로드맵
+
+위 한계를 좁히는 순서대로 진행합니다. 항목별 논의는
+[GitHub Issues](https://github.com/leeyunseokarchive/fituna/issues)에서
+추적합니다.
+
+- **KLD 품질 지표 옵션** — perplexity 대리 지표의 보완으로,
+  `llama-perplexity`가 이미 지원하는 KL divergence 측정을 선택형으로 추가
+- **llama.cpp `--fit` 통합** — 최신 llama.cpp의 메모리 자동 맞춤을 탐색의
+  하위 루틴으로 활용해 ngl 초기 후보 선정을 가속
+- **분산 측정 구조** — 원격 서버에서 양자화·품질 평가를 수행하고, 자원이
+  부족한 배포 기기에서는 속도만 측정하는 구조로 확장
+- **승리 명령 직접 실행(`--launch`)과 LM Studio preset 내보내기** —
+  현재 `--export-ollama`처럼 산출물 경계를 유지한 채 출력 포맷만 추가
+- **멀티 GPU(`--tensor-split`) 탐색** — 단일 GPU 한계 해소
+
 ## 협업 및 관리체계
 
 FiTuna는 `main`을 항상 실행 가능한 기준선으로 두는 **GitHub Flow 기반**으로
