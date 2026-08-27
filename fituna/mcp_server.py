@@ -33,6 +33,7 @@ second time.
 from __future__ import annotations
 
 import json
+import re
 import sys
 from dataclasses import asdict
 from pathlib import Path
@@ -44,6 +45,8 @@ from fituna.config import FiTunaError, NoFeasibleConfigError, TargetSpec
 
 PROTOCOL_VERSION = "2024-11-05"
 SERVER_INFO = {"name": "fituna", "version": "0.2.0"}
+_DEFAULT_QUANTS = ("Q8_0", "Q6_K", "Q5_K_M", "Q4_K_M")
+_BASE_GGUF_RE = re.compile(r"(?:^|[-_.])(?:bf16|f16|fp16|f32|fp32)$", re.IGNORECASE)
 
 _TOOLS: list[dict[str, Any]] = [
     {
@@ -73,7 +76,7 @@ _TOOLS: list[dict[str, Any]] = [
             "properties": {
                 "model_path": {
                     "type": "string",
-                    "description": "Path to an F16/BF16 .gguf file (or HF model directory if a convert script is available)",
+                    "description": "Path to an F16/BF16 .gguf file (defaults to the only base-precision GGUF in out_dir)",
                 },
                 "target_tps": {
                     "type": "number",
@@ -86,12 +89,12 @@ _TOOLS: list[dict[str, Any]] = [
                 },
                 "wikitext_path": {
                     "type": "string",
-                    "description": "Path to a plain-text perplexity corpus (see FiTuna README for the wikitext-2 export snippet)",
+                    "description": "Path to a plain-text perplexity corpus (default: ./wiki.txt)",
                 },
                 "out_dir": {
                     "type": "string",
                     "description": "Working directory for quantized files and the result cache",
-                    "default": "./fituna-out",
+                    "default": "./out",
                 },
                 "ctx": {
                     "type": "integer",
@@ -101,7 +104,8 @@ _TOOLS: list[dict[str, Any]] = [
                 "quant_candidates": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "Quant levels to consider (default: Q8_0, Q6_K, Q5_K_M, Q4_K_M, Q3_K_M, Q2_K)",
+                    "description": "Quant levels to consider",
+                    "default": list(_DEFAULT_QUANTS),
                 },
                 "ppl_chunks": {
                     "type": "integer",
@@ -109,7 +113,7 @@ _TOOLS: list[dict[str, Any]] = [
                     "default": 32,
                 },
             },
-            "required": ["model_path", "target_tps", "wikitext_path"],
+            "required": ["target_tps"],
         },
     },
 ]
@@ -122,27 +126,46 @@ def _detect_hardware() -> dict[str, Any]:
     return payload
 
 
+def _resolve_paths(args: dict[str, Any]) -> tuple[Path, Path, Path]:
+    work_dir = Path(args.get("out_dir") or "./out")
+    if args.get("model_path"):
+        model_path = Path(args["model_path"])
+    else:
+        models = [
+            p for p in work_dir.glob("*.gguf")
+            if p.is_file() and _BASE_GGUF_RE.search(p.stem)
+        ]
+        if not models:
+            raise FiTunaError(f"no base GGUF file found in {work_dir}; pass model_path")
+        if len(models) > 1:
+            raise FiTunaError(f"multiple base GGUF files found in {work_dir}; pass model_path")
+        model_path = models[0]
+    return work_dir, model_path, Path(args.get("wikitext_path") or "./wiki.txt")
+
+
 def _recommend(args: dict[str, Any]) -> dict[str, Any]:
+    try:
+        target_tps = float(args["target_tps"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise FiTunaError("target_tps must be a number") from exc
+
     bins = binaries.locate_binaries()
     hw = hardware.detect_hardware()
 
-    work_dir = Path(args.get("out_dir") or "./fituna-out")
+    work_dir, model_path, wikitext_path = _resolve_paths(args)
     work_dir.mkdir(parents=True, exist_ok=True)
 
-    model_path = Path(args["model_path"])
     base_gguf = model_info.ensure_base_gguf(model_path, work_dir, bins)
     minfo = model_info.read_model_info(base_gguf, bins)
 
     ctx = int(args.get("ctx") or 4096)
-    quants = args.get("quant_candidates") or [
-        "Q8_0", "Q6_K", "Q5_K_M", "Q4_K_M", "Q3_K_M", "Q2_K",
-    ]
+    quants = args.get("quant_candidates") or _DEFAULT_QUANTS
     ppl_chunks_raw = args.get("ppl_chunks", 32)
     ppl_chunks: Optional[int] = int(ppl_chunks_raw) if int(ppl_chunks_raw) > 0 else None
 
     target = TargetSpec(
         model_path=model_path,
-        target_tokens_per_sec=float(args["target_tps"]),
+        target_tokens_per_sec=target_tps,
         max_quality_loss_pct=float(args.get("max_quality_loss_pct") or 5.0),
         ctx=ctx,
         ctx_candidates=[ctx],
@@ -155,7 +178,7 @@ def _recommend(args: dict[str, Any]) -> dict[str, Any]:
     try:
         result = search.search(
             target, minfo, hw, bins, work_dir,
-            Path(args["wikitext_path"]), cache=cache,
+            wikitext_path, cache=cache,
         )
         payload = json.loads(report.to_json(result))
         payload["already_quantized_warning"] = model_info.is_already_quantized(minfo)
@@ -191,9 +214,20 @@ def _tool_call(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         return {"content": [{"type": "text", "text": str(exc)}], "isError": True}
 
 
-def _handle(msg: dict[str, Any]) -> Optional[dict[str, Any]]:
+def _error(msg_id: Any, code: int, message: str) -> dict[str, Any]:
+    return {
+        "jsonrpc": "2.0",
+        "id": msg_id,
+        "error": {"code": code, "message": message},
+    }
+
+
+def _handle(msg: object) -> Optional[dict[str, Any]]:
     """Handle one JSON-RPC message; return the response, or None for
     notifications (no id -> no response, per JSON-RPC 2.0)."""
+    if not isinstance(msg, dict):
+        return _error(None, -32600, "invalid request")
+
     method = msg.get("method")
     msg_id = msg.get("id")
 
@@ -209,8 +243,18 @@ def _handle(msg: dict[str, Any]) -> Optional[dict[str, Any]]:
     elif method == "tools/list":
         result = {"tools": _TOOLS}
     elif method == "tools/call":
-        params = msg.get("params") or {}
-        result = _tool_call(params.get("name", ""), params.get("arguments") or {})
+        params = msg.get("params")
+        if params is None:
+            params = {}
+        if not isinstance(params, dict):
+            return _error(msg_id, -32602, "invalid params")
+
+        arguments = params.get("arguments")
+        if arguments is None:
+            arguments = {}
+        if not isinstance(arguments, dict):
+            return _error(msg_id, -32602, "invalid params")
+        result = _tool_call(params.get("name", ""), arguments)
     elif method == "ping":
         result = {}
     else:
