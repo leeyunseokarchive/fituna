@@ -331,6 +331,21 @@ serving the model stays llama.cpp's job
 - **Benchmarks are thermally sensitive** — verdicts within a few tok/s of target are marginal ([variance analysis](docs/RESULTS.md#run-to-run-variance-measured-not-hidden))
 - **Real-hardware E2E covers macOS · Linux** — Windows is unit-tested and CI-run
 
+## Roadmap
+
+Ordered by how directly each item narrows the limitations above. Each item
+is tracked on [GitHub Issues](https://github.com/leeyunseokarchive/fituna/issues).
+
+- **KLD quality metric option** — complement the perplexity proxy with the
+  KL-divergence measurement `llama-perplexity` already supports
+- **llama.cpp `--fit` integration** — use upstream's memory auto-fit as a
+  sub-routine to seed the ngl search
+- **Distributed measurement** — quantize and score quality on a remote
+  server, then measure only speed on resource-constrained target devices
+- **`--launch` and LM Studio preset export** — additional output formats,
+  keeping the same artifact boundary as `--export-ollama`
+- **Multi-GPU (`--tensor-split`) search** — lift the single-GPU limitation
+
 ## Contributing
 
 The codebase is small, dependency-free and contract-first — start at
