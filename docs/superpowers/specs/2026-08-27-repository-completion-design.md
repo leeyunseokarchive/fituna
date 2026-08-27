@@ -26,6 +26,9 @@ source of truth for code, release, and project-management claims.
 - Remove the awkward "copy 1)-3), about a minute" paragraph and sweep both
   READMEs for broken Markdown, stale values, spacing, and claims that differ
   from the report.
+- Add the official demonstration video (`https://youtu.be/ejNnWFm9V6I`) near
+  the reviewer guide in both README hero blocks and link it once from the demo
+  section; avoid repeating the URL elsewhere.
 - Update or replace `docs/CHATBOT_COMPARISON.md` so linked evidence describes
   the same experiment as the README and report.
 
