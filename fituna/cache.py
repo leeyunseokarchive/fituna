@@ -282,6 +282,22 @@ class ResultCache:
         )
         self._conn.commit()
 
+    def delete_quality(
+        self,
+        model_fp: str,
+        quant: str,
+        ppl_chunks: Optional[int] = None,
+        corpus_fp: str = "",
+        metric: str = "ppl",
+    ) -> None:
+        """Remove one quality-cache row (used by tests to force remasurement)."""
+        self._conn.execute(
+            """DELETE FROM quality_cache
+               WHERE model_fp=? AND quant=? AND ppl_chunks=? AND corpus_fp=? AND metric=?""",
+            (model_fp, quant, _chunks_key(ppl_chunks), corpus_fp, metric),
+        )
+        self._conn.commit()
+
 
 def _self_check() -> None:
     """Minimal assert-based sanity check -- roundtrip + miss + resume-reopen.

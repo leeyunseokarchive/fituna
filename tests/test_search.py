@@ -526,13 +526,15 @@ def test_search_with_kld_quality_metric(monkeypatch, tmp_path, resume):
         generated_logits[0].unlink()
         search(target, model, _hw(GPUVendor.NONE), _binaries(tmp_path), tmp_path, wiki, cache=cache)
         assert len(generated_logits) == 2
-        cache._conn.execute("DELETE FROM quality_cache WHERE quant = '__baseline__'")
-        cache._conn.commit()
+        from fituna.model_info import model_fingerprint
+        from fituna.search import _BASELINE_QUANT_KEY
+        model_fp = model_fingerprint(model.base_gguf_path)
+        corpus_fp = model_fingerprint(wiki)
+        cache.delete_quality(model_fp, _BASELINE_QUANT_KEY, target.ppl_chunks, corpus_fp)
         search(target, model, _hw(GPUVendor.NONE), _binaries(tmp_path), tmp_path, wiki, cache=cache)
         assert len(generated_logits) == 3
         generated_logits[0].unlink()
-        cache._conn.execute("DELETE FROM quality_cache WHERE quant = '__baseline__'")
-        cache._conn.commit()
+        cache.delete_quality(model_fp, _BASELINE_QUANT_KEY, target.ppl_chunks, corpus_fp)
         search(target, model, _hw(GPUVendor.NONE), _binaries(tmp_path), tmp_path, wiki, cache=cache)
         assert len(generated_logits) == 4
         cache.close()
@@ -607,3 +609,47 @@ def test_no_gpu_search_benches_the_config_it_recommends(monkeypatch, tmp_path):
     assert probed == [0]
     assert result.config.ngl == 0
     assert result.bench.candidate.ngl == 0
+
+
+def test_cached_baseline_resume_skips_baseline_write(monkeypatch, tmp_path):
+    """A --resume run that hits a cached baseline must not call put_quality for it."""
+    put_calls: list[str] = []
+    _patch_flat_quality(monkeypatch)
+    _patch(monkeypatch, "binaries", "list_supported_quant_types", lambda bins: ["Q4_K_M"])
+    _patch(
+        monkeypatch, "bench", "run_bench",
+        lambda gguf_path, ngl, ctx, target, binaries, timeout_sec=300: BenchResult(
+            candidate=CandidateConfig(quant=_quant_of(gguf_path), ngl=ngl, ctx=ctx),
+            prompt_tok_per_sec=100.0, gen_tok_per_sec=50.0,
+            vram_used_mb=None, raw_stdout="{}",
+        ),
+    )
+    from fituna.cache import ResultCache
+    from fituna.model_info import model_fingerprint
+    from fituna.search import _BASELINE_QUANT_KEY
+
+    wiki = tmp_path / "wiki.txt"
+    wiki.write_text("hi")
+    model = _model_info(tmp_path)
+    cache = ResultCache(tmp_path / "cache.sqlite")
+    real_put = cache.put_quality
+
+    def tracking_put(model_fp, result, ppl_chunks=None, corpus_fp=""):
+        put_calls.append(result.candidate_quant)
+        return real_put(model_fp, result, ppl_chunks, corpus_fp)
+
+    cache.put_quality = tracking_put  # type: ignore[method-assign]
+    target = TargetSpec(
+        model_path=tmp_path / "m.gguf",
+        target_tokens_per_sec=20.0,
+        max_quality_loss_pct=5.0,
+        ctx=4096,
+        ctx_candidates=[4096],
+        quant_candidates=["Q4_K_M"],
+    )
+    search(target, model, _hw(GPUVendor.NONE), _binaries(tmp_path), tmp_path, wiki, cache=cache)
+    assert _BASELINE_QUANT_KEY in put_calls
+    put_calls.clear()
+    search(target, model, _hw(GPUVendor.NONE), _binaries(tmp_path), tmp_path, wiki, cache=cache)
+    assert _BASELINE_QUANT_KEY not in put_calls
+    cache.close()
