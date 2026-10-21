@@ -6,6 +6,8 @@ Exercises fituna.hardware by monkeypatching subprocess.run so no real
 nvidia-smi/rocm-smi/system_profiler binary (or GPU) is required. Covers:
 - the pure parsing helpers (_parse_nvidia_csv/_parse_rocm_smi/
   _parse_system_profiler/_parse_meminfo_kb) with realistic sample output,
+- every OS branch and fallback of _detect_ram_mb() via monkeypatched
+  platform.system, hardware._run, and builtins.open,
 - detect_hardware()'s vendor-priority fallthrough (nvidia -> amd -> apple ->
   cpu-only) driven entirely through a faked subprocess.run,
 - parse_manual_hardware()'s override-merge semantics against a faked
@@ -14,13 +16,16 @@ nvidia-smi/rocm-smi/system_profiler binary (or GPU) is required. Covers:
 
 from __future__ import annotations
 
+import io
 import subprocess
+import sys
 
 import pytest
 
 from fituna.config import GPUVendor
 from fituna import hardware
 from fituna.hardware import (
+    _detect_ram_mb,
     _parse_meminfo_kb,
     _parse_nvidia_csv,
     _parse_rocm_smi,
@@ -120,6 +125,88 @@ def test_parse_system_profiler_intel_unsupported_vendor():
 def test_parse_meminfo_kb():
     assert _parse_meminfo_kb("MemTotal:       16384000 kB\nMemFree: 1000 kB\n") == 16384000
     assert _parse_meminfo_kb("garbage\n") is None
+
+
+# ---------------------------------------------------------------------------
+# _detect_ram_mb(): per-OS branches and failure fallbacks
+# ---------------------------------------------------------------------------
+
+
+def _patch_open_for_meminfo(monkeypatch, *, content=None, error=None):
+    """Intercept open('/proc/meminfo'); leave every other path alone."""
+    real_open = open
+
+    def _fake_open(path, *args, **kwargs):
+        if str(path) == "/proc/meminfo":
+            if error is not None:
+                raise error
+            return io.StringIO(content if content is not None else "")
+        return real_open(path, *args, **kwargs)
+
+    monkeypatch.setattr("builtins.open", _fake_open)
+
+
+def test_detect_ram_mb_linux_memtotal_returns_mb(monkeypatch):
+    monkeypatch.setattr(hardware.platform, "system", lambda: "Linux")
+    _patch_open_for_meminfo(
+        monkeypatch, content="MemTotal:       16384000 kB\nMemFree: 1000 kB\n"
+    )
+    assert _detect_ram_mb() == 16384000 // 1024
+
+
+def test_detect_ram_mb_linux_oserror_returns_0(monkeypatch):
+    monkeypatch.setattr(hardware.platform, "system", lambda: "Linux")
+    _patch_open_for_meminfo(monkeypatch, error=OSError("meminfo unavailable"))
+    assert _detect_ram_mb() == 0
+
+
+def test_detect_ram_mb_linux_missing_memtotal_returns_0(monkeypatch):
+    monkeypatch.setattr(hardware.platform, "system", lambda: "Linux")
+    _patch_open_for_meminfo(monkeypatch, content="MemFree: 1000 kB\n")
+    assert _detect_ram_mb() == 0
+
+
+def test_detect_ram_mb_macos_sysctl_bytes_to_mb(monkeypatch):
+    monkeypatch.setattr(hardware.platform, "system", lambda: "Darwin")
+    # 16 GiB in bytes -> 16384 MiB
+    monkeypatch.setattr(hardware, "_run", lambda cmd, timeout=5.0: "17179869184\n")
+    assert _detect_ram_mb() == 17179869184 // (1024 * 1024)
+
+
+def test_detect_ram_mb_macos_run_none_returns_0(monkeypatch):
+    monkeypatch.setattr(hardware.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(hardware, "_run", lambda cmd, timeout=5.0: None)
+    assert _detect_ram_mb() == 0
+
+
+def test_detect_ram_mb_macos_non_numeric_returns_0(monkeypatch):
+    monkeypatch.setattr(hardware.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(hardware, "_run", lambda cmd, timeout=5.0: "not-a-number\n")
+    assert _detect_ram_mb() == 0
+
+
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="ctypes.windll exists on Windows; this case needs a host without it",
+)
+def test_detect_ram_mb_windows_without_windll_returns_0(monkeypatch):
+    """On Linux/macOS, patching system to Windows must not raise when windll
+    is missing; the except Exception path returns 0."""
+    monkeypatch.setattr(hardware.platform, "system", lambda: "Windows")
+    assert _detect_ram_mb() == 0
+
+
+@pytest.mark.skipif(
+    sys.platform != "win32",
+    reason="requires real Windows GlobalMemoryStatusEx via ctypes.windll",
+)
+def test_detect_ram_mb_windows_real_call_returns_positive():
+    assert _detect_ram_mb() > 0
+
+
+def test_detect_ram_mb_unknown_os_returns_0(monkeypatch):
+    monkeypatch.setattr(hardware.platform, "system", lambda: "FreeBSD")
+    assert _detect_ram_mb() == 0
 
 
 # ---------------------------------------------------------------------------
