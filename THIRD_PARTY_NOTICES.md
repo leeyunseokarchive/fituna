@@ -136,6 +136,20 @@ weight를 내장하거나 fine-tuning·재학습·재배포하지 않습니다. 
 
 ---
 
+## 6. Ollama Modelfile 형식(선택, 파일 출력만)
+
+- **프로젝트**: https://github.com/ollama/ollama
+- **라이선스**: MIT License, Copyright (c) Ollama
+  (`https://api.github.com/repos/ollama/ollama/license`로 2026-10-28 확인)
+- **FiTuna의 사용 방식**: `fituna run --export-ollama`가 찾은 설정을
+  `FROM`, `PARAMETER num_gpu`, `PARAMETER num_ctx` 세 줄의 `Modelfile`로 씁니다
+  (`fituna/report.py:export_ollama_modelfile`). 공개 문서
+  (https://docs.ollama.com/modelfile)의 문법을 따른 텍스트 파일일 뿐이며,
+  FiTuna는 Ollama 코드나 바이너리를 포함·호출·재배포하지 않습니다.
+  `ollama create`는 사용자가 직접 실행합니다.
+
+---
+
 ## 요약
 
 | # | 구성요소 | 라이선스 | 저장소 포함 여부 | 호출 방식 |
@@ -149,6 +163,7 @@ weight를 내장하거나 fine-tuning·재학습·재배포하지 않습니다. 
 | 3 | WikiText-2(영어)와 한국어 Wikipedia corpus | CC BY-SA 3.0 / GFDL | 아니요 | 파일 입력으로 읽음 |
 | 4 | 사용자가 선택한 LLM weight | 모델마다 다름 | 아니요 | 파일 입력으로 읽음 |
 | 5 | pytest(개발 전용) | MIT | 아니요(선택 개발 의존성) | 런타임에 호출하지 않음 |
+| 6 | Ollama `Modelfile` 형식 | MIT | 아니요 | 파일 출력만(`--export-ollama`, 실행하지 않음) |
 
 FiTuna가 사용하는 Python 표준 라이브러리 모듈 목록은 `docs/SBOM.md`, 각
 오픈소스 구성요소의 사용 영역과 라이선스 확인 방법은
