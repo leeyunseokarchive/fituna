@@ -2,7 +2,7 @@
 # Copyright (c) 2026 FiTuna contributors
 """FiTuna: hardware-aware auto-tuner for llama.cpp GGUF quantization + runtime configs."""
 
-__version__ = "0.3.6"
+__version__ = "0.3.7"
 
 __all__ = ["__version__"]
 

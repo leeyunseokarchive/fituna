@@ -7,6 +7,8 @@
 
 ## [미출시]
 
+## [0.3.7] — 2026-10-28
+
 ### 추가
 
 - **KLD 모드 결과에 기준 logits 파일의 경로와 크기 표시.** `--quality-metric kld`는
@@ -431,7 +433,8 @@ subprocess 계층을 의도적으로 모의 처리하므로, 실제 llama.cpp �
 - `--wikitext`를 `--quality-corpus`로 바꿨습니다. 이전 이름을 alias로
   유지하므로 호환성을 깨는 변경은 아닙니다.
 
-[미출시]: https://github.com/leeyunseokarchive/fituna/compare/v0.3.6...HEAD
+[미출시]: https://github.com/leeyunseokarchive/fituna/compare/v0.3.7...HEAD
+[0.3.7]: https://github.com/leeyunseokarchive/fituna/releases/tag/v0.3.7
 [0.3.6]: https://github.com/leeyunseokarchive/fituna/releases/tag/v0.3.6
 [0.3.5]: https://github.com/leeyunseokarchive/fituna/releases/tag/v0.3.5
 [0.3.4]: https://github.com/leeyunseokarchive/fituna/releases/tag/v0.3.4
