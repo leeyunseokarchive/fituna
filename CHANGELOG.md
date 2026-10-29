@@ -7,6 +7,12 @@
 
 ## [미출시]
 
+### 문서
+
+- **Ollama 라이선스와 결합 방식 기록.** `--export-ollama`가 쓰는 Ollama `Modelfile`
+  형식을 `docs/OPEN_SOURCE_USAGE.md` §15와 `THIRD_PARTY_NOTICES.md` §6에 추가했습니다.
+  Ollama는 MIT이며, FiTuna는 텍스트 파일만 쓰고 Ollama를 포함하거나 실행하지 않습니다.
+
 ## [0.3.7] — 2026-10-28
 
 ### 추가

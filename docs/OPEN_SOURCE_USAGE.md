@@ -63,6 +63,7 @@ FiTuna는 다섯 가지 결합 방식을 사용하며, 그중 하나만 이 저�
 | 12 | test framework | pytest | MIT | 개발 전용(`[dev]` extra) | `tests/`, `pyproject.toml` |
 | 13 | 검증 환경 | Jupyter notebook 형식, git, CMake, pip, `huggingface_hub` | BSD-3-Clause, GPL-2.0, BSD-3-Clause, MIT, Apache-2.0 | 개발·notebook 전용 | `notebooks/colab_nvidia_verification.ipynb` |
 | 14 | GPU/RAM 감지 | `rocm-smi` (ROCm) | MIT | 서브프로세스(선택) | `hardware.py:112` |
+| 15 | 결과 내보내기 | Ollama `Modelfile` 형식(`--export-ollama`) | MIT | 파일 형식(텍스트 출력만, `ollama` 실행 안 함) | `report.py:124` `export_ollama_modelfile()` |
 
 FiTuna가 호출하지만 재배포하지 않는 비오픈소스 구성요소인 `nvidia-smi`,
 `system_profiler`(§14), CUDA toolkit(§13), hosted GitHub Actions(§11), Google
@@ -535,6 +536,27 @@ open source인 반면 `system_profiler`는 아니라는 점입니다.
 실패해도 `detect_hardware()`는 CPU 전용 `HardwareProfile`을 반환하고 탐색을
 계속합니다. 이때 `docs/ARCHITECTURE.md` 설명대로 `-ngl` binary search는
 건너뜁니다.
+
+## 15. 결과 내보내기 — Ollama Modelfile
+
+`fituna run --export-ollama`는 찾은 설정을 Ollama가 읽는 `Modelfile`로 저장합니다
+(`fituna/report.py:124` `export_ollama_modelfile()`). 파일 내용은 공개 문서에 적힌
+문법으로 쓴 세 줄 텍스트뿐입니다.
+
+```
+FROM ./<양자화된 GGUF 파일 이름>
+PARAMETER num_gpu <찾은 -ngl>
+PARAMETER num_ctx <찾은 ctx>
+```
+
+| 항목 | 내용 |
+|---|---|
+| 프로젝트 | Ollama, https://github.com/ollama/ollama |
+| 라이선스 | **MIT** (`Copyright (c) Ollama`) |
+| 확인 방법 | `https://api.github.com/repos/ollama/ollama/license` → SPDX `MIT`, `LICENSE` 원문 첫 줄 `MIT License` (2026-10-28) |
+| 형식 근거 | `https://docs.ollama.com/modelfile`(원본 `docs/modelfile.mdx`), `num_gpu`는 `api/types.go`의 `Runner.NumGPU` |
+| 결합 방식 | 파일 형식. FiTuna는 Ollama 코드나 바이너리를 import·호출·포함·재배포하지 않습니다. `ollama create`는 사용자가 직접 실행합니다 |
+| FiTuna에 생기는 의무 | 없음. 배포물에 Ollama 구성요소가 들어가지 않으므로 MIT 고지 의무가 발생하지 않습니다 |
 
 ---
 
