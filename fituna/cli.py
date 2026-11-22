@@ -158,6 +158,16 @@ def _build_parser() -> argparse.ArgumentParser:
         "--resume", action="store_true", help="reuse cached bench/quality results"
     )
     run.add_argument(
+        "--low-disk",
+        action="store_true",
+        help=(
+            "keep one candidate GGUF at a time; deletes previous candidate "
+            "files for the same model fingerprint and requested quants in "
+            "--out; re-quantizes as needed and retains the selected result"
+        ),
+    )
+
+    run.add_argument(
         "--export-ollama",
         action="store_true",
         dest="export_ollama",
@@ -489,6 +499,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
         # compute_perplexity's own "no limit" sentinel.
         ppl_chunks=args.ppl_chunks if args.ppl_chunks > 0 else None,
         quality_metric=args.quality_metric,
+        low_disk=args.low_disk,
     )
 
     cache = ResultCache(work_dir / ".fituna_cache.sqlite3") if args.resume else None

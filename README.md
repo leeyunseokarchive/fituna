@@ -369,3 +369,42 @@ The codebase is small, dependency-free and contract-first — start at
 [Open-source usage](docs/OPEN_SOURCE_USAGE.md) ·
 [AI-assisted development disclosure](docs/AI_MODEL_USAGE.md) ·
 [CHANGELOG.md](CHANGELOG.md) · [SECURITY.md](SECURITY.md)
+
+## Low-disk mode (`--low-disk`)
+
+Add `--low-disk` to `fituna run` when storage is limited.
+
+```bash
+fituna run --model ./base-f16.gguf --quality-corpus ./wiki.txt --target-tps 20 --max-quality-loss 5 --out ./out-low-disk --resume --low-disk
+```
+
+Adjust the input paths and targets for your environment. If the llama.cpp
+binaries are not on PATH, specify their location with `--llama-bin-dir`.
+
+The quality pass deletes each candidate after measurement. The speed pass
+re-creates candidates in measured-quality order and retains the selected
+result. If no candidate meets the target, the best-effort candidate is
+re-created before it is reported.
+
+### File cleanup
+
+Use a dedicated output directory.
+
+- At startup, this mode removes previous candidate files and their temporary
+  files for the same model fingerprint and requested, supported quant types.
+- It preserves the base model, other models, unrequested quant types, and
+  reference logits files.
+- Besides the base, it keeps at most one managed candidate GGUF at a time.
+  Other preserved files, the cache, and the corpus require additional space.
+- Do not run concurrent searches against the same output directory.
+
+### Runtime and cache
+
+Re-quantization can increase runtime. With `--resume`, measurements are reused,
+but a missing final model file still needs to be re-created.
+
+Without this flag, existing behavior is preserved. The option is exposed
+through the CLI; MCP and interactive quickstart retain their existing behavior.
+
+See the [measured comparison](docs/RESULTS.md) for the experiment conditions
+and results. The comparison is documented in Korean and links to raw JSON data.

@@ -1,0 +1,51 @@
+{
+  "config": {
+    "quant": "Q6_K",
+    "ngl": 0,
+    "ctx": 512
+  },
+  "bench": {
+    "candidate": {
+      "quant": "Q6_K",
+      "ngl": 0,
+      "ctx": 512
+    },
+    "prompt_tok_per_sec": 1034.900105,
+    "gen_tok_per_sec": 207.282388,
+    "vram_used_mb": null,
+    "raw_stdout": "[\n  {\n    \"build_commit\": \"e300919cc\",\n    \"build_number\": 12631,\n    \"cpu_info\": \"13th Gen Intel(R) Core(TM) i7-1360P\",\n    \"gpu_info\": \"\",\n    \"backends\": \"CPU\",\n    \"model_filename\": \"C:\\\\Users\\\\baese\\\\osproject\\\\fituna-measurement\\\\low-disk\\\\SmolLM2-135M-Instruct-b070cb3223ca-Q6_K.gguf\",\n    \"model_type\": \"llama 256M Q6_K\",\n    \"model_size\": 136597248,\n    \"model_n_params\": 134515008,\n    \"n_batch\": 2048,\n    \"n_ubatch\": 512,\n    \"n_threads\": 12,\n    \"cpu_mask\": \"0x0\",\n    \"cpu_strict\": false,\n    \"poll\": 50,\n    \"type_k\": \"f16\",\n    \"type_v\": \"f16\",\n    \"n_gpu_layers\": 0,\n    \"n_cpu_moe\": 0,\n    \"split_mode\": \"layer\",\n    \"main_gpu\": 0,\n    \"no_kv_offload\": false,\n    \"flash_attn\": -1,\n    \"devices\": \"auto\",\n    \"tensor_split\": \"0.00\",\n    \"tensor_buft_overrides\": \"none\",\n    \"load_mode\": \"auto\",\n    \"lazy_mode\": \"auto\",\n    \"embeddings\": false,\n    \"no_op_offload\": 0,\n    \"no_host\": false,\n    \"repack\": true,\n    \"fit_target\": 0,\n    \"fit_min_ctx\": 0,\n    \"n_prompt\": 512,\n    \"n_gen\": 0,\n    \"n_depth\": 0,\n    \"test_time\": \"2026-11-22T17:19:03Z\",\n    \"avg_ns\": 494801580,\n    \"stddev_ns\": 6478354,\n    \"avg_ts\": 1034.900105,\n    \"stddev_ts\": 13.547064,\n    \"samples_ns\": [ 487004400, 495272500, 489938500, 503008000, 498784500 ],\n    \"samples_ts\": [ 1051.33, 1033.77, 1045.03, 1017.88, 1026.5 ]\n  },\n  {\n    \"build_commit\": \"e300919cc\",\n    \"build_number\": 12631,\n    \"cpu_info\": \"13th Gen Intel(R) Core(TM) i7-1360P\",\n    \"gpu_info\": \"\",\n    \"backends\": \"CPU\",\n    \"model_filename\": \"C:\\\\Users\\\\baese\\\\osproject\\\\fituna-measurement\\\\low-disk\\\\SmolLM2-135M-Instruct-b070cb3223ca-Q6_K.gguf\",\n    \"model_type\": \"llama 256M Q6_K\",\n    \"model_size\": 136597248,\n    \"model_n_params\": 134515008,\n    \"n_batch\": 2048,\n    \"n_ubatch\": 512,\n    \"n_threads\": 12,\n    \"cpu_mask\": \"0x0\",\n    \"cpu_strict\": false,\n    \"poll\": 50,\n    \"type_k\": \"f16\",\n    \"type_v\": \"f16\",\n    \"n_gpu_layers\": 0,\n    \"n_cpu_moe\": 0,\n    \"split_mode\": \"layer\",\n    \"main_gpu\": 0,\n    \"no_kv_offload\": false,\n    \"flash_attn\": -1,\n    \"devices\": \"auto\",\n    \"tensor_split\": \"0.00\",\n    \"tensor_buft_overrides\": \"none\",\n    \"load_mode\": \"auto\",\n    \"lazy_mode\": \"auto\",\n    \"embeddings\": false,\n    \"no_op_offload\": 0,\n    \"no_host\": false,\n    \"repack\": true,\n    \"fit_target\": 0,\n    \"fit_min_ctx\": 0,\n    \"n_prompt\": 0,\n    \"n_gen\": 128,\n    \"n_depth\": 0,\n    \"test_time\": \"2026-11-22T17:19:06Z\",\n    \"avg_ns\": 617652820,\n    \"stddev_ns\": 10349348,\n    \"avg_ts\": 207.282388,\n    \"stddev_ts\": 3.448526,\n    \"samples_ns\": [ 609635400, 611165900, 609829400, 626407700, 631225700 ],\n    \"samples_ts\": [ 209.962, 209.436, 209.895, 204.34, 202.78 ]\n  }\n]\n"
+  },
+  "quality": {
+    "candidate_quant": "Q6_K",
+    "perplexity": 10.8999,
+    "baseline_perplexity": 10.9387,
+    "quality_loss_pct": -0.3547039410533259,
+    "metric": "ppl",
+    "kld": null
+  },
+  "gguf_path": "C:\\Users\\baese\\osproject\\fituna-measurement\\low-disk\\SmolLM2-135M-Instruct-b070cb3223ca-Q6_K.gguf",
+  "run_command": [
+    "C:\\Users\\baese\\osproject\\llama-bin\\llama-cli.exe",
+    "-m",
+    "C:\\Users\\baese\\osproject\\fituna-measurement\\low-disk\\SmolLM2-135M-Instruct-b070cb3223ca-Q6_K.gguf",
+    "-ngl",
+    "0",
+    "-c",
+    "512"
+  ],
+  "meets_target": true,
+  "llama_server_command": [
+    "C:\\Users\\baese\\osproject\\llama-bin\\llama-server.exe",
+    "-m",
+    "C:\\Users\\baese\\osproject\\fituna-measurement\\low-disk\\SmolLM2-135M-Instruct-b070cb3223ca-Q6_K.gguf",
+    "-ngl",
+    "0",
+    "-c",
+    "512",
+    "--port",
+    "8080"
+  ],
+  "modelfile_path": null,
+  "base_logits_path": null,
+  "base_logits_size_bytes": null
+}

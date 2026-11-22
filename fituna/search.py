@@ -68,10 +68,11 @@ from fituna.config import (
     QualityResult,
     SearchResult,
     TargetSpec,
+    FiTunaError,
 )
 from fituna.model_info import model_fingerprint
 from fituna.quality import compute_perplexity, evaluate_quality, generate_base_logits
-from fituna.quantize import quantize
+from fituna.quantize import quantize, quantized_path
 from fituna.report import build_run_command, build_server_command
 
 # Sentinel quant key used to cache the base-GGUF baseline perplexity inside
@@ -180,7 +181,37 @@ def search(
             f"{target.quant_candidates} are supported by this llama-quantize "
             f"build (supported: {sorted(supported) if supported else 'unknown'})"
         )
+    if target.low_disk:
+        old_candidates = [
+            quantized_path(model_info.base_gguf_path, q, work_dir, model_fp)
+            for q in quant_order
+        ]
 
+        # 삭제 전에 모든 후보 경로가 원본과 다른 파일인지 확인한다.
+        for path in old_candidates:
+            if path.exists() and path.samefile(model_info.base_gguf_path):
+                raise FiTunaError(
+                    f"--low-disk: candidate aliases the base GGUF: {path}"
+                )
+
+        for path in old_candidates:
+            path.unlink(missing_ok=True)
+
+        # 중단된 양자화 작업이 남긴 해당 후보의 임시 파일도 정리한다.
+        temp_prefixes = tuple(
+            f"{path.name}.tmp." for path in old_candidates
+        )
+        if work_dir.is_dir():
+            for stale in work_dir.iterdir():
+                if (
+                    stale.name.startswith(temp_prefixes)
+                    and (stale.is_file() or stale.is_symlink())
+                ):
+                    stale.unlink(missing_ok=True)
+
+        progress(
+            "low-disk mode: retaining only one candidate GGUF at a time"
+        )
     # Baseline perplexity: one call, cached across runs via the sentinel key.
     baseline_ppl: Optional[float] = None
     baseline_measured = False
@@ -253,40 +284,61 @@ def search(
             timed_out = True
             break
 
-        progress(f"[{quant}] quantizing")
-        cand_gguf = quantize(model_info.base_gguf_path, quant, work_dir, binaries, model_fp)
+        cand_gguf = quantized_path(model_info.base_gguf_path, quant, work_dir, model_fp)
+
+        if not target.low_disk:
+            progress(f"[{quant}] quantizing")
+            cand_gguf = quantize(
+                model_info.base_gguf_path, quant, work_dir, binaries, model_fp
+            )
 
         quality_res = (
             cache.get_quality(
-                model_fp, quant, target.ppl_chunks, corpus_fp, metric=target.quality_metric
+                model_fp, quant, target.ppl_chunks, corpus_fp,
+                metric=target.quality_metric
             )
             if cache is not None
             else None
         )
-        if quality_res is None:
-            progress(f"[{quant}] evaluating quality")
-            if target.quality_metric == "kld":
-                quality_res = evaluate_quality(
-                    quant,
-                    cand_gguf,
-                    baseline_ppl,
-                    wikitext_path,
-                    binaries,
-                    target.ppl_chunks,
-                    metric=target.quality_metric,
-                    base_logits_path=base_logits_path,
-                )
-            else:
-                quality_res = evaluate_quality(
-                    quant,
-                    cand_gguf,
-                    baseline_ppl,
-                    wikitext_path,
-                    binaries,
-                    target.ppl_chunks,
-                )
-            if cache is not None:
-                cache.put_quality(model_fp, quality_res, target.ppl_chunks, corpus_fp)
+
+        try:
+            if quality_res is None:
+                if target.low_disk:
+                    progress(f"[{quant}] quantizing")
+                    cand_gguf = quantize(
+                        model_info.base_gguf_path, quant, work_dir,
+                        binaries, model_fp
+                    )
+
+                progress(f"[{quant}] evaluating quality")
+                if target.quality_metric == "kld":
+                    quality_res = evaluate_quality(
+                        quant,
+                        cand_gguf,
+                        baseline_ppl,
+                        wikitext_path,
+                        binaries,
+                        target.ppl_chunks,
+                        metric=target.quality_metric,
+                        base_logits_path=base_logits_path,
+                    )
+                else:
+                    quality_res = evaluate_quality(
+                        quant,
+                        cand_gguf,
+                        baseline_ppl,
+                        wikitext_path,
+                        binaries,
+                        target.ppl_chunks,
+                    )
+
+                if cache is not None:
+                    cache.put_quality(
+                        model_fp, quality_res, target.ppl_chunks, corpus_fp
+                    )
+        finally:
+            if target.low_disk:
+                cand_gguf.unlink(missing_ok=True)
 
         if quality_res.quality_loss_pct > target.max_quality_loss_pct:
             progress(
@@ -314,6 +366,11 @@ def search(
                 hit = cache.get_bench(model_fp, hw_fp, cand)
                 if hit is not None:
                     return hit
+            if target.low_disk:
+                quantize(
+                    model_info.base_gguf_path, quant, work_dir,
+                    binaries, model_fp
+                )
             try:
                 res = run_bench(cand_gguf, ngl, ctx, target, binaries)
             except BenchTimeoutError:
@@ -355,13 +412,25 @@ def search(
                     base_logits_size_bytes=base_logits_size_bytes,
                 )
 
+        keep_candidate = False
+
         def build_result(bench: BenchResult) -> SearchResult:
-            return SearchResult(
+            nonlocal keep_candidate
+
+            if target.low_disk:
+                quantize(
+                    model_info.base_gguf_path, quant, work_dir,
+                    binaries, model_fp
+                )
+
+            result = SearchResult(
                 config=bench.candidate,
                 bench=bench,
                 quality=quality_res,
                 gguf_path=cand_gguf,
-                run_command=build_run_command(cand_gguf, bench.candidate, binaries),
+                run_command=build_run_command(
+                    cand_gguf, bench.candidate, binaries
+                ),
                 llama_server_command=build_server_command(
                     cand_gguf, bench.candidate, binaries
                 ),
@@ -369,6 +438,9 @@ def search(
                 base_logits_path=base_logits_path,
                 base_logits_size_bytes=base_logits_size_bytes,
             )
+
+            keep_candidate = True
+            return result
 
         def verify_other_ctx(ngl: int) -> bool:
             nonlocal timed_out
@@ -387,65 +459,77 @@ def search(
             return True
 
         # --- Stage 2: speed search -------------------------------------------
-        progress(f"[{quant}] bench full-offload (ngl={max_ngl})")
-        top = cached_bench(max_ngl, target.ctx)
-        consider_best_effort(top)
+        try:
+            progress(f"[{quant}] bench full-offload (ngl={max_ngl})")
+            top = cached_bench(max_ngl, target.ctx)
+            consider_best_effort(top)
 
-        if top.gen_tok_per_sec < target.target_tokens_per_sec:
-            progress(
-                f"[{quant}] full-offload {top.gen_tok_per_sec:.2f} tok/s < "
-                f"target {target.target_tokens_per_sec:.2f}, skipping (early-exit B)"
-            )
-            continue
+            if top.gen_tok_per_sec < target.target_tokens_per_sec:
+                progress(
+                    f"[{quant}] full-offload {top.gen_tok_per_sec:.2f} tok/s < "
+                    f"target {target.target_tokens_per_sec:.2f}, skipping (early-exit B)"
+                )
+                continue
 
-        if not time_left():
-            timed_out = True
-            break
-
-        if hw.gpu_vendor == GPUVendor.NONE:
-            # No GPU: ngl search doesn't apply; `top` already ran at ngl=0.
-            if verify_other_ctx(0):
-                return build_result(top)
-            continue
-
-        # Every ctx must hold at the chosen ngl. If even full offload misses
-        # one, no smaller ngl will (monotonic assumption) -- next quant.
-        if not verify_other_ctx(max_ngl):
-            if timed_out:
+            if not time_left():
+                timed_out = True
                 break
-            continue
 
-        low = cached_bench(0, target.ctx)
-        consider_best_effort(low)
-        if low.gen_tok_per_sec >= target.target_tokens_per_sec and verify_other_ctx(0):
-            progress(f"[{quant}] zero-offload already meets target (early-exit C)")
-            return build_result(low)
+            if hw.gpu_vendor == GPUVendor.NONE:
+                # No GPU: ngl search doesn't apply; `top` already ran at ngl=0.
+                if verify_other_ctx(0):
+                    return build_result(top)
+                continue
 
-        if not time_left():
-            timed_out = True
-            break
+            # Every ctx must hold at the chosen ngl. If even full offload misses
+            # one, no smaller ngl will (monotonic assumption) -- next quant.
+            if not verify_other_ctx(max_ngl):
+                if timed_out:
+                    break
+                continue
 
-        # Binary search the minimal ngl in [0, max_ngl] meeting the target at
-        # every ctx candidate (not just the first -- a larger ctx can need
-        # more offload than the first ctx's minimum).
-        lo, hi = 0, max_ngl
-        best = top  # already known to satisfy the target at every ctx
-        calls = 0
-        while lo < hi and calls < target.ngl_max_calls and time_left():
-            mid = (lo + hi) // 2
-            r = cached_bench(mid, target.ctx)
-            consider_best_effort(r)
-            calls += 1
-            if r.gen_tok_per_sec >= target.target_tokens_per_sec and verify_other_ctx(mid):
-                best = r
-                hi = mid
-            else:
-                lo = mid + 1
-        if not time_left():
-            timed_out = True
+            low = cached_bench(0, target.ctx)
+            consider_best_effort(low)
+            if low.gen_tok_per_sec >= target.target_tokens_per_sec and verify_other_ctx(0):
+                progress(f"[{quant}] zero-offload already meets target (early-exit C)")
+                return build_result(low)
 
-        progress(f"[{quant}] found ngl={best.candidate.ngl} meeting target -- done")
-        return build_result(best)
+            if not time_left():
+                timed_out = True
+                break
+
+            # Binary search the minimal ngl in [0, max_ngl] meeting the target at
+            # every ctx candidate (not just the first -- a larger ctx can need
+            # more offload than the first ctx's minimum).
+            lo, hi = 0, max_ngl
+            best = top  # already known to satisfy the target at every ctx
+            calls = 0
+            while lo < hi and calls < target.ngl_max_calls and time_left():
+                mid = (lo + hi) // 2
+                r = cached_bench(mid, target.ctx)
+                consider_best_effort(r)
+                calls += 1
+                if r.gen_tok_per_sec >= target.target_tokens_per_sec and verify_other_ctx(mid):
+                    best = r
+                    hi = mid
+                else:
+                    lo = mid + 1
+            if not time_left():
+                timed_out = True
+
+            progress(f"[{quant}] found ngl={best.candidate.ngl} meeting target -- done")
+            return build_result(best)
+        finally:
+            if target.low_disk and not keep_candidate:
+                cand_gguf.unlink(missing_ok=True)
+    if target.low_disk and best_effort is not None:
+        quantize(
+            model_info.base_gguf_path,
+            best_effort.config.quant,
+            work_dir,
+            binaries,
+            model_fp,
+        )
 
     if timed_out:
         # A time-out is not proof that no config is feasible -- return the

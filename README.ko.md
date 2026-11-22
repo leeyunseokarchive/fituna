@@ -406,3 +406,41 @@ Pull Request → CI·서면 리뷰 → `main` 병합**
 [오픈소스 활용](docs/OPEN_SOURCE_USAGE.md) ·
 [AI 활용 개발 공개](docs/AI_MODEL_USAGE.md) · [CHANGELOG.md](CHANGELOG.md) ·
 [SECURITY.md](SECURITY.md)
+
+## 저용량 모드 (`--low-disk`)
+
+저장 공간이 부족한 환경에서는 `fituna run`에 `--low-disk`를 추가할 수 있습니다.
+
+```bash
+fituna run --model ./base-f16.gguf --quality-corpus ./wiki.txt --target-tps 20 --max-quality-loss 5 --out ./out-low-disk --resume --low-disk
+```
+
+위 예시의 모델·코퍼스 경로와 목표값은 실행 환경에 맞게 변경합니다.
+llama.cpp 실행 도구가 PATH에 없다면 `--llama-bin-dir`로 위치를 지정합니다.
+
+품질 측정이 끝난 후보 파일은 삭제하고, 실측 품질 순서에 따라
+속도 측정에 필요한 후보를 다시 생성합니다. 최종 선택된 파일만 남기며,
+모든 후보가 목표에 미달하면 최선의 시도로 보고할 후보 파일을 복원합니다.
+
+### 파일 정리 범위
+
+전용 출력 폴더를 사용하는 것을 권장합니다.
+
+- 탐색 시작 시 같은 모델 지문과 요청한 지원 quant에 해당하는
+  이전 후보 파일 및 해당 후보의 임시 파일을 정리합니다.
+- 원본 모델, 다른 모델, 요청하지 않은 quant 파일,
+  품질 평가용 기준 logits 파일은 삭제하지 않습니다.
+- 원본 외 관리 대상 후보 GGUF를 한 번에 하나씩 보관합니다.
+  보존되는 다른 파일과 캐시·코퍼스의 공간은 별도로 필요합니다.
+- 같은 출력 폴더에서 여러 탐색을 동시에 실행하지 마세요.
+
+### 시간과 캐시
+
+저용량 모드는 재양자화가 필요하므로 실행 시간이 늘어날 수 있습니다.
+`--resume`을 사용하면 측정값을 재사용하지만, 최종 모델 파일이 없다면
+다시 생성해야 합니다.
+
+옵션을 지정하지 않으면 기존 동작을 사용합니다.
+이번 옵션은 CLI에서 제공하며 MCP와 대화형 quickstart에는 추가하지 않았습니다.
+
+실측 조건과 비교 결과는 [저용량 모드 비교 실험](docs/RESULTS.md)을 참고하세요.

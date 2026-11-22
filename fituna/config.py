@@ -65,6 +65,7 @@ class TargetSpec:
     # or a larger value explicitly when a more rigorous evaluation is needed.
     ppl_chunks: Optional[int] = 32
     quality_metric: str = "ppl"  # "ppl" | "kld"
+    low_disk: bool = False  # True이면 후보 GGUF를 한 번에 하나만 보관
 
     def __post_init__(self) -> None:
         check_target_ranges(

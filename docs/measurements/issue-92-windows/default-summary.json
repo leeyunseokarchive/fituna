@@ -1,0 +1,37 @@
+{
+  "mode": "default",
+  "command": [
+    "run",
+    "--model",
+    "C:\\Users\\baese\\osproject\\fituna-measurement\\SmolLM2-135M-Instruct-f16.gguf",
+    "--quality-corpus",
+    "C:\\Users\\baese\\osproject\\fituna-measurement\\wiki.txt",
+    "--llama-bin-dir",
+    "C:\\Users\\baese\\osproject\\llama-bin",
+    "--out",
+    "C:\\Users\\baese\\osproject\\fituna-measurement\\default",
+    "--gpu",
+    "none",
+    "--quant",
+    "Q8_0,Q6_K,Q4_K_M",
+    "--target-tps",
+    "1",
+    "--max-quality-loss",
+    "20",
+    "--ppl-chunks",
+    "1",
+    "--ctx",
+    "512",
+    "--resume",
+    "--json"
+  ],
+  "exit_code": 0,
+  "wall_seconds": 12.83420040004421,
+  "peak_gguf_bytes": 659534080,
+  "quantization_seconds": 2.6007579000433907,
+  "remaining_candidates": [
+    "SmolLM2-135M-Instruct-b070cb3223ca-Q4_K_M.gguf",
+    "SmolLM2-135M-Instruct-b070cb3223ca-Q6_K.gguf",
+    "SmolLM2-135M-Instruct-b070cb3223ca-Q8_0.gguf"
+  ]
+}
