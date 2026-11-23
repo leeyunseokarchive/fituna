@@ -375,3 +375,22 @@ def test_ctrl_c_is_a_one_line_notice_not_a_traceback(monkeypatch, capsys):
     err = capsys.readouterr().err
     assert "interrupted" in err
     assert "Traceback" not in err
+
+
+@pytest.mark.parametrize("low_disk", [False, True])
+def test_low_disk_flag_reaches_search(tmp_path, monkeypatch, low_disk):
+    """--low-disk on the command line reaches TargetSpec.low_disk."""
+
+    def fake_search(*args, **kwargs):
+        # The first argument is the TargetSpec.
+        assert args[0].low_disk is low_disk
+
+        # Return a canned result instead of running a model.
+        return _fake_result(args[4])
+
+    model, wikitext, out = _setup(monkeypatch, tmp_path, fake_search)
+
+    extra = ["--low-disk"] if low_disk else []
+    result = cli.main(_run_argv(model, wikitext, out, extra=extra))
+
+    assert result == 0
