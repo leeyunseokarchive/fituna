@@ -7,6 +7,8 @@
 
 ## [미출시]
 
+## [0.3.8] — 2026-11-25
+
 ### 추가
 
 - **`--low-disk`: 탐색 중 후보 GGUF를 하나씩만 디스크에 둡니다.** 후보마다 양자화 → 품질
@@ -24,6 +26,11 @@
 - **Ollama 라이선스와 결합 방식 기록.** `--export-ollama`가 쓰는 Ollama `Modelfile`
   형식을 `docs/OPEN_SOURCE_USAGE.md` §15와 `THIRD_PARTY_NOTICES.md` §6에 추가했습니다.
   Ollama는 MIT이며, FiTuna는 텍스트 파일만 쓰고 Ollama를 포함하거나 실행하지 않습니다.
+
+### 테스트
+
+- **`model_info.py`의 GGUF 헤더 파서 테스트 추가**([#103](https://github.com/leeyunseokarchive/fituna/pull/103), @amarjithkumar2007-wq, #94).
+- **`_detect_ram_mb()`의 OS별 분기 테스트 추가**([#104](https://github.com/leeyunseokarchive/fituna/pull/104), @amarjithkumar2007-wq, #95).
 
 ## [0.3.7] — 2026-10-28
 
@@ -451,7 +458,8 @@ subprocess 계층을 의도적으로 모의 처리하므로, 실제 llama.cpp �
 - `--wikitext`를 `--quality-corpus`로 바꿨습니다. 이전 이름을 alias로
   유지하므로 호환성을 깨는 변경은 아닙니다.
 
-[미출시]: https://github.com/leeyunseokarchive/fituna/compare/v0.3.7...HEAD
+[미출시]: https://github.com/leeyunseokarchive/fituna/compare/v0.3.8...HEAD
+[0.3.8]: https://github.com/leeyunseokarchive/fituna/releases/tag/v0.3.8
 [0.3.7]: https://github.com/leeyunseokarchive/fituna/releases/tag/v0.3.7
 [0.3.6]: https://github.com/leeyunseokarchive/fituna/releases/tag/v0.3.6
 [0.3.5]: https://github.com/leeyunseokarchive/fituna/releases/tag/v0.3.5
