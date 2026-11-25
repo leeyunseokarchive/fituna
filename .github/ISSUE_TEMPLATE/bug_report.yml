@@ -1,0 +1,57 @@
+name: Bug report / 버그 신고
+description: Something failed or behaved differently than expected. / 오류가 나거나 예상과 다르게 동작했습니다.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. English or Korean is fine. For security issues, follow [SECURITY.md](https://github.com/leeyunseokarchive/fituna/blob/main/SECURITY.md) instead of opening a public issue.
+        신고해 주셔서 감사합니다. 영어나 한국어 모두 괜찮습니다. 보안 문제는 공개 이슈 대신 [SECURITY.md](https://github.com/leeyunseokarchive/fituna/blob/main/SECURITY.md) 안내를 따라 주세요.
+  - type: textarea
+    id: command
+    attributes:
+      label: Command you ran / 실행한 명령
+      description: The full `fituna` command. / 실행한 `fituna` 명령 전체를 붙여 주세요.
+      render: shell
+      placeholder: fituna run --hf ... --target-tps 30 --max-quality-loss 5 ...
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened / 발생한 현상
+      description: The error output or the result that looked wrong. / 오류 출력이나 이상해 보인 결과를 적어 주세요.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected / 기대한 동작
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: FiTuna version / FiTuna 버전
+      description: Output of `fituna --version`. / `fituna --version` 출력
+      placeholder: fituna 0.3.8
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Environment / 실행 환경
+      description: |
+        Output of `fituna doctor` (or `fituna detect-hw` and `fituna list-binaries`). Add `--llama-bin-dir <dir>` if llama.cpp is not on PATH.
+        `fituna doctor` 출력(또는 `fituna detect-hw`, `fituna list-binaries` 출력)을 붙여 주세요. llama.cpp가 PATH에 없으면 `--llama-bin-dir <경로>`를 붙여 주세요.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else / 기타
+      description: Model used, how llama.cpp was installed, exit code, etc. / 사용한 모델, llama.cpp 설치 방법, 종료 코드 등
+    validations:
+      required: false

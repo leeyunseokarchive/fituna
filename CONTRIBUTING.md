@@ -8,9 +8,10 @@ Thanks for your interest. FiTuna is a small Python CLI with no runtime dependenc
 
 ### Ways to contribute
 
-- **Report a test run on your hardware.** No code needed. See [#93](https://github.com/leeyunseokarchive/fituna/issues/93).
+- **Report a test run on your hardware.** No code needed. Use the [test report form](https://github.com/leeyunseokarchive/fituna/issues/new?template=test_report.yml); [#93](https://github.com/leeyunseokarchive/fituna/issues/93) lists the commands to run.
 - **Pick an issue.** [`good first issue`](https://github.com/leeyunseokarchive/fituna/labels/good%20first%20issue) is scoped for a first PR; [`help wanted`](https://github.com/leeyunseokarchive/fituna/labels/help%20wanted) needs hardware or knowledge the maintainer doesn't have.
 - **Report a bug or suggest a feature** with the issue templates.
+- **Ask a question or share an early idea** in [Discussions](https://github.com/leeyunseokarchive/fituna/discussions).
 
 Before you start on an issue, leave a comment saying you're taking it, so two people don't open the same PR. For a new feature, open an issue first and agree on the approach before writing code. Check the pinned issues for any temporary policy, such as a release freeze.
 
@@ -73,9 +74,10 @@ By contributing, you agree that your contribution is distributed under the [MIT 
 
 ### 기여 방법
 
-- **내 기기에서 실행해 보고 결과 알려 주기.** 코드 작성은 필요 없습니다. [#93](https://github.com/leeyunseokarchive/fituna/issues/93)을 참고해 주세요.
+- **내 기기에서 실행해 보고 결과 알려 주기.** 코드 작성은 필요 없습니다. [실행 결과 제보 양식](https://github.com/leeyunseokarchive/fituna/issues/new?template=test_report.yml)으로 올려 주시면 되고, 실행할 명령은 [#93](https://github.com/leeyunseokarchive/fituna/issues/93)에 있습니다.
 - **이슈 골라서 작업하기.** [`good first issue`](https://github.com/leeyunseokarchive/fituna/labels/good%20first%20issue)는 첫 PR에 맞는 크기로 정리한 이슈이고, [`help wanted`](https://github.com/leeyunseokarchive/fituna/labels/help%20wanted)는 메인테이너에게 없는 하드웨어나 지식이 필요한 이슈입니다.
 - **버그 신고나 기능 제안**은 이슈 템플릿으로 올려 주세요.
+- **사용법 질문이나 아직 막연한 아이디어**는 [Discussions](https://github.com/leeyunseokarchive/fituna/discussions)에 남겨 주세요.
 
 이슈 작업을 시작하기 전에 맡겠다는 코멘트를 남겨 주세요. 두 사람이 같은 PR을 여는 일을 막을 수 있습니다. 새 기능은 코드를 쓰기 전에 이슈를 먼저 열어 방향을 맞춰 주세요. 릴리스 동결 같은 임시 정책은 고정된(pinned) 이슈에서 확인할 수 있습니다.
 
