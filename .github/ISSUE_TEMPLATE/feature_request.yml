@@ -1,0 +1,40 @@
+name: Feature request / 기능 제안
+description: Suggest an improvement. For open-ended ideas, Discussions may fit better. / 개선할 기능을 제안합니다. 아직 막연한 아이디어라면 Discussions가 더 잘 맞을 수 있습니다.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please check the [roadmap issues](https://github.com/leeyunseokarchive/fituna/labels/roadmap) first. Your idea may already have a tracking issue you can comment on.
+        먼저 [로드맵 이슈](https://github.com/leeyunseokarchive/fituna/labels/roadmap)를 확인해 주세요. 이미 같은 내용을 다루는 이슈가 있으면 거기에 의견을 남겨 주셔도 됩니다.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve / 해결하려는 문제
+      description: What were you trying to do, and what got in the way? / 무엇을 하려고 했고, 무엇이 불편했는지 적어 주세요.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior / 제안하는 동작
+      description: What should FiTuna do? An example command or output helps. / FiTuna가 어떻게 동작하면 좋을지 적어 주세요. 예시 명령이나 출력이 있으면 좋습니다.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered / 검토한 대안
+      description: Workarounds or other tools you tried. / 시도해 본 우회 방법이나 다른 도구
+    validations:
+      required: false
+  - type: dropdown
+    id: contribute
+    attributes:
+      label: Would you like to work on it? / 직접 구현해 보실 생각이 있나요?
+      options:
+        - "Yes / 네"
+        - "Maybe, with some guidance / 도움을 받으면 해 볼 수 있어요"
+        - "No / 아니요"
+    validations:
+      required: false

@@ -1,0 +1,77 @@
+name: Test report / 실행 결과 제보
+description: Share how FiTuna ran on your hardware, whether it worked or not. No code needed. / 내 기기에서 FiTuna를 실행한 결과를 알려 주세요. 성공이든 실패든 도움이 됩니다. 코드 작성은 필요 없습니다.
+title: "[Test report] "
+labels: ["area: platform"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        FiTuna has been measured end to end only on an Apple M3 Pro and an NVIDIA T4, so a run from any other machine helps. See [#93](https://github.com/leeyunseokarchive/fituna/issues/93) for the suggested commands. Reporters are credited in `docs/RESULTS.md`.
+        FiTuna는 지금까지 Apple M3 Pro와 NVIDIA T4에서만 처음부터 끝까지 실측했습니다. 다른 기기에서 나온 결과라면 무엇이든 도움이 됩니다. 실행할 명령은 [#93](https://github.com/leeyunseokarchive/fituna/issues/93)을 참고해 주세요. 제보자 이름은 `docs/RESULTS.md`에 함께 기록합니다.
+
+        Exit code 3 (`BEST EFFORT`) is not a bug: no configuration met the target, and FiTuna reports the closest one.
+        종료 코드 3(`BEST EFFORT`)은 버그가 아닙니다. 목표를 만족하는 구성이 없어서 가장 가까운 구성을 보고했다는 뜻입니다.
+  - type: input
+    id: device
+    attributes:
+      label: Device / 기기
+      description: CPU, GPU and RAM. / CPU, GPU, 메모리
+      placeholder: Ryzen 7 5800X, RTX 3060 12GB, 32GB RAM
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: OS / 운영체제
+      options:
+        - macOS
+        - Linux
+        - Windows
+        - Other / 기타
+    validations:
+      required: true
+  - type: input
+    id: llama
+    attributes:
+      label: llama.cpp install and build / llama.cpp 설치 방법과 빌드 번호
+      description: From `fituna list-binaries`. / `fituna list-binaries` 출력에서 확인할 수 있습니다.
+      placeholder: Homebrew, build 9960
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: FiTuna version / FiTuna 버전
+      placeholder: fituna 0.3.8
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: "`fituna doctor` and `fituna detect-hw` output / 출력"
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: "`fituna run` command / 실행한 명령"
+      render: shell
+      placeholder: fituna run --hf bartowski/SmolLM2-135M-Instruct-GGUF --target-tps 240 --max-quality-loss 5 --ctx 2048 --quality-corpus wiki.txt --out ./out --resume
+    validations:
+      required: false
+  - type: textarea
+    id: result
+    attributes:
+      label: Result / 결과
+      description: The final result block, exit code, and roughly how long it took. / 마지막 결과 블록, 종료 코드, 대략적인 소요 시간
+      render: text
+    validations:
+      required: false
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything that looked wrong / 이상해 보인 점
+      description: A wrong GPU name, VRAM shown as 0, a confusing message, etc. / 틀린 GPU 이름, 0으로 나온 VRAM, 이해하기 어려운 메시지 등
+    validations:
+      required: false
