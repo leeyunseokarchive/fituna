@@ -7,6 +7,22 @@
 
 ## [미출시]
 
+## [0.4.0] — 2026-11-27
+
+저용량 모드(`--low-disk`, 0.3.8)를 실제 엣지 기기에서 검증한 결과를 담은 릴리스입니다.
+코드 동작은 0.3.8과 같습니다.
+
+### 문서
+
+- **Raspberry Pi 4(4GB)에서 `llama-bench` 스레드별 측정과 `--low-disk` 검증 결과 추가.**
+  `docs/edge/`에 측정 환경과 결과표를 기록했습니다. 생성 속도는 4스레드보다
+  3스레드가 빨랐고, 팬 없이 연속 측정하면 약 30분 뒤 thermal throttling으로 값이 낮아졌습니다.
+  `--low-disk`는 9가지 시나리오에서 기대대로 동작했고, `--out`의 디스크 최대 사용량이
+  기본 모드 대비 약 71% 줄었습니다([#109](https://github.com/leeyunseokarchive/fituna/pull/109), @jeonghun43, #56, #92).
+  검증 중 찾은 개선점은 #110~#113으로 등록했습니다.
+- **이슈 템플릿을 영어·한국어 이슈 폼으로 교체하고, 실행 결과 제보 폼과 Discussions 링크 추가**
+  ([#108](https://github.com/leeyunseokarchive/fituna/pull/108)).
+
 ## [0.3.8] — 2026-11-25
 
 ### 추가
@@ -458,7 +474,8 @@ subprocess 계층을 의도적으로 모의 처리하므로, 실제 llama.cpp �
 - `--wikitext`를 `--quality-corpus`로 바꿨습니다. 이전 이름을 alias로
   유지하므로 호환성을 깨는 변경은 아닙니다.
 
-[미출시]: https://github.com/leeyunseokarchive/fituna/compare/v0.3.8...HEAD
+[미출시]: https://github.com/leeyunseokarchive/fituna/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/leeyunseokarchive/fituna/releases/tag/v0.4.0
 [0.3.8]: https://github.com/leeyunseokarchive/fituna/releases/tag/v0.3.8
 [0.3.7]: https://github.com/leeyunseokarchive/fituna/releases/tag/v0.3.7
 [0.3.6]: https://github.com/leeyunseokarchive/fituna/releases/tag/v0.3.6
