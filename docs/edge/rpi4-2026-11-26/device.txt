@@ -1,0 +1,27 @@
+## date
+2026-11-25T17:21:23+09:00
+## model
+Raspberry Pi 4 Model B Rev 1.5
+## arch
+aarch64
+## bits
+64
+## os
+PRETTY_NAME="Debian GNU/Linux 13 (trixie)"
+## kernel
+6.18.50+rpt-rpi-v8
+## cores
+4
+## memory
+               total        used        free      shared  buff/cache   available
+Mem:           3.7Gi       417Mi       2.1Gi        34Mi       1.3Gi       3.3Gi
+Swap:          2.0Gi          0B       2.0Gi
+## disk
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/mmcblk0p2   29G  6.9G   21G  26% /
+## temp
+temp=46.2'C
+## throttled
+throttled=0x0
+## governor
+ondemand
